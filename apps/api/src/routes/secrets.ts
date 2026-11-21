@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { agentGuard } from "../agent-guard.ts";
 import { audit } from "../audit.ts";
 import { lapsedGrant } from "../grants.ts";
 import { NAME_RE } from "../limits.ts";
@@ -151,6 +152,18 @@ secrets.get("/secret", async (c) => {
     });
     return c.json({ error: "access has expired" }, 403);
   }
+  // ADR 17: agent rules for this path (reason, approval for */prod, per-hour budget). Refusals are audited.
+  const guard = await agentGuard(
+    c.env.DB,
+    who,
+    path,
+    c.req.header("X-Cfs-Reason"),
+    c.req.header("CF-Connecting-IP"),
+  );
+  if (!guard.ok) {
+    if (guard.retryAfter) c.header("Retry-After", String(guard.retryAfter));
+    return c.json({ error: guard.error }, guard.status);
+  }
   const want = c.req.query("version");
   const row = await c.env.DB.prepare(
     `SELECT v.version, v.keyring_version AS keyringVersion, v.names, v.wrapped_dek AS wrappedDek, v.ciphertext, v.created_at AS createdAt
@@ -166,6 +179,7 @@ secrets.get("/secret", async (c) => {
     path,
     version: row.version,
     result: "ok",
+    note: guard.note,
     ip: c.req.header("CF-Connecting-IP"),
   });
   return c.json({ ...row, names: JSON.parse(row.names) });

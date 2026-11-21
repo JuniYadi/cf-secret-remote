@@ -161,7 +161,11 @@ function fail(status: number, body: unknown, what: string): never {
   throw new CliError(`${what}: ${msg}`);
 }
 
-async function groupKey(c: Client, prefix: string): Promise<{ key: Uint8Array; version: number }> {
+/** The group key for `prefix` at the current version. Exported for the agent proxy (ADR 17). */
+export async function groupKey(
+  c: Client,
+  prefix: string,
+): Promise<{ key: Uint8Array; version: number }> {
   if (!c.privateKey) throw new CliError("Your vault is locked. Run: cfs unlock");
   const [me, k] = await Promise.all([
     c.call<{ publicKey: string }>("GET", "/whoami"),
