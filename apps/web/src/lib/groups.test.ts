@@ -72,7 +72,7 @@ async function groupFixture(count: number, oldKey: Uint8Array, prefix = "data") 
       ciphertext: sealed.ciphertext,
       createdAt: 1,
     });
-    list.push({ path, version: 2, updatedAt: 1, names: ["K"] });
+    list.push({ path, version: 2, updatedAt: 1, names: ["K"], meta: {} });
   }
   return { store, list };
 }
@@ -145,9 +145,9 @@ describe("chunking and the group view", () => {
 
   it("keeps only the secrets under the group's own prefix", () => {
     const list: SecretListRow[] = [
-      { path: "data/a", version: 1, updatedAt: 1, names: [] },
-      { path: "data2/a", version: 1, updatedAt: 1, names: [] },
-      { path: "other/x", version: 1, updatedAt: 1, names: [] },
+      { path: "data/a", version: 1, updatedAt: 1, names: [], meta: {} },
+      { path: "data2/a", version: 1, updatedAt: 1, names: [], meta: {} },
+      { path: "other/x", version: 1, updatedAt: 1, names: [], meta: {} },
     ];
     expect(groupSecrets(list, "data").map((s) => s.path)).toEqual(["data/a"]);
   });

@@ -32,7 +32,7 @@ async function fixtures(count: number) {
       ciphertext: sealed.ciphertext,
       createdAt: 1,
     });
-    secrets.push({ path, version: 2, updatedAt: 1, names: ["TOKEN"] });
+    secrets.push({ path, version: 2, updatedAt: 1, names: ["TOKEN"], meta: {} });
   }
   return { oldKey, admin, store, secrets };
 }

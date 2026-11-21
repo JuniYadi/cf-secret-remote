@@ -359,12 +359,8 @@ export interface PolicyRow {
   assignees: PolicyAssignee[];
 }
 
-export interface SecretListRow {
-  path: string;
-  version: number;
-  updatedAt: number;
-  names: string[];
-}
+/** GET /secrets row. The same shape the secrets screens read (names and metadata, never values). */
+export type SecretListRow = SecretSummary;
 
 /** One stored version. Ciphertext only; opening it needs the group key. */
 export interface SecretVersion {
@@ -466,7 +462,7 @@ export const api = {
     request<VersionRow[]>("GET", `/secret/versions${queryString({ path })}`),
   secretHistory: (path: string) =>
     request<SecretHistory>("GET", `/secret/history${queryString({ path })}`),
-  keyrings: () => request<{ prefix: string; version: number }[]>("GET", "/keyrings"),
+  keyrings: () => request<KeyringRow[]>("GET", "/keyrings"),
 
   // Agent rules (ADR 17)
   apps: () => request<AppRow[]>("GET", "/apps"),
@@ -487,7 +483,6 @@ export const api = {
   cliApprove: (userCode: string) => request<{ ok: true }>("POST", "/cli/approve", { userCode }),
 
   // Groups (ADR 3, 14). `identities` is above, shared with the access requests part.
-  keyrings: () => request<KeyringRow[]>("GET", "/keyrings"),
   keyringMembers: (prefix: string) =>
     request<GroupMember[]>("GET", `/keyrings/${encodeURIComponent(prefix)}/members`),
   myGroupKey: (prefix: string) =>
@@ -533,7 +528,6 @@ export const api = {
     request<{ ok: true }>("POST", "/invites", { email, role }),
 
   // Secrets, read only here (names and ciphertext for re-locking)
-  secrets: () => request<SecretListRow[]>("GET", "/secrets"),
   secretVersion: (path: string) =>
     request<SecretVersion>("GET", `/secret?path=${encodeURIComponent(path)}`),
 

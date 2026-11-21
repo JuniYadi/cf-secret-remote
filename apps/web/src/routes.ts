@@ -307,6 +307,7 @@ export function pageCrumbs(id: PageId, name?: string): Crumb[] {
         secrets,
         { label: name ?? "", href: secretHref(name) },
         { label: t("Access history", "Riwayat akses") },
+      ];
     case "groupNew":
       return [groups, { label: t("New group", "Grup baru") }];
     case "groupDetail":
