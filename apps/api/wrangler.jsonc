@@ -3,6 +3,8 @@
   "name": "cfs",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",
+  // AsyncLocalStorage, used to hand the request context to the alert evaluator (src/alerts.ts, ADR 18).
+  "compatibility_flags": ["nodejs_als"],
 
   "assets": {
     "directory": "../web/dist",

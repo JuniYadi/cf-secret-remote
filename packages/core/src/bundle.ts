@@ -11,6 +11,8 @@ export interface BundleManifest {
   /** Worker entry file, relative to the bundle root. */
   main: string;
   compatibility_date: string;
+  /** Worker compatibility flags from wrangler.jsonc, e.g. "nodejs_als". Missing in older bundles. */
+  compatibility_flags: string[];
   crons: string[];
   /** Static asset settings copied from wrangler.jsonc. */
   assets: { not_found_handling: string; run_worker_first: string[] };
@@ -37,6 +39,9 @@ export function parseManifest(raw: unknown): BundleManifest {
   if (typeof raw.main !== "string" || !raw.main) throw new Error("manifest: main missing.");
   if (typeof raw.compatibility_date !== "string")
     throw new Error("manifest: compatibility_date missing.");
+  if (raw.compatibility_flags === undefined) raw.compatibility_flags = [];
+  if (!isStrings(raw.compatibility_flags))
+    throw new Error("manifest: compatibility_flags must be a list of strings.");
   if (!isStrings(raw.crons)) throw new Error("manifest: crons must be a list of strings.");
   if (
     !isObj(raw.assets) ||
