@@ -67,7 +67,7 @@ secrets.get("/secret", async (c) => {
   const row = await c.env.DB.prepare(
     `SELECT v.version, v.keyring_version AS keyringVersion, v.names, v.wrapped_dek AS wrappedDek, v.ciphertext, v.created_at AS createdAt
      FROM secret s JOIN secret_version v ON v.secret_id = s.id AND v.version = COALESCE(?, s.current)
-     WHERE s.path = ? AND s.deleted_at IS NULL`,
+     WHERE s.path = ? AND s.deleted_at IS NULL AND v.version <= s.current`,
   )
     .bind(want ? Number(want) : null, path)
     .first<{ version: number; names: string }>();
@@ -109,10 +109,13 @@ secrets.put("/secret", async (c) => {
   }
   if (names.some((n) => typeof n !== "string" || !NAME_RE.test(n)))
     return c.json({ error: "bad name" }, 400);
-  const keyring = await c.env.DB.prepare("SELECT id, version FROM keyring WHERE prefix = ?")
+  const keyring = await c.env.DB.prepare("SELECT id, version, status FROM keyring WHERE prefix = ?")
     .bind(prefixOf(path))
-    .first<{ id: string; version: number }>();
+    .first<{ id: string; version: number; status: string }>();
   if (!keyring) return c.json({ error: "create the group first" }, 409);
+  // ADR 14: no writes while the group is rotating.
+  if (keyring.status === "rotating")
+    return c.json({ error: "group is rotating, writes are paused" }, 409);
   if (keyringVersion !== keyring.version)
     return c.json({ error: "group key changed, reload and retry" }, 409);
 
@@ -168,6 +171,14 @@ secrets.delete("/secret", async (c) => {
   const path = c.req.query("path") ?? "";
   if (!validPath(path)) return c.json({ error: "bad path" }, 400);
   if (!(await check(c, path, "delete"))) return c.json({ error: "denied" }, 403);
+  // ADR 14: no writes while the group is rotating.
+  const grp = await c.env.DB.prepare(
+    "SELECT k.status FROM secret s JOIN keyring k ON k.id = s.keyring_id WHERE s.path = ? AND s.deleted_at IS NULL",
+  )
+    .bind(path)
+    .first<{ status: string }>();
+  if (grp?.status === "rotating")
+    return c.json({ error: "group is rotating, writes are paused" }, 409);
   const res = await c.env.DB.prepare(
     "UPDATE secret SET deleted_at = ? WHERE path = ? AND deleted_at IS NULL",
   )
@@ -191,7 +202,7 @@ secrets.get("/secret/versions", async (c) => {
   const rows = await c.env.DB.prepare(
     `SELECT v.version, v.names, v.created_at AS createdAt, i.name AS createdBy
      FROM secret s JOIN secret_version v ON v.secret_id = s.id JOIN identity i ON i.id = v.created_by
-     WHERE s.path = ? ORDER BY v.version DESC`,
+     WHERE s.path = ? AND v.version <= s.current ORDER BY v.version DESC`,
   )
     .bind(path)
     .all<{ names: string }>();
