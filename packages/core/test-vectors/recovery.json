@@ -1,0 +1,23 @@
+{
+  "name": "ADR 20 recovery phrase and fingerprint words",
+  "mnemonic": [
+    {
+      "entropyHex": "0000000000000000000000000000000000000000000000000000000000000000",
+      "words": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"
+    },
+    {
+      "entropyHex": "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+      "words": "legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title"
+    },
+    {
+      "entropyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "words": "abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware"
+    }
+  ],
+  "fingerprint": [
+    {
+      "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJ2hEYo9q0x3k7qkIskBE5SDryBZ1dQHhe1gHYR5EE8T9NXUwMHTCmgJ7S0osVvhgh0u-AEJvnNRJxaKdnR4SLQ",
+      "words": "envelope until chimney noble"
+    }
+  ]
+}

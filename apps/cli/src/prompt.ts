@@ -14,11 +14,11 @@ export async function confirm(question: string): Promise<boolean> {
   return /^y(es)?$/i.test(await ask(question));
 }
 
-/** Reads one line without echoing it. Falls back to CFS_PASSWORD for scripts. */
-export async function askHidden(label: string): Promise<string> {
-  if (process.env.CFS_PASSWORD) return process.env.CFS_PASSWORD;
+/** Reads one line without echoing it. Falls back to an environment variable (CFS_PASSWORD by default) for scripts. */
+export async function askHidden(label: string, envVar = "CFS_PASSWORD"): Promise<string> {
+  if (process.env[envVar]) return process.env[envVar] as string;
   if (!process.stdin.isTTY)
-    throw new Error("No terminal to ask for the vault password. Set CFS_PASSWORD.");
+    throw new Error(`No terminal to ask for the vault password. Set ${envVar}.`);
   process.stderr.write(label);
   process.stdin.setRawMode(true);
   process.stdin.resume();

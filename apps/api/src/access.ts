@@ -17,6 +17,20 @@ async function keys(env: Env): Promise<Jwk[]> {
 
 /** Verifies a Cloudflare Access JWT (RS256) and returns the user's email, or null. */
 export async function verifyAccessJwt(env: Env, jwt: string | undefined): Promise<string | null> {
+  return (await verifyAccessClaims(env, jwt))?.email ?? null;
+}
+
+export interface AccessClaims {
+  email: string;
+  /** Issued-at, unix seconds. ADR 20 uses it to require a fresh login for recovery. */
+  iat: number;
+}
+
+/** Verifies a Cloudflare Access JWT (RS256) and returns its email and issue time, or null. */
+export async function verifyAccessClaims(
+  env: Env,
+  jwt: string | undefined,
+): Promise<AccessClaims | null> {
   if (!jwt || !env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return null;
   const [h, p, s] = jwt.split(".");
   if (!h || !p || !s) return null;
@@ -43,13 +57,15 @@ export async function verifyAccessJwt(env: Env, jwt: string | undefined): Promis
       aud?: string[] | string;
       iss?: string;
       exp?: number;
+      iat?: number;
       email?: string;
     };
     const aud = Array.isArray(c.aud) ? c.aud : [c.aud];
     if (!aud.includes(env.ACCESS_AUD)) return null;
     if (c.iss !== `https://${env.ACCESS_TEAM_DOMAIN}`) return null;
     if (!c.exp || c.exp < Date.now() / 1000) return null;
-    return c.email?.toLowerCase() ?? null;
+    if (typeof c.iat !== "number" || !c.email) return null;
+    return { email: c.email.toLowerCase(), iat: c.iat };
   } catch {
     return null;
   }
