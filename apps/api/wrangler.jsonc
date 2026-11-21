@@ -28,8 +28,14 @@
     "BOOTSTRAP_ADMIN_EMAIL": "",
     // Cloudflare Access team domain and application audience, used to check sign-in tokens.
     "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    "ACCESS_AUD": "",
+    // ADR 19: audit retention in days. Minimum 90 is enforced in code.
+    "AUDIT_RETENTION_DAYS": "365"
+    // Optional: CHECKPOINT_WEBHOOK_URL as a var or secret. The daily checkpoint is posted there when set.
   },
+
+  // ADR 19: 00:05 UTC checkpoint, pruning, and sweeps. Runs `scheduled` in src/index.ts.
+  "triggers": { "crons": ["5 0 * * *"] },
 
   "observability": { "enabled": true }
 }

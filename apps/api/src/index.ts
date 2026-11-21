@@ -1,7 +1,9 @@
 import { PROTOCOL_VERSION } from "@cfs/core";
 import { Hono } from "hono";
 import { authenticate } from "./auth.ts";
+import { runDaily } from "./cron.ts";
 import { bodyLimit } from "./limits.ts";
+import { isQuotaError, retryAfterSeconds } from "./quota.ts";
 import { admin } from "./routes/admin.ts";
 import { agent_rules } from "./routes/agent-rules.ts";
 import { alerts } from "./routes/alerts.ts";
@@ -19,7 +21,8 @@ import { requests } from "./routes/requests.ts";
 import { secrets } from "./routes/secrets.ts";
 import { sessions } from "./routes/sessions.ts";
 import { versions } from "./routes/versions.ts";
-import type { AppEnv } from "./types.ts";
+import type { AppEnv, Env } from "./types.ts";
+import { now } from "./util.ts";
 
 const app = new Hono<AppEnv>();
 app.use("/api/*", bodyLimit);
@@ -51,8 +54,18 @@ app.route("/api/v1", v1);
 
 app.all("/api/*", (c) => c.json({ error: "not found" }, 404));
 app.onError((e, c) => {
+  // ADR 19: D1 over the daily quota. Writes wait until 00:00 UTC; reads and audit appends fail open (see audit.ts).
+  if (isQuotaError(e)) {
+    c.header("Retry-After", String(retryAfterSeconds(now())));
+    return c.json({ error: "daily free-tier quota reached, retry after 00:00 UTC" }, 503);
+  }
   console.error(e.message); // never log request bodies
   return c.json({ error: "server error" }, 500);
 });
 
-export default app;
+export default {
+  fetch: (req: Request, env: Env, ctx: ExecutionContext) => app.fetch(req, env, ctx),
+  // ADR 19: the 00:05 UTC cron.
+  scheduled: (event: ScheduledController, env: Env, ctx: ExecutionContext) =>
+    ctx.waitUntil(runDaily(env, Math.floor(event.scheduledTime / 1000))),
+};
