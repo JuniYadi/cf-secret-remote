@@ -121,8 +121,12 @@ async function groupAdd(prefix: string, email: string) {
 
 // Removal: the server ends the removed person's access, then the secrets are re-encrypted under a
 // new group key in chunks. Any failure after the start aborts the rotation.
-async function groupRemove(prefix: string, email: string) {
-  const c = await connect();
+// Exported for offboarding (ADR 21), which removes a person from each group with this same flow.
+export async function removeMember(
+  c: Client,
+  prefix: string,
+  email: string,
+): Promise<{ count: number; newVersion: number }> {
   const mine = await myGroupKey(c, prefix);
   const target = await identityByEmail(c, email.toLowerCase());
   const members = await groupMembers(c, prefix);
@@ -180,6 +184,12 @@ async function groupRemove(prefix: string, email: string) {
     await c.call("POST", `/keyrings/${prefix}/rotate/abort`, {});
     throw e;
   }
+  return { count, newVersion };
+}
+
+async function groupRemove(prefix: string, email: string) {
+  const c = await connect();
+  const { count, newVersion } = await removeMember(c, prefix, email);
   console.log(
     `${email} removed from "${prefix}". ${count} secret(s) re-encrypted under key version ${newVersion}.`,
   );
