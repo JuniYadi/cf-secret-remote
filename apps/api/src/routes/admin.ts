@@ -4,12 +4,11 @@ import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { prefixOf } from "../policy.ts";
 import type { AppEnv } from "../types.ts";
-import { newId, newToken, now, sha256Hex } from "../util.ts";
+import { newId } from "../util.ts";
 
 export const admin = new Hono<AppEnv>();
 admin.use("/policies/*", requireAdmin);
 admin.use("/policies", requireAdmin);
-admin.use("/apps", requireAdmin);
 admin.use("/audit/*", requireAdmin);
 admin.use("/audit", requireAdmin);
 
@@ -64,48 +63,6 @@ admin.post("/policies/:id/assign", async (c) => {
     result: "ok",
   });
   return c.json({ ok: true });
-});
-
-// New app/bot. The browser makes its key pair and puts the private key in the kit; only the public key comes here.
-// secret_id is returned once and stored as a hash.
-admin.post("/apps", async (c) => {
-  const b = await c.req.json<{
-    name?: string;
-    publicKey?: string;
-    tokenTtl?: number;
-    maxUses?: number;
-    cidr?: string;
-  }>();
-  if (!b.name || !b.publicKey) return c.json({ error: "bad request" }, 400);
-  const id = newId();
-  const roleId = newId();
-  const secretId = newToken("cfssid");
-  try {
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        "INSERT INTO identity (id, kind, name, role, public_key, created_at) VALUES (?, 'app', ?, 'member', ?, ?)",
-      ).bind(id, b.name, b.publicKey, now()),
-      c.env.DB.prepare(
-        "INSERT INTO app_role (identity_id, role_id, secret_hash, token_ttl, max_uses, cidr) VALUES (?, ?, ?, ?, ?, ?)",
-      ).bind(
-        id,
-        roleId,
-        await sha256Hex(secretId),
-        b.tokenTtl ?? 3600,
-        b.maxUses ?? null,
-        b.cidr ?? null,
-      ),
-    ]);
-  } catch {
-    return c.json({ error: "name already used" }, 409);
-  }
-  await audit(c.env.DB, {
-    who: c.get("who").name,
-    action: "app.create",
-    note: b.name,
-    result: "ok",
-  });
-  return c.json({ id, roleId, secretId }, 201);
 });
 
 admin.get("/audit", async (c) => {

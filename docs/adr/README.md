@@ -20,7 +20,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [12](0012-cli-unlock-and-local-state.md) | CLI unlock and local state | implemented; keychain in 25 |
 | [13](0013-cli-host-config-and-run.md) | CLI host, config and run | partly; rest in 25 |
 | [14](0014-membership-and-rotation.md) | Membership and key rotation | planned |
-| [15](0015-apps-and-bots-lifecycle.md) | Apps and bots lifecycle | planned |
+| [15](0015-apps-and-bots-lifecycle.md) | Apps and bots lifecycle | implemented |
 | [16](0016-access-requests.md) | Access requests with approval | planned |
 | [17](0017-agent-proxy-and-rules.md) | Agent proxy and rules | planned |
 | [18](0018-alerts-and-notifications.md) | Alerts and notifications | planned |
