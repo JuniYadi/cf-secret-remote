@@ -1,45 +1,23 @@
 import { unlockPrivateKey } from "@cfs/core";
 import { flag } from "../args.ts";
-import { anonymous, CliError, connect } from "../client.ts";
-import { clearSession, loadSession, resolveHost, saveHost, saveSession } from "../config.ts";
+import { CliError, connect } from "../client.ts";
+import { currentProfile, loadSession, resolveHost, saveSession } from "../config.ts";
+import { clearUnlock, DEFAULT_TTL, parseTtl, pickStore, saveUnlock } from "../keychain.ts";
 import { askHidden } from "../prompt.ts";
+import { signIn } from "../signin.ts";
 import type { Commands } from "./types.ts";
 
-async function login(args: string[]) {
-  const host = resolveHost(flag(args, "--host"));
-  if (!host) throw new CliError("Which server? Run: cfs login --host https://secrets.example.com");
-  const api = anonymous(host);
-  const start = await api.call<{
-    deviceCode: string;
-    userCode: string;
-    expiresIn: number;
-    interval: number;
-  }>("POST", "/cli/start", { device: process.env.HOSTNAME ?? "cli" });
-  if (start.status !== 200) throw new CliError("The server did not start a login.");
-  console.log(`Open ${host}/cli/authorize and enter this code:\n\n    ${start.body.userCode}\n`);
-  const until = Date.now() + start.body.expiresIn * 1000;
-  while (Date.now() < until) {
-    await Bun.sleep(start.body.interval * 1000);
-    const p = await api.call<{ token?: string; expiresIn?: number }>("POST", "/cli/poll", {
-      deviceCode: start.body.deviceCode,
-    });
-    if (p.status === 200 && p.body.token) {
-      saveHost(host);
-      saveSession({
-        host,
-        token: p.body.token,
-        expiresAt: Math.floor(Date.now() / 1000) + (p.body.expiresIn ?? 3600),
-      });
-      console.log("Signed in. Next: cfs unlock");
-      return;
-    }
-    if (p.status === 410) break;
-  }
-  throw new CliError("The code expired. Run cfs login again.");
+async function login(hostFlag?: string) {
+  const resolved = resolveHost(hostFlag);
+  if (!resolved)
+    throw new CliError("Which server? Run: cfs login --host https://secrets.example.com");
+  // Signing in is what trusts the host, so any source is fine here.
+  await signIn(resolved.host, currentProfile() ?? new URL(resolved.host).hostname);
 }
 
-async function unlock() {
-  const c = await connect();
+async function unlock(hostFlag?: string, args: string[] = []) {
+  const ttl = parseTtl(flag(args, "--ttl") ?? DEFAULT_TTL);
+  const c = await connect(hostFlag);
   const me = await c.call<{ vaultReady: boolean; lockedKey: string | null }>("GET", "/whoami");
   if (!me.body.vaultReady || !me.body.lockedKey)
     throw new CliError(
@@ -52,25 +30,30 @@ async function unlock() {
   } catch {
     throw new CliError("That vault password did not work.");
   }
-  const s = loadSession();
-  if (!s) throw new CliError("Not signed in.");
-  saveSession({ ...s, privateKey: key });
-  console.log("Unlocked until your session ends.");
+  const expiresAt = await saveUnlock(pickStore(), c.host, key, ttl);
+  console.log(
+    `Unlocked until ${new Date(expiresAt).toLocaleTimeString()}. Run cfs lock to end it sooner.`,
+  );
 }
 
 export const session: Commands = {
   login: {
-    help: "cfs login [--host <url>]            sign in with your browser",
-    run: (a, h) => login(h ? ["--host", h, ...a] : a),
+    help: "cfs login [--host <url>] [--profile <name>]   sign in with your browser",
+    run: (_a, h) => login(h),
   },
   unlock: {
-    help: "cfs unlock                          unlock your vault on this device",
-    run: () => unlock(),
+    help: "cfs unlock [--ttl 1h]               unlock your vault on this device",
+    run: (a, h) => unlock(h, a),
   },
   lock: {
     help: "cfs lock                            forget the unlocked vault",
-    run: () => {
-      clearSession();
+    run: async () => {
+      const s = loadSession();
+      if (s) {
+        await clearUnlock(pickStore(), s.host);
+        // Rewrites the session file without anything but host, token and expiry.
+        saveSession(s);
+      }
       console.log("Locked.");
     },
   },
@@ -79,8 +62,9 @@ export const session: Commands = {
     run: async (_a, h) => {
       const c = await connect(h);
       const w = await c.call<{ name: string; kind: string; role: string }>("GET", "/whoami");
+      const unlocked = c.privateKey !== undefined;
       console.log(
-        `${w.body.name} (${w.body.kind}, ${w.body.role}) on ${c.host}${c.privateKey ? ", vault unlocked" : ", vault locked"}`,
+        `${w.body.name} (${w.body.kind}, ${w.body.role}) on ${c.host}${unlocked ? ", vault unlocked" : ", vault locked"}`,
       );
     },
   },

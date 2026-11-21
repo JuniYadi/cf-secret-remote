@@ -1,6 +1,6 @@
 import { flag, parseEnv } from "../args.ts";
 import { CliError, connect, readSecret, writeSecret } from "../client.ts";
-import { projectFile } from "../config.ts";
+import { mergeSecrets, projectFile, runPaths } from "../config.ts";
 import type { Commands } from "./types.ts";
 
 export const secrets: Commands = {
@@ -58,14 +58,20 @@ export const secrets: Commands = {
         throw new CliError("Usage: cfs run [<secret>] [--env <name>] -- <command>");
       const before = a.slice(0, dd);
       const command = a.slice(dd + 1);
-      const env = flag(before, "--env") ?? "dev";
-      let path = before[0];
-      if (!path) {
-        const project = projectFile().project;
-        if (!project) throw new CliError("No secret given and no project in .cfs.json.");
-        path = `${project}/${env}`;
+      const env = flag(before, "--env");
+      const c = await connect(h);
+      let values: Record<string, string>;
+      if (before[0]) {
+        values = (await readSecret(c, before[0])).values;
+      } else {
+        // ADR 25: explicit envs in .cfs.json, later secrets override earlier ones.
+        const plan = runPaths(projectFile(), env);
+        values = await mergeSecrets(
+          plan.paths,
+          async (p) => (await readSecret(c, p)).values,
+          plan.env,
+        );
       }
-      const { values } = await readSecret(await connect(h), path);
       const child = Bun.spawn(command, {
         env: { ...process.env, ...values },
         stdio: ["inherit", "inherit", "inherit"],
