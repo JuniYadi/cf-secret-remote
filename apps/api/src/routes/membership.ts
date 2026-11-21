@@ -168,7 +168,15 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
     .bind(g.id, g.version, now())
     .all<{ id: string }>();
   const ids = current.results.map((r) => r.id);
-  if (!ids.includes(removeId)) return c.json({ error: "not in this group" }, 404);
+  // A person who is no longer in the group (an earlier attempt removed them, then was aborted) can be
+  // removed again: start is idempotent, so a failed rotation can always be retried. An unknown id is refused.
+  if (!ids.includes(removeId)) {
+    const known = await db
+      .prepare("SELECT 1 AS ok FROM identity WHERE id = ?")
+      .bind(removeId)
+      .first();
+    if (!known) return c.json({ error: "no such person" }, 404);
+  }
   const remaining = ids.filter((i) => i !== removeId).sort();
   const given = members.map((m) => m.identityId).sort();
   if (given.length !== remaining.length || given.some((id, i) => id !== remaining[i]))

@@ -277,7 +277,7 @@ describe("ADR 14: remove member and staged rotation", () => {
     expect(read.body.keyringVersion).toBe(1);
   });
 
-  it("start validates the removal: no self-removal, exact remaining set, must be a member", async () => {
+  it("start validates the removal: no self-removal, exact remaining set, known person", async () => {
     const prefix = prefixName("val");
     const adm = await person({ role: "admin" });
     const mem = await person();
@@ -295,10 +295,12 @@ describe("ADR 14: remove member and staged rotation", () => {
     );
     // Duplicates do not count as the full set.
     expect((await startRemove(adm, prefix, gone.id, [adm, adm], newGk, 2)).status).toBe(400);
-    // Not in the group.
+    // Not in the group (but a known person): allowed, so a removal can be retried after an abort.
+    // It is a re-key with the same members; abort puts the group back.
     expect((await startRemove(adm, prefix, outsider.id, [adm, mem, gone], newGk, 2)).status).toBe(
-      404,
+      200,
     );
+    expect((await api("POST", `/keyrings/${prefix}/rotate/abort`, adm.token, {})).status).toBe(200);
     expect((await groupRow(prefix))?.status).toBe("active");
   });
 
@@ -402,6 +404,46 @@ describe("ADR 14: remove member and staged rotation", () => {
     expect((await write(adm, gk, `${prefix}/a`, { K: "a2" }, 1, 2)).status).toBe(200);
     // Abort when not rotating is refused.
     expect((await api("POST", `/keyrings/${prefix}/rotate/abort`, adm.token, {})).status).toBe(409);
+  });
+
+  it("a removal can be retried after an abort: start is idempotent for someone already removed", async () => {
+    const prefix = prefixName("retry");
+    const adm = await person({ role: "admin" });
+    const mem = await person();
+    const gone = await person();
+    const gk = await makeGroup(prefix, adm, [mem, gone]);
+    expect((await write(adm, gk, `${prefix}/a`, { K: "a" })).status).toBe(201);
+    const oldGk = (await keyOf(adm, prefix)).key;
+
+    // First attempt: start removes the person's rows, then the client dies and aborts.
+    const first = await newGroupKey();
+    expect((await startRemove(adm, prefix, gone.id, [adm, mem], first, 2)).status).toBe(200);
+    expect((await api("POST", `/keyrings/${prefix}/rotate/abort`, adm.token, {})).status).toBe(200);
+    expect((await groupRow(prefix))?.status).toBe("active");
+
+    // Retry for the same person (no longer a member) must work, and finish the rotation.
+    const second = await newGroupKey();
+    const again = await startRemove(adm, prefix, gone.id, [adm, mem], second, 2);
+    expect(again.status).toBe(200);
+    const items = await reencrypt(adm, oldGk, second, 2, [`${prefix}/a`]);
+    expect((await chunk(adm, prefix, 2, items)).status).toBe(200);
+    const done = await api("POST", `/keyrings/${prefix}/rotate/commit`, adm.token, {});
+    expect(done.status).toBe(200);
+    expect(done.body).toEqual({ version: 2, status: "active" });
+    expect((await groupRow(prefix))?.version).toBe(2);
+    expect((await api("GET", `/keyrings/${prefix}/key`, gone.token)).status).toBe(404);
+    expect((await keyOf(mem, prefix)).version).toBe(2);
+  });
+
+  it("start still refuses an unknown person and the wrong remaining set", async () => {
+    const prefix = prefixName("retry-bad");
+    const adm = await person({ role: "admin" });
+    const mem = await person();
+    await makeGroup(prefix, adm, [mem]);
+    const gk = await newGroupKey();
+    expect((await startRemove(adm, prefix, "no-such-person", [adm, mem], gk, 2)).status).toBe(404);
+    // The remaining set must still be exactly the current members.
+    expect((await startRemove(adm, prefix, mem.id, [adm, mem], gk, 2)).status).toBe(400);
   });
 
   it("full rotation: remaining members get the new key and keep old keys; removed member loses everything", async () => {

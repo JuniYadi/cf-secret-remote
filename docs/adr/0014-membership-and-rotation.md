@@ -18,5 +18,8 @@ ADR 3 says removing a member rotates the group key. Adding a member and rotating
 
 **Identities.** Admins can disable and re-enable identities and change role (member/admin). Disabling ends all sessions. At least two admins must hold a vault (ADR 20).
 
+## Amendment (found in web review)
+`rotate/start` is idempotent for a person who is no longer in the group: it deletes their rows at the start, so a failed rotation that is aborted would otherwise be impossible to retry, leaving the group on the old key that person still holds. Start therefore accepts any known identity as `removeIdentityId`; the remaining set must still be exactly the current members. Starting with a person who was never a member is a re-key of the group with the same members.
+
 ## Consequences
 Schema: `keyring.status ('active'|'rotating')`, `secret_version` staged rows carry the new `keyring_version` and are invisible until commit (`secret.current` is only moved at commit). The CLI gets `group add-member`, `group remove-member`, `group list`.
