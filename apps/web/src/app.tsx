@@ -8,6 +8,7 @@ import { loadSession } from "./lib/session.ts";
 import { guardTarget, type MatchedPage, matchPage, type PageId, SHELL_PAGES } from "./routes.ts";
 import { AccessDeniedPage } from "./screens/AccessDenied.tsx";
 import { ActivityPage } from "./screens/Activity.tsx";
+import { adminScreen } from "./screens/AdminRoutes.tsx";
 import { AgentRulesPage } from "./screens/AgentRules.tsx";
 import { AlertsPage } from "./screens/Alerts.tsx";
 import { CliAuthorizePage } from "./screens/CliAuthorize.tsx";
@@ -141,7 +142,7 @@ function renderPage(
       if (SHELL_PAGES.has(page.id)) {
         return (
           <ShellFrame>
-            <ComingSoonPage id={page.id} shell={true} />
+            {adminScreen(page) ?? <ComingSoonPage id={page.id} shell={true} />}
           </ShellFrame>
         );
       }
