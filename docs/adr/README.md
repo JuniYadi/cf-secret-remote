@@ -27,7 +27,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [19](0019-audit-retention-and-quota.md) | Audit checkpoints, retention, quota | implemented |
 | [20](0020-recovery-and-vault-password.md) | Recovery, vault password, admins | planned |
 | [21](0021-offboarding.md) | Offboarding | planned |
-| [22](0022-secrets-versions-and-metadata.md) | Versions, history, import, metadata | planned |
+| [22](0022-secrets-versions-and-metadata.md) | Versions, history, import, metadata | implemented |
 | [23](0023-backup-and-restore.md) | Backup and restore | planned |
 | [24](0024-web-app.md) | Web app | planned |
 | [25](0025-deploy-and-distribution.md) | Deploy, init, hosts, releases | planned |

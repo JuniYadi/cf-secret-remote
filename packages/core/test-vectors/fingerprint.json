@@ -1,0 +1,16 @@
+{
+  "name": "ADR 22 per-name fingerprints",
+  "groupKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "cases": [
+    {
+      "path": "pay/prod",
+      "values": { "KEY": "sk_live_1", "PORT": "8080" },
+      "fps": { "KEY": "89fa4dcc57cedb07", "PORT": "46e6e45254c48282" }
+    },
+    {
+      "path": "pay/dev",
+      "values": { "KEY": "sk_live_1" },
+      "fps": { "KEY": "b16ca9947d29173e" }
+    }
+  ]
+}
