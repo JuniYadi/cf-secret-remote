@@ -1,0 +1,433 @@
+/* ADR 24 part 5: Settings, Admins, Backup and Restore, Offboarding, Recovery, Quota reached.
+   Tokens come from styles.css (:root). Components reused from there: .card, .btn, .field, .warn-box, .words. */
+
+.settings-page,
+.offboard-page,
+.regrant-page,
+.password-page,
+.quota-page {
+  max-width: 880px;
+}
+
+.forgot-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sub-title {
+  margin: 8px 0 0;
+  font: 600 15px / 1.3 var(--font-body);
+  color: var(--ink);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  word-break: break-all;
+}
+
+.right {
+  text-align: right;
+}
+
+.plain-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+  font-size: 14.5px;
+  line-height: 1.55;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plain-list.ok-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.plan-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.plan-list li {
+  padding-left: 14px;
+  border-left: 3px solid var(--teal);
+}
+
+.info-box {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--ok-soft);
+  color: var(--ok);
+  font-size: 14px;
+}
+
+/* Tabs: General, Admins, Backup (design boards Settings, Settings-Admins). */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.tab {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab.on {
+  color: var(--ink);
+  border-bottom-color: var(--teal);
+  font-weight: 600;
+}
+
+/* Key and value rows. */
+.kv {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.kv-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 14.5px;
+}
+
+.kv-row dt {
+  color: var(--muted);
+}
+
+.kv-row dd {
+  margin: 0;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+}
+
+.pill.ok {
+  border-color: #9fd3b3;
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.pill.warn {
+  border-color: #e6c878;
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+/* Usage meter. The count is written out, so the bar is not the only cue. */
+.usage-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.usage-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.usage-bar {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.usage-bar i {
+  display: block;
+  height: 100%;
+  background: var(--teal);
+}
+
+/* Tables (admins, offboarding report, regrant list). */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: middle;
+}
+
+.data-table th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.person-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--teal-soft);
+  color: var(--teal-hover);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.btn.danger {
+  background: var(--surface);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Restore steps: 1 choose, 2 check, 3 replace. Text and number, not colour alone. */
+.restore-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.restore-steps .st {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+.restore-steps .st.now {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.restore-steps .st.done {
+  color: var(--ok);
+}
+
+.restore-steps .st i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 99px;
+  border: 1px solid var(--line-strong);
+  font: 600 13px var(--font-body);
+  font-style: normal;
+  color: var(--muted);
+}
+
+.restore-steps .st.done i {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+}
+
+.restore-steps .st.now i {
+  background: var(--warn);
+  border-color: var(--warn);
+  color: #fff;
+}
+
+/* Recovery steps, as on the Forgot board. */
+.steps-st {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.steps-st .st {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.steps-st .st i {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  border: 1px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 13px var(--font-body);
+  font-style: normal;
+  color: var(--muted);
+}
+
+.steps-st .st.done i {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+}
+
+.steps-st .st.now i {
+  background: var(--warn);
+  border-color: var(--warn);
+  color: #fff;
+}
+
+.steps-st .body {
+  flex: 1;
+  min-width: 0;
+}
+
+.steps-st small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* The four-word code, large and in mono. */
+.code-box {
+  display: block;
+  font: 600 22px / 1.4 var(--font-mono);
+  letter-spacing: 0.02em;
+  text-align: center;
+  padding: 16px;
+  border: 1px solid #9ed3cf;
+  background: #f2faf9;
+  border-radius: 10px;
+  word-break: break-word;
+}
+
+.words-input {
+  width: 100%;
+  min-height: 96px;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font: 500 15px / 1.6 var(--font-mono);
+  resize: vertical;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.words-input:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+/* Quota reached: the banner on every shell page, and the screen at /quota. */
+.quota-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 9px;
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.quota-banner a {
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--warn-ink);
+  font-weight: 600;
+}
+
+.quota-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 720px) {
+  .quota-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .kv-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .restore-steps {
+    gap: 12px;
+  }
+}

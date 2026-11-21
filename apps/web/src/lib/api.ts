@@ -4,7 +4,11 @@
 // can VITE_DEV_TOKEN add a bearer token, so the UI can be developed before Access is set up. The token is
 // never read in production builds.
 
+import { markQuotaReached } from "./quota.ts";
+
 export const API_BASE = "/api/v1";
+/** The health route sits outside /api/v1 (apps/api/src/index.ts). */
+export const HEALTH_PATH = "/api/health";
 
 export type ApiErrorKind =
   | "unauthorized"
@@ -14,6 +18,8 @@ export type ApiErrorKind =
   | "invalid"
   | "rate-limited"
   | "unavailable"
+  | "quota"
+  | "maintenance"
   | "server"
   | "network";
 
@@ -22,14 +28,22 @@ export class ApiError extends Error {
   readonly status: number;
   /** Set only for a wrong CLI code (ADR 27): how many tries are left. No other body field is kept. */
   readonly attemptsLeft: number | undefined;
+  /** Seconds from the Retry-After header, when the server sent one (ADR 19, ADR 23). */
+  readonly retryAfter: number | null;
 
-  constructor(kind: ApiErrorKind, status: number, attemptsLeft?: number) {
+  constructor(
+    kind: ApiErrorKind,
+    status: number,
+    attemptsLeft?: number,
+    retryAfter: number | null = null,
+  ) {
     // The message is the kind only. Response bodies are never copied into errors or logs.
     super(kind);
     this.name = "ApiError";
     this.kind = kind;
     this.status = status;
     this.attemptsLeft = attemptsLeft;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -66,6 +80,23 @@ export function kindForStatus(status: number): ApiErrorKind {
   }
 }
 
+/**
+ * Tells the two 503s apart by the server's message. The message is read here and dropped, never kept.
+ * "quota" stops writes until the reset; "maintenance" means a restore is running (ADR 23).
+ */
+export function kindForFailure(status: number, message: string): ApiErrorKind {
+  if (status === 503 && /quota/i.test(message)) return "quota";
+  if (status === 503 && /maintenance/i.test(message)) return "maintenance";
+  return kindForStatus(status);
+}
+
+/** Retry-After as whole seconds, or null when absent or not a number. */
+export function retryAfterOf(res: Response): number | null {
+  const raw = res.headers.get("Retry-After");
+  const n = raw === null ? Number.NaN : Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 /** The dev-only bearer token. Production builds have DEV false, so this returns undefined there. */
 export function devBearerToken(): string | undefined {
   if (!import.meta.env.DEV) return undefined;
@@ -74,23 +105,31 @@ export function devBearerToken(): string | undefined {
 }
 
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
+export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
-export async function request<T>(
-  method: "GET" | "POST" | "PUT" | "DELETE",
-  path: string,
+const defaultFetch: FetchLike = (input, init) => fetch(input, init);
+
+/**
+ * One request to `url`. Throws ApiError for any non-2xx status. A quota 503 on a write also marks the
+ * quota screen (quota.ts), so every page shows the same state. Reads are never blocked by the quota.
+ */
+export async function send(
+  method: Method,
+  url: string,
   body?: unknown,
-  fetchImpl: FetchLike = (input, init) => fetch(input, init),
-): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  fetchImpl: FetchLike = defaultFetch,
+  headers: Record<string, string> = {},
+): Promise<Response> {
+  const h: Record<string, string> = { Accept: "application/json", ...headers };
+  if (body !== undefined) h["Content-Type"] = "application/json";
   const token = devBearerToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (token) h.Authorization = `Bearer ${token}`;
 
   let res: Response;
   try {
-    res = await fetchImpl(`${API_BASE}${path}`, {
+    res = await fetchImpl(url, {
       method,
-      headers,
+      headers: h,
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: "same-origin",
       cache: "no-store",
@@ -98,10 +137,25 @@ export async function request<T>(
   } catch {
     throw new ApiError("network", 0);
   }
-  if (!res.ok) {
-    const attempts = res.status === 404 ? await attemptsFrom(res) : undefined;
-    throw new ApiError(kindForStatus(res.status), res.status, attempts);
-  }
+  if (res.ok) return res;
+
+  // The 503 message is read only to tell the quota from a restore; the text itself is never kept.
+  const message = res.status === 503 ? await res.text().catch(() => "") : "";
+  const kind = kindForFailure(res.status, message);
+  const retryAfter = retryAfterOf(res);
+  if (kind === "quota" && method !== "GET") markQuotaReached(retryAfter);
+  const attempts = res.status === 404 ? await attemptsFrom(res) : undefined;
+  throw new ApiError(kind, res.status, attempts, retryAfter);
+}
+
+export async function request<T>(
+  method: Method,
+  path: string,
+  body?: unknown,
+  fetchImpl: FetchLike = defaultFetch,
+  headers?: Record<string, string>,
+): Promise<T> {
+  const res = await send(method, `${API_BASE}${path}`, body, fetchImpl, headers);
   return (await res.json()) as T;
 }
 
@@ -216,6 +270,8 @@ export interface Identity {
   role: "admin" | "member";
   publicKey: string | null;
   status: string;
+  /** True (or 1 from SQLite) when the person has saved a recovery key (ADR 20). */
+  recoverySet?: boolean | number;
 }
 
 export interface AppSummary {
@@ -419,6 +475,107 @@ export interface NewAppBody {
   cidr?: string | null;
 }
 
+// --- ADR 24 part 5: settings, offboarding, recovery, backup (the shapes the Worker returns) ---
+
+/** GET /api/health. Outside /api/v1. */
+export interface Health {
+  ok: boolean;
+  protocol: number;
+  version: string;
+}
+
+/** GET /recovery (admin): a pending request, names and times only. */
+export interface PendingRecovery {
+  id: string;
+  name: string;
+  createdAt: number;
+  attempts: number;
+}
+
+/** GET /recovery/:id (admin): one pending request, with the new public key the code is made from. */
+export interface RecoveryDetail {
+  id: string;
+  name: string;
+  status: string;
+  attemptsLeft: number;
+  publicKey: string;
+  groups: string[];
+}
+
+/** POST /recovery/request: the four-word code and the cancel token, shown once to the requester. */
+export interface RecoveryStart {
+  id: string;
+  words: string;
+  cancelToken: string;
+}
+
+export interface RecoveryKeyStatus {
+  set: boolean;
+  lockedKey: string | null;
+}
+
+export interface RestoreCounts {
+  identity: number;
+  secret: number;
+  audit: number;
+  [table: string]: number;
+}
+
+/** POST /restore/check (ADR 23). Reads and verifies a file; changes nothing. */
+export interface RestoreCheck {
+  ok: true;
+  host: string;
+  schema: number;
+  createdAt: number;
+  gapSeconds: number;
+  lastAuditAt: number | null;
+  audit: {
+    rows: number;
+    ok: boolean;
+    checkpoints: { stored: number; verified: number; pruned: number; mismatched: string[] };
+  };
+  counts: { file: RestoreCounts; current: RestoreCounts };
+  sha256: string;
+}
+
+export interface OffboardPlan {
+  person: { id: string; name: string; role: string; status: string };
+  groups: string[];
+  apps: { id: string; name: string; status: string }[];
+  sessions: {
+    id: string;
+    kind: string;
+    device: string | null;
+    createdAt: number;
+    expiresAt: number;
+  }[];
+  opened: {
+    windowDays: number;
+    secrets: {
+      path: string;
+      versions: number[];
+      names: string[];
+      opens: number;
+      lastOpened: number;
+    }[];
+  };
+  blockers: { groups: string[]; apps: string[]; twoAdmins: boolean };
+  canFinish: boolean;
+}
+
+/** Base64 of raw bytes, in chunks so large files do not overflow the call stack. */
+export function toBase64(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(out);
+}
+
+function passphraseHeader(passphrase: string | undefined): Record<string, string> | undefined {
+  return passphrase ? { "X-Backup-Passphrase": passphrase } : undefined;
+}
+
 export const api = {
   whoami: (fetchImpl?: FetchLike) => request<Me>("GET", "/whoami", undefined, fetchImpl),
   createVault: (publicKey: string, lockedKey: string) =>
@@ -548,4 +705,64 @@ export const api = {
     request<{ roleId: string; secretId: string }>("POST", `/apps/${encodeURIComponent(id)}/rotate`),
   disableApp: (id: string) =>
     request<{ ok: true }>("POST", `/apps/${encodeURIComponent(id)}/disable`),
+
+  // Part 5: settings, offboarding, recovery, backup (ADR 14, 19, 20, 21, 23, 24).
+  recoveryKeyStatus: () => request<RecoveryKeyStatus>("GET", "/me/recovery"),
+  changeVaultPassword: (lockedKey: string) =>
+    request<{ ok: true }>("PUT", "/me/vault", { lockedKey }),
+  setRole: (id: string, role: "admin" | "member") =>
+    request<{ id: string; role: string; status: string }>("PATCH", `/identities/${id}`, { role }),
+  health: async (fetchImpl?: FetchLike): Promise<Health> => {
+    const res = await send("GET", HEALTH_PATH, undefined, fetchImpl);
+    return (await res.json()) as Health;
+  },
+  offboardPlan: (id: string) => request<OffboardPlan>("GET", `/offboard/${id}/plan`),
+  offboardReassign: (id: string, appId: string, ownerId: string) =>
+    request<unknown>("POST", `/offboard/${id}/apps/${appId}/reassign`, { ownerId }),
+  offboardFinish: (id: string) =>
+    request<{ changed: { disabled: boolean; sessionsEnded: number; policiesRemoved: number } }>(
+      "POST",
+      `/offboard/${id}/finish`,
+      {},
+    ),
+  startRecovery: (publicKey: string, lockedKey: string) =>
+    request<RecoveryStart>("POST", "/recovery/request", { publicKey, lockedKey }),
+  pendingRecoveries: () => request<PendingRecovery[]>("GET", "/recovery"),
+  recoveryDetail: (id: string) => request<RecoveryDetail>("GET", `/recovery/${id}`),
+  grantRecovery: (
+    id: string,
+    words: string,
+    keys: { prefix: string; version: number; wrappedKey: string }[],
+  ) => request<{ ok: true; groups: string[] }>("POST", `/recovery/${id}/grant`, { words, keys }),
+  cancelRecovery: (id: string, token: string) =>
+    request<{ ok: true }>("POST", `/recovery/${id}/cancel`, { token }),
+
+  // Backup and restore (ADR 23). The passphrase travels in a header only, never in the URL.
+  downloadBackup: async (passphrase: string | undefined, fetchImpl?: FetchLike): Promise<Blob> => {
+    const headers: Record<string, string> = { Accept: "application/octet-stream" };
+    if (passphrase) headers["X-Backup-Passphrase"] = passphrase;
+    const res = await send("GET", `${API_BASE}/backup`, undefined, fetchImpl, headers);
+    return res.blob();
+  },
+  restoreCheck: (file: Uint8Array, passphrase?: string, fetchImpl?: FetchLike) =>
+    request<RestoreCheck>(
+      "POST",
+      "/restore/check",
+      { file: toBase64(file) },
+      fetchImpl,
+      passphraseHeader(passphrase),
+    ),
+  restoreApply: (
+    file: Uint8Array,
+    confirmHost: string,
+    passphrase?: string,
+    fetchImpl?: FetchLike,
+  ) =>
+    request<{ ok: true; restoredAt: number; counts: RestoreCounts }>(
+      "POST",
+      "/restore",
+      { file: toBase64(file), confirmHost },
+      fetchImpl,
+      passphraseHeader(passphrase),
+    ),
 };

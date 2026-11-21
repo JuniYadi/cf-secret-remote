@@ -124,6 +124,15 @@ recovery.post("/recovery/request", async (c) => {
   return c.json({ id, words: await fingerprintWords(b.publicKey), cancelToken }, 201);
 });
 
+// Admin: the pending requests, names and times only. The admin opens one to give access again (ADR 20).
+recovery.get("/recovery", requireAdmin, async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT r.id, i.name, r.created_at AS createdAt, r.attempts FROM recovery_request r
+     JOIN identity i ON i.id = r.identity_id WHERE r.status = 'pending' ORDER BY r.created_at`,
+  ).all<{ id: string; name: string; createdAt: number; attempts: number }>();
+  return c.json(rows.results);
+});
+
 // An admin reads a pending request: the new public key (to re-wrap to), the person's groups, and attempts left.
 recovery.get("/recovery/:id", requireAdmin, async (c) => {
   const r = await loadRequest(c, c.req.param("id"));
