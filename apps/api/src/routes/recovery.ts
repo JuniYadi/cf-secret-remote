@@ -1,6 +1,7 @@
 import { b64uDecode, fingerprintWords, isPrivateKeyLock, normalizeWords } from "@cfs/core";
 import { type Context, Hono } from "hono";
 import { verifyAccessClaims } from "../access.ts";
+import { RECOVERY_ACTION } from "../alerts.ts";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { notifyRecovery, type RecoveryEvent } from "../recovery-notify.ts";
@@ -111,9 +112,10 @@ recovery.post("/recovery/request", async (c) => {
     // The partial unique index stopped a second open request at the same moment.
     return c.json({ error: "a recovery request is already waiting for an admin" }, 409);
   }
+  // RECOVERY_ACTION is the exact name the ADR 18 "recovery_requested" alert watches.
   await audit(db, {
     who: who.name,
-    action: "recovery.request",
+    action: RECOVERY_ACTION,
     note: `request ${id}`,
     result: "ok",
     ip: ip(c),

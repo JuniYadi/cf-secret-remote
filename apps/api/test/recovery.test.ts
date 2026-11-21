@@ -13,6 +13,7 @@ import {
   wrapGroupKey,
 } from "@cfs/core";
 import { beforeAll, describe, expect, it } from "vitest";
+import { flushAlerts, resetAlertSenders, setAlertSenders } from "../src/alerts.ts";
 import { accessJwt, freshLogin, installAccessCerts } from "./access-jwt.ts";
 import { admin, api, makeIdentity } from "./helpers.ts";
 
@@ -88,6 +89,43 @@ async function auditEntries(): Promise<Record<string, unknown>[]> {
   const rows = await env.DB.prepare("SELECT entry FROM audit").all<{ entry: string }>();
   return rows.results.map((r) => JSON.parse(r.entry));
 }
+
+describe("ADR 18: recovery_requested alert (real route)", () => {
+  it("a request made through POST /recovery/request sends the alert; a refused one does not", async () => {
+    const sent: string[] = [];
+    setAlertSenders({
+      webhook: async (_url, text) => {
+        sent.push(text);
+      },
+    });
+    try {
+      const a = await person({ role: "admin" });
+      const put = await api("PUT", "/alerts", a.token, {
+        webhook: "https://hooks.test/services/T/B/X",
+      });
+      expect(put.status).toBe(200);
+
+      const p = await person();
+      const stale = await accessJwt(p.name, Math.floor(Date.now() / 1000) - 400);
+      expect((await startRecovery(p, { "Cf-Access-Jwt-Assertion": stale })).r.status).toBe(403);
+      await flushAlerts();
+      expect(sent.filter((t) => t.includes("Recovery requested"))).toHaveLength(0);
+
+      const ok = await startRecovery(p);
+      expect(ok.r.status).toBe(201);
+      await flushAlerts();
+      expect(sent.filter((t) => t.includes("Recovery requested"))).toHaveLength(1);
+    } finally {
+      await flushAlerts();
+      resetAlertSenders();
+      // Storage is shared by this file: drop the webhook so later denials do not reach the real network.
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM setting"),
+        env.DB.prepare("DELETE FROM alert_state"),
+      ]);
+    }
+  });
+});
 
 describe("ADR 20: fingerprint code and request", () => {
   it("a fresh Access login starts a request and returns the four words of the new key", async () => {
