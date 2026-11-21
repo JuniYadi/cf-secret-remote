@@ -10,7 +10,7 @@
     "dev": "bun run src/index.ts",
     "build": "bun build --compile src/index.ts --outfile dist/cfs",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"no tests yet\""
+    "test": "bun test"
   },
   "dependencies": {
     "@cfs/core": "workspace:*"

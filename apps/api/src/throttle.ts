@@ -21,6 +21,21 @@ export async function hit(
   return (row?.count ?? 0) <= limit;
 }
 
+/** Read-only check: true if `limit` has already been reached in the current window. Does not count. */
+export async function spent(
+  db: D1Database,
+  key: string,
+  limit: number,
+  windowSec: number,
+): Promise<boolean> {
+  const w = now() - (now() % windowSec);
+  const row = await db
+    .prepare("SELECT count FROM login_attempt WHERE key = ? AND window = ?")
+    .bind(key, w)
+    .first<{ count: number }>();
+  return (row?.count ?? 0) >= limit;
+}
+
 /** Constant-time string comparison for hashes. */
 export function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
