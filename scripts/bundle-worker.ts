@@ -38,6 +38,7 @@ export function parseJsonc(text: string): unknown {
 
 export interface WranglerSettings {
   compatibility_date: string;
+  compatibility_flags: string[];
   crons: string[];
   assets: { not_found_handling: string; run_worker_first: string[] };
   vars: Record<string, string>;
@@ -51,6 +52,7 @@ export function wranglerSettings(jsonc: string): WranglerSettings {
   const vars = (w.vars ?? {}) as Record<string, unknown>;
   return {
     compatibility_date: String(w.compatibility_date ?? ""),
+    compatibility_flags: (w.compatibility_flags as string[] | undefined) ?? [],
     crons: triggers.crons ?? [],
     assets: {
       not_found_handling: String(assets.not_found_handling ?? "none"),
@@ -108,6 +110,7 @@ export function buildManifest(input: ManifestInput): BundleManifest {
     protocol: PROTOCOL_VERSION,
     main: "worker/index.js",
     compatibility_date: input.settings.compatibility_date,
+    compatibility_flags: input.settings.compatibility_flags,
     crons: input.settings.crons,
     assets: input.settings.assets,
     vars: input.settings.vars,

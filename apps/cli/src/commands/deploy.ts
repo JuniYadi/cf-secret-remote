@@ -685,6 +685,7 @@ export async function uploadWorker(
   const metadata = {
     main_module: basename(m.main),
     compatibility_date: m.compatibility_date,
+    compatibility_flags: m.compatibility_flags,
     bindings: [
       { type: "d1", name: "DB", id: b.databaseId },
       { type: "assets", name: "ASSETS" },

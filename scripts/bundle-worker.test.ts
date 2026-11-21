@@ -17,6 +17,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const SETTINGS = {
   compatibility_date: "2026-08-01",
+  compatibility_flags: ["nodejs_als"],
   crons: ["5 0 * * *"],
   assets: { not_found_handling: "single-page-application", run_worker_first: ["/api/*"] },
   vars: { AUDIT_RETENTION_DAYS: "365" },
@@ -143,7 +144,8 @@ describe("wrangler.jsonc settings", () => {
     const s = wranglerSettings(text);
     expect(s.compatibility_date).toBe("2026-08-01");
     expect(s.crons).toEqual(["5 0 * * *"]);
-    expect(s.assets.run_worker_first).toEqual(["/api/*"]);
+    // ADR 24: the Worker runs for every path so it can add the security headers to the web app.
+    expect(s.assets.run_worker_first).toEqual(["/*"]);
     expect(s.assets.not_found_handling).toBe("single-page-application");
     expect(s.vars).toEqual({ AUDIT_RETENTION_DAYS: "365" });
   });
@@ -156,5 +158,28 @@ describe("wrangler.jsonc settings", () => {
     }`) as { a: string; b: number[] };
     expect(v.a).toBe("https://example.com");
     expect(v.b).toEqual([1, 2]);
+  });
+});
+
+describe("compatibility flags (nodejs_als)", () => {
+  test("the real wrangler.jsonc asks for nodejs_als, because alerts.ts uses AsyncLocalStorage", async () => {
+    const settings = wranglerSettings(readFileSync("apps/api/wrangler.jsonc", "utf8"));
+    expect(settings.compatibility_flags).toContain("nodejs_als");
+  });
+
+  test("an older manifest without the field is read as no flags", async () => {
+    const m = parseManifest({
+      format: 1,
+      version: "0.0.1",
+      protocol: 1,
+      main: "worker/index.js",
+      compatibility_date: "2026-08-01",
+      crons: [],
+      assets: { not_found_handling: "single-page-application", run_worker_first: ["/*"] },
+      vars: {},
+      migrations: [],
+      files: {},
+    });
+    expect(m.compatibility_flags).toEqual([]);
   });
 });

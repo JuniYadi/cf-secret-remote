@@ -204,8 +204,7 @@ secrets.put("/secret", async (c) => {
     !validPath(path) ||
     !Array.isArray(names) ||
     !wrappedDek ||
-    !ciphertext ||
-    !ciphertext.startsWith("v1.") ||
+    !ciphertext?.startsWith("v1.") ||
     !keyringVersion
   ) {
     return c.json({ error: "bad request" }, 400);

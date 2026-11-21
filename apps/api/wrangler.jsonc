@@ -3,14 +3,17 @@
   "name": "cfs",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",
+  // AsyncLocalStorage, used to hand the request context to the alert evaluator (src/alerts.ts, ADR 18).
+  "compatibility_flags": ["nodejs_als"],
 
   "assets": {
     "directory": "../web/dist",
     "binding": "ASSETS",
     // Unknown paths get index.html, so deep links into the SPA work.
     "not_found_handling": "single-page-application",
-    // Only /api/* runs the Worker. Everything else is served as a static file.
-    "run_worker_first": ["/api/*"]
+    // The Worker runs for every path so it can add the security headers (ADR 24, src/static.ts).
+    // Static files are still served by the assets binding.
+    "run_worker_first": ["/*"]
   },
 
   "d1_databases": [

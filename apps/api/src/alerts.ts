@@ -290,7 +290,7 @@ async function brokenAt(db: D1Database, ref: AuditRef): Promise<number | null> {
   if (i < 0) return null; // another write landed after ours; that write is checked instead
   const window = results.slice(i, i + 3);
   for (let k = 0; k < window.length; k++) {
-    const r = window[k]!;
+    const r = window[k] as (typeof window)[number];
     try {
       if ((await chainHash(r.prev, JSON.parse(r.entry))) !== r.hash) return r.seq;
     } catch {

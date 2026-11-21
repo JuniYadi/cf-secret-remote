@@ -15,7 +15,7 @@ import {
 import { beforeAll, describe, expect, it } from "vitest";
 import { flushAlerts, resetAlertSenders, setAlertSenders } from "../src/alerts.ts";
 import { accessJwt, freshLogin, installAccessCerts } from "./access-jwt.ts";
-import { admin, api, makeIdentity } from "./helpers.ts";
+import { api, makeIdentity } from "./helpers.ts";
 
 // ADR 20 rules, one test each (failures included). Real Workers runtime and D1.
 
