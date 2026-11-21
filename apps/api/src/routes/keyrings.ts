@@ -50,15 +50,29 @@ keyrings.post("/keyrings", requireAdmin, async (c) => {
 });
 
 // The caller's wrapped copy of a group key. Whoever lacks one cannot decrypt, whatever the policies say.
+// ADR 16: a time-boxed key (from an approved request) is refused once its expires_at has passed.
 keyrings.get("/keyrings/:prefix/key", async (c) => {
   const who = c.get("who");
+  const prefix = c.req.param("prefix");
   const row = await c.env.DB.prepare(
-    `SELECT m.wrapped_key, m.version FROM keyring_member m JOIN keyring k ON k.id = m.keyring_id
+    `SELECT m.wrapped_key, m.version, m.expires_at AS expiresAt FROM keyring_member m JOIN keyring k ON k.id = m.keyring_id
      WHERE k.prefix = ? AND m.identity_id = ? ORDER BY m.version DESC LIMIT 1`,
   )
-    .bind(c.req.param("prefix"), who.id)
-    .first<{ wrapped_key: string; version: number }>();
+    .bind(prefix, who.id)
+    .first<{ wrapped_key: string; version: number; expiresAt: number | null }>();
   if (!row) return c.json({ error: "no key for you in this group" }, 404);
+  if (row.expiresAt !== null && row.expiresAt <= now()) {
+    await audit(c.env.DB, {
+      who: who.name,
+      action: "group.key",
+      path: prefix,
+      version: row.version,
+      result: "denied",
+      note: "access expired",
+      ip: c.req.header("CF-Connecting-IP"),
+    });
+    return c.json({ error: "access has expired" }, 403);
+  }
   return c.json({ wrappedKey: row.wrapped_key, version: row.version });
 });
 
