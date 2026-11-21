@@ -22,6 +22,7 @@ import { requests } from "./routes/requests.ts";
 import { secrets } from "./routes/secrets.ts";
 import { sessions } from "./routes/sessions.ts";
 import { versions } from "./routes/versions.ts";
+import { serveAsset } from "./static.ts";
 import type { AppEnv, Env } from "./types.ts";
 import { now } from "./util.ts";
 
@@ -59,6 +60,8 @@ v1.route("/", backup);
 app.route("/api/v1", v1);
 
 app.all("/api/*", (c) => c.json({ error: "not found" }, 404));
+// ADR 24: every other path is the web app. wrangler.jsonc runs the Worker for all paths so the headers apply.
+app.all("*", (c) => serveAsset(c.req.raw, c.env.ASSETS));
 app.onError((e, c) => {
   // ADR 19: D1 over the daily quota. Writes wait until 00:00 UTC; reads and audit appends fail open (see audit.ts).
   if (isQuotaError(e)) {

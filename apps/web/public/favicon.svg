@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="cfs">
+  <title>cfs</title>
+  <rect width="64" height="64" rx="14" fill="#0B7A75"/>
+  <g transform="translate(32 32) scale(.9) translate(-32 -32)" fill="#fff">
+    <path fill-rule="evenodd" d="M30.7 29.85 A13 13 0 1 1 4.7 29.85 A13 13 0 1 1 30.7 29.85 Z M23.1 29.85 A5.4 5.4 0 1 0 12.3 29.85 A5.4 5.4 0 1 0 23.1 29.85 Z"/>
+    <circle cx="39.6" cy="29.85" r="5.4"/>
+    <circle cx="53.9" cy="29.85" r="5.4"/>
+    <circle cx="53.9" cy="42.95" r="4.2"/>
+  </g>
+</svg>

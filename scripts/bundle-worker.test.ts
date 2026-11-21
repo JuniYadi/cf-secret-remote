@@ -143,7 +143,8 @@ describe("wrangler.jsonc settings", () => {
     const s = wranglerSettings(text);
     expect(s.compatibility_date).toBe("2026-08-01");
     expect(s.crons).toEqual(["5 0 * * *"]);
-    expect(s.assets.run_worker_first).toEqual(["/api/*"]);
+    // ADR 24: the Worker runs for every path so it can add the security headers to the web app.
+    expect(s.assets.run_worker_first).toEqual(["/*"]);
     expect(s.assets.not_found_handling).toBe("single-page-application");
     expect(s.vars).toEqual({ AUDIT_RETENTION_DAYS: "365" });
   });
