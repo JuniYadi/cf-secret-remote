@@ -7,9 +7,20 @@ import {
   unwrapGroupKey,
   type Values,
 } from "@cfs/core";
-import { loadSession } from "./config.ts";
+import {
+  CliError,
+  ensureTrusted,
+  loadSession,
+  normalizeHost,
+  resolveHost,
+  type TrustDeps,
+} from "./config.ts";
+import { loadUnlock, pickStore } from "./keychain.ts";
+import { confirm } from "./prompt.ts";
+import { checkServer } from "./server.ts";
+import { signIn } from "./signin.ts";
 
-export class CliError extends Error {}
+export { CliError };
 
 export interface Client {
   host: string;
@@ -44,12 +55,23 @@ export const anonymous = (host: string) => ({
     raw<T>(host, method, path, body),
 });
 
+/** Asks the user on the terminal before trusting a new host (ADR 25). */
+export const terminalTrust = (): TrustDeps => ({
+  interactive: Boolean(process.stdin.isTTY),
+  confirm: (q) => confirm(q),
+  signIn: (host) => signIn(host, new URL(host).hostname),
+});
+
 /** A signed-in client: CFS_KIT (apps) or the saved session (people). */
-export async function connect(hostFlag?: string): Promise<Client> {
+export async function connect(
+  hostFlag?: string,
+  trust: TrustDeps = terminalTrust(),
+): Promise<Client> {
   const kitStr = process.env.CFS_KIT;
   if (kitStr) {
     const kit: Kit = decodeKit(kitStr);
-    const host = kit.host.replace(/\/+$/, "");
+    const host = normalizeHost(kit.host);
+    await checkServer(host);
     const r = await raw<{ token?: string }>(host, "POST", "/auth/approle/login", {
       roleId: kit.roleId,
       secretId: kit.secretId,
@@ -59,16 +81,24 @@ export async function connect(hostFlag?: string): Promise<Client> {
     const token = r.body.token;
     return { host, privateKey: kit.privateKey, call: (m, p, b) => raw(host, m, p, b, token) };
   }
-  const s = loadSession();
-  if (!s) throw new CliError("You are not signed in. Run: cfs login --host <url>");
-  if (hostFlag && hostFlag.replace(/\/+$/, "") !== s.host)
+  const resolved = resolveHost(hostFlag);
+  if (!resolved)
     throw new CliError(
-      `You are signed in to ${s.host}, not ${hostFlag}. Run: cfs login --host ${hostFlag}`,
+      "No server set. Run: cfs login --host https://your-server, or add .cfs.json with a host.",
     );
+  await ensureTrusted(resolved, trust);
+  const host = resolved.host;
+  const s = loadSession();
+  if (!s) throw new CliError(`You are not signed in to ${host}. Run: cfs login --host ${host}`);
+  if (s.host !== host)
+    throw new CliError(
+      `You are signed in to ${s.host}, not ${host}. Run: cfs login --host ${host}`,
+    );
+  await checkServer(host);
   return {
-    host: s.host,
-    privateKey: s.privateKey,
-    call: (m, p, b) => raw(s.host, m, p, b, s.token),
+    host,
+    privateKey: await loadUnlock(pickStore(), host),
+    call: (m, p, b) => raw(host, m, p, b, s.token),
   };
 }
 
