@@ -8,6 +8,7 @@ export interface Env {
   CHECKPOINT_WEBHOOK_URL?: string; // ADR 19: optional Slack-compatible webhook for the daily checkpoint
   SEND_EMAIL?: EmailBinding; // ADR 18: optional send_email binding. Email alerts are off without it.
   ALERT_EMAIL_FROM?: string; // ADR 18: sender address on a domain verified for the binding
+  BACKUP?: R2Bucket; // ADR 23: optional R2 bucket for daily backups (last 30 kept). Absent = no scheduled copy.
 }
 
 /** The subset of the Workers send_email binding that alerts use. */

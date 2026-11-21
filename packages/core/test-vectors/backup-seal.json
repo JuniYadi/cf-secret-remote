@@ -1,0 +1,8 @@
+{
+  "passphrase": "correct horse battery",
+  "iterations": 600000,
+  "salt": "000102030405060708090a0b0c0d0e0f",
+  "iv": "a0a1a2a3a4a5a6a7a8a9aaab",
+  "plaintext": "{\"schema\":12,\"createdAt\":1700000000,\"tables\":{\"policy\":[{\"id\":\"p1\",\"name\":\"ops\",\"rules\":\"[]\"}]}}",
+  "sealed": "4346535345414c31000927c0000102030405060708090a0b0c0d0e0fa0a1a2a3a4a5a6a7a8a9aaabce31a2f3be97961714081ef65aa3901571015461e2a40dfae306c18bb92dc64f90984a406be2bb689cd33c74d67d8cdea4d36bb264a916c482c1cbc9d7d6179cf144ca682b50ddd74b2524f21a97b413020074482ee9c3b20e9baabc221d9cbbbc1f9f9d788fc95ad18592d1a77961de"
+}

@@ -1,6 +1,7 @@
 export const PROTOCOL_VERSION = 1;
 
 export * from "./audit.ts";
+export * from "./backup-seal.ts";
 export * from "./bundle.ts";
 export * from "./encoding.ts";
 export * from "./envelope.ts";

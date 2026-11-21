@@ -31,6 +31,18 @@ export interface Client {
     body?: unknown,
     headers?: Record<string, string>,
   ): Promise<{ status: number; body: T }>;
+  /** Like call, with extra request headers (ADR 23: the backup passphrase travels in a header only). */
+  send<T = unknown>(
+    method: string,
+    path: string,
+    body?: unknown,
+    headers?: Record<string, string>,
+  ): Promise<{ status: number; body: T }>;
+  /** A binary GET. On a refusal, `error` holds the server's message. */
+  download(
+    path: string,
+    headers?: Record<string, string>,
+  ): Promise<{ status: number; bytes: Uint8Array; error?: string }>;
 }
 
 async function raw<T>(
@@ -56,6 +68,43 @@ async function raw<T>(
     throw new CliError(`Cannot reach ${host}. Check the host and your network.`);
   }
   return { status: r.status, body: (await r.json().catch(() => ({}))) as T };
+}
+
+async function rawBytes(
+  host: string,
+  path: string,
+  token: string | undefined,
+  extra: Record<string, string> = {},
+) {
+  let r: Response;
+  try {
+    r = await fetch(`${host}/api/v1${path}`, {
+      headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...extra },
+    });
+  } catch {
+    throw new CliError(`Cannot reach ${host}. Check the host and your network.`);
+  }
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  let error: string | undefined;
+  if (r.status !== 200) {
+    try {
+      error = (JSON.parse(new TextDecoder().decode(bytes)) as { error?: string }).error;
+    } catch {
+      error = undefined;
+    }
+  }
+  return { status: r.status, bytes, error };
+}
+
+/** A client that sends `token` with every request. */
+function signed(host: string, token: string, privateKey?: string): Client {
+  return {
+    host,
+    privateKey,
+    call: (m, p, b, h) => raw(host, m, p, b, token, h),
+    send: (m, p, b, h) => raw(host, m, p, b, token, h),
+    download: (p, h) => rawBytes(host, p, token, h),
+  };
 }
 
 export const anonymous = (host: string) => ({
@@ -86,12 +135,7 @@ export async function connect(
     });
     if (!r.body.token)
       throw new CliError("The access kit was refused. It may be revoked or expired.");
-    const token = r.body.token;
-    return {
-      host,
-      privateKey: kit.privateKey,
-      call: (m, p, b, h) => raw(host, m, p, b, token, h),
-    };
+    return signed(host, r.body.token, kit.privateKey);
   }
   const resolved = resolveHost(hostFlag);
   if (!resolved)
@@ -107,11 +151,7 @@ export async function connect(
       `You are signed in to ${s.host}, not ${host}. Run: cfs login --host ${host}`,
     );
   await checkServer(host);
-  return {
-    host,
-    privateKey: await loadUnlock(pickStore(), host),
-    call: (m, p, b, h) => raw(host, m, p, b, s.token, h),
-  };
+  return signed(host, s.token, await loadUnlock(pickStore(), host));
 }
 
 function fail(status: number, body: unknown, what: string): never {

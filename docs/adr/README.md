@@ -28,7 +28,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [20](0020-recovery-and-vault-password.md) | Recovery, vault password, admins | implemented |
 | [21](0021-offboarding.md) | Offboarding | planned |
 | [22](0022-secrets-versions-and-metadata.md) | Versions, history, import, metadata | implemented |
-| [23](0023-backup-and-restore.md) | Backup and restore | planned |
+| [23](0023-backup-and-restore.md) | Backup and restore | implemented |
 | [24](0024-web-app.md) | Web app | planned |
 | [25](0025-deploy-and-distribution.md) | Deploy, init, hosts, releases | implemented |
 | [26](0026-testing-strategy.md) | Testing strategy | planned, starts first |

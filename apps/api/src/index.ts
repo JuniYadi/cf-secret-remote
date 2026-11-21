@@ -10,7 +10,7 @@ import { agent_rules } from "./routes/agent-rules.ts";
 import { alerts } from "./routes/alerts.ts";
 import { approle } from "./routes/approle.ts";
 import { apps } from "./routes/apps.ts";
-import { backup } from "./routes/backup.ts";
+import { backup, blockDuringMaintenance } from "./routes/backup.ts";
 import { checkpoint } from "./routes/checkpoint.ts";
 import { cliApprove, cliPublic } from "./routes/cli.ts";
 import { keyrings } from "./routes/keyrings.ts";
@@ -27,6 +27,7 @@ import { now } from "./util.ts";
 
 const app = new Hono<AppEnv>();
 app.use("/api/*", bodyLimit);
+app.use("/api/*", blockDuringMaintenance); // ADR 23: writes return 503 while a restore runs
 
 // Read by `cfs` before it talks to the server (ADR 25). Keep in step with the release version.
 const SERVER_VERSION = "0.0.0";
