@@ -75,21 +75,57 @@ admin.get("/audit", async (c) => {
   return c.json(rows.results.map((r) => ({ seq: r.seq, hash: r.hash, ...JSON.parse(r.entry) })));
 });
 
-// Re-checks the whole chain; also what the daily head hash is taken from.
+// Re-checks the chain from audit_base (or genesis if nothing was pruned), then each stored checkpoint (ADR 19).
+// firstBad is the index into the rows after the base; firstBadSeq is that row's seq.
 admin.get("/audit/verify", async (c) => {
-  const rows = await c.env.DB.prepare("SELECT entry, hash FROM audit ORDER BY seq").all<{
-    entry: string;
-    hash: string;
-  }>();
+  const db = c.env.DB;
+  const base = await db
+    .prepare("SELECT seq, hash FROM audit_base WHERE id = 1")
+    .first<{ seq: number; hash: string }>();
+  const start = base?.hash ?? GENESIS;
+  const rows = await db
+    .prepare("SELECT seq, entry, hash FROM audit ORDER BY seq")
+    .all<{ seq: number; entry: string; hash: string }>();
   const bad = await verifyChain(
     rows.results.map((r) => ({ entry: JSON.parse(r.entry), hash: r.hash })),
-    GENESIS,
+    start,
   );
+  const bySeq = new Map(rows.results.map((r) => [r.seq, r.hash]));
+  const cps = await db
+    .prepare("SELECT day, seq, head FROM checkpoint ORDER BY day")
+    .all<{ day: string; seq: number; head: string }>();
+  const checkpoints = {
+    stored: cps.results.length,
+    verified: 0,
+    pruned: 0,
+    mismatched: [] as string[],
+  };
+  for (const cp of cps.results) {
+    if (cp.seq === 0) {
+      // Taken on an empty chain.
+      if (cp.head === GENESIS && !base) checkpoints.verified++;
+      else if (cp.head === GENESIS) checkpoints.pruned++;
+      else checkpoints.mismatched.push(cp.day);
+    } else if (base && cp.seq === base.seq) {
+      if (cp.head === base.hash) checkpoints.verified++;
+      else checkpoints.mismatched.push(cp.day);
+    } else if (base && cp.seq < base.seq) {
+      checkpoints.pruned++; // the row is gone by design; retention wrote this checkpoint first
+    } else if (bySeq.get(cp.seq) === cp.head) {
+      checkpoints.verified++;
+    } else {
+      checkpoints.mismatched.push(cp.day); // row missing or rewritten since the checkpoint
+    }
+  }
+  const chainOk = bad === -1;
   return c.json({
-    ok: bad === -1,
+    ok: chainOk && checkpoints.mismatched.length === 0,
     rows: rows.results.length,
-    firstBad: bad === -1 ? null : bad,
-    head: rows.results.at(-1)?.hash ?? GENESIS,
+    firstBad: chainOk ? null : bad,
+    firstBadSeq: chainOk ? null : (rows.results[bad]?.seq ?? null),
+    head: rows.results.at(-1)?.hash ?? start,
+    base: base ? { seq: base.seq, hash: base.hash } : null,
+    checkpoints,
   });
 });
 

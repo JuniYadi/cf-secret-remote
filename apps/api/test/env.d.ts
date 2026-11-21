@@ -10,6 +10,8 @@ declare global {
       ACCESS_TEAM_DOMAIN: string;
       ACCESS_AUD: string;
       TEST_MIGRATIONS: D1Migration[];
+      AUDIT_RETENTION_DAYS?: string;
+      CHECKPOINT_WEBHOOK_URL?: string;
     }
   }
 }
