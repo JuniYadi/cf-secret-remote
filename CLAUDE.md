@@ -7,6 +7,7 @@ Bun workspaces monorepo. Follow the decisions in `docs/adr/`. Read `DESIGN.md` b
 - `apps/web`: SPA.
 - `apps/cli`: `cfs`, built with `bun build --compile`.
 - `packages/core`: crypto and shared formats. Imported by all apps as `@cfs/core`.
+- `docs/adr/`: decisions. Implement from these; the index shows the build order and status.
 - `design/`: UI canvas sources and brand SVGs. Not part of the build.
 
 ## Rules that must hold
