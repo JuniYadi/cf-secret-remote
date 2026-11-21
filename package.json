@@ -8,13 +8,16 @@
     "dev:api": "bun run --filter @cfs/api dev",
     "build:web": "bun run --filter @cfs/web build",
     "build:cli": "bun run --filter @cfs/cli build",
-    "typecheck": "bun run --filter '*' typecheck",
-    "test": "bun run --filter '*' test",
-    "lint": "biome check apps packages",
-    "format": "biome format --write apps packages"
+    "typecheck": "bun run --filter '*' typecheck && tsc -p scripts/tsconfig.json",
+    "test": "bun run --filter '*' test && bun test scripts",
+    "lint": "biome check apps packages scripts",
+    "format": "biome format --write apps packages scripts",
+    "bundle:worker": "bun run scripts/bundle-worker.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
+    "@cfs/core": "workspace:*",
+    "@types/bun": "^1.4.5",
     "typescript": "^5.6.0"
   }
 }
