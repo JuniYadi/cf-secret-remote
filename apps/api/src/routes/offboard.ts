@@ -223,11 +223,29 @@ offboard.post("/offboard/:id/finish", async (c) => {
     );
   }
 
+  // The disable is conditional on the person still being in no group, so a group add that landed after the
+  // check above cannot slip through; the cleanup only runs once they are disabled.
   const results = await db.batch([
-    db.prepare("UPDATE identity SET status = 'disabled' WHERE id = ?").bind(p.id),
-    db.prepare("DELETE FROM session WHERE identity_id = ?").bind(p.id),
-    db.prepare("DELETE FROM identity_policy WHERE identity_id = ?").bind(p.id),
+    db
+      .prepare(
+        `UPDATE identity SET status = 'disabled' WHERE id = ? AND status <> 'disabled'
+         AND NOT EXISTS (SELECT 1 FROM keyring_member WHERE identity_id = ?)
+         AND NOT EXISTS (SELECT 1 FROM keyring_member_staged WHERE identity_id = ?)`,
+      )
+      .bind(p.id, p.id, p.id),
+    db
+      .prepare(
+        "DELETE FROM session WHERE identity_id = ? AND EXISTS (SELECT 1 FROM identity WHERE id = ? AND status = 'disabled')",
+      )
+      .bind(p.id, p.id),
+    db
+      .prepare(
+        "DELETE FROM identity_policy WHERE identity_id = ? AND EXISTS (SELECT 1 FROM identity WHERE id = ? AND status = 'disabled')",
+      )
+      .bind(p.id, p.id),
   ]);
+  if (p.status !== "disabled" && !results[0]?.meta.changes)
+    return c.json({ error: "the person changed while finishing, reload and retry" }, 409);
   const flipped = p.status !== "disabled";
   const ended = results[1]?.meta.changes ?? 0;
   const removed = results[2]?.meta.changes ?? 0;
