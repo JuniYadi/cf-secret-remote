@@ -1,6 +1,7 @@
 import { GENESIS } from "@cfs/core";
 import { dayOf } from "./quota.ts";
 import { sweepExpiredRequests } from "./requests-sweep.ts";
+import { backupDaily } from "./routes/backup.ts";
 import type { Env } from "./types.ts";
 
 const DAY = 86400;
@@ -86,6 +87,7 @@ export async function runDaily(
     );
 
   const pruned = await pruneAudit(db, t, retentionDays(env));
+  await backupDaily(env, t);
 
   await db.batch([
     db.prepare("DELETE FROM login_attempt WHERE window < ?").bind(t - LOGIN_WINDOW_KEEP_SEC),

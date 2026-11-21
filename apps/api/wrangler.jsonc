@@ -34,6 +34,10 @@
     // Optional: CHECKPOINT_WEBHOOK_URL as a var or secret. The daily checkpoint is posted there when set.
   },
 
+  // ADR 23 (optional): with an R2 bucket bound as BACKUP, the daily job keeps the last 30 backups there.
+  // Without it the daily job does nothing and backups are downloads only.
+  // "r2_buckets": [{ "binding": "BACKUP", "bucket_name": "cfs-backups" }],
+
   // ADR 19: 00:05 UTC checkpoint, pruning, and sweeps. Runs `scheduled` in src/index.ts.
   "triggers": { "crons": ["5 0 * * *"] },
 

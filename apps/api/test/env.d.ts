@@ -12,6 +12,7 @@ declare global {
       TEST_MIGRATIONS: D1Migration[];
       AUDIT_RETENTION_DAYS?: string;
       CHECKPOINT_WEBHOOK_URL?: string;
+      BACKUP?: R2Bucket;
     }
   }
 }
