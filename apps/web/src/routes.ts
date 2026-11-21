@@ -38,6 +38,15 @@ export const PATHS = {
   secretsNew: "/secrets/new",
   secretsImport: "/secrets/import",
   secretsImportReview: "/secrets/import/review",
+  // ADR 24 part 5: settings tabs, offboarding, give access again, account, quota, and "Was this you?".
+  settingsAdmins: "/settings/admins",
+  settingsBackup: "/settings/backup",
+  restore: "/settings/backup/restore",
+  offboard: "/groups/offboard",
+  regrant: "/groups/regrant",
+  password: "/account/password",
+  quota: "/quota",
+  wasYou: "/was-you",
 } as const;
 
 /** Suffixes of a secret's own pages. The secret name comes first: /secrets/myapp/dev/versions. */
@@ -93,7 +102,15 @@ export type PageId =
   | "roleNew"
   | "appNew"
   | "appDetail"
-  | "appKit";
+  | "appKit"
+  | "settingsAdmins"
+  | "settingsBackup"
+  | "restore"
+  | "offboard"
+  | "regrant"
+  | "password"
+  | "quota"
+  | "wasYou";
 
 /** Pages inside the signed-in shell (sidebar and header). They need an unlocked vault. */
 export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
@@ -125,6 +142,13 @@ export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
   "appNew",
   "appDetail",
   "appKit",
+  "settingsAdmins",
+  "settingsBackup",
+  "restore",
+  "offboard",
+  "regrant",
+  "password",
+  "quota",
 ]);
 
 export interface Crumb {
@@ -167,6 +191,14 @@ const STATIC_PATHS: Readonly<Record<string, PageId>> = {
   [PATHS.permNew]: "permNew",
   [PATHS.roleNew]: "roleNew",
   [PATHS.appNew]: "appNew",
+  [PATHS.settingsAdmins]: "settingsAdmins",
+  [PATHS.settingsBackup]: "settingsBackup",
+  [PATHS.restore]: "restore",
+  [PATHS.offboard]: "offboard",
+  [PATHS.regrant]: "regrant",
+  [PATHS.password]: "password",
+  [PATHS.quota]: "quota",
+  [PATHS.wasYou]: "wasYou",
 };
 
 function decodeSegment(segment: string): string | undefined {
@@ -194,6 +226,12 @@ export function matchPage(pathname: string): MatchedPage {
   if (denied?.[1] !== undefined) {
     const name = decodeSegment(denied[1]);
     return name ? { id: "denied", name } : { id: "notFound" };
+  }
+  // Give access again for one request: /groups/regrant/:id (the list is /groups/regrant).
+  const regrant = path.match(/^\/groups\/regrant\/([^/]+)$/);
+  if (regrant?.[1] !== undefined) {
+    const id = decodeSegment(regrant[1]);
+    return id ? { id: "regrant", name: id } : { id: "notFound" };
   }
   const fixed = STATIC_PATHS[path];
   if (fixed !== undefined) return { id: fixed };
@@ -262,7 +300,7 @@ export function pageCrumbs(id: PageId, name?: string): Crumb[] {
     case "unlock":
       return [{ label: t("Unlock your vault", "Buka vault-mu") }];
     case "forgot":
-      return [{ label: t("Forgot password", "Lupa password") }];
+      return [{ label: t("Forgot your vault password?", "Lupa vault password?") }];
     case "recover":
       return [{ label: t("Use your recovery key", "Pakai kunci pemulihan") }];
     case "alerts":
@@ -280,6 +318,41 @@ export function pageCrumbs(id: PageId, name?: string): Crumb[] {
       return [{ label: t("Authorize cfs", "Izinkan cfs") }];
     case "cliDone":
       return [{ label: t("You're signed in", "Kamu sudah masuk") }];
+    case "settingsAdmins":
+      return [
+        { label: t("Settings", "Pengaturan"), href: PATHS.settings },
+        { label: t("Admins", "Admin") },
+      ];
+    case "settingsBackup":
+      return [
+        { label: t("Settings", "Pengaturan"), href: PATHS.settings },
+        { label: t("Backup", "Cadangan") },
+      ];
+    case "restore":
+      return [
+        { label: t("Settings", "Pengaturan"), href: PATHS.settings },
+        { label: t("Backup", "Cadangan"), href: PATHS.settingsBackup },
+        { label: t("Restore from a backup", "Pulihkan dari cadangan") },
+      ];
+    case "offboard":
+      return [
+        { label: t("Groups", "Grup"), href: PATHS.groups },
+        { label: t("Offboard a teammate", "Keluarkan anggota") },
+      ];
+    case "regrant":
+      return [
+        { label: t("Groups", "Grup"), href: PATHS.groups },
+        { label: t("Give access again", "Beri akses lagi") },
+      ];
+    case "password":
+      return [
+        { label: t("Account", "Akun") },
+        { label: t("Change vault password", "Ganti vault password") },
+      ];
+    case "quota":
+      return [{ label: t("Free plan limit reached", "Batas paket gratis tercapai") }];
+    case "wasYou":
+      return [{ label: t("Was this you?", "Apakah ini kamu?") }];
     case "notFound":
       return [{ label: t("Page not found", "Halaman tidak ditemukan") }];
     case "secretsNew":
@@ -374,7 +447,13 @@ export interface GuardInput {
 export function guardTarget(input: GuardInput): string | null {
   const { page, phase, vaultReady, unlocked } = input;
   if (page === "root") return PATHS.secrets;
-  if (page === "signIn" || page === "sessionEnded" || page === "forgot" || page === "recover") {
+  if (
+    page === "signIn" ||
+    page === "sessionEnded" ||
+    page === "forgot" ||
+    page === "recover" ||
+    page === "wasYou"
+  ) {
     return null;
   }
   if (page === "notFound") return null;

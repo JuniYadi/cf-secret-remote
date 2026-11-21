@@ -14,19 +14,30 @@ import { AlertsPage } from "./screens/Alerts.tsx";
 import { CliAuthorizePage } from "./screens/CliAuthorize.tsx";
 import { CliDonePage } from "./screens/CliDone.tsx";
 import { DevicesPage } from "./screens/Devices.tsx";
+import { ForgotPage } from "./screens/Forgot.tsx";
+import { OffboardPage } from "./screens/Offboard.tsx";
+import { PasswordChangePage } from "./screens/PasswordChange.tsx";
 import {
   ComingSoonPage,
   LoadErrorPage,
   LoadingPage,
   NotFoundPage,
 } from "./screens/Placeholders.tsx";
+import { QuotaReachedPage } from "./screens/QuotaReached.tsx";
+import { RecoverPage } from "./screens/Recover.tsx";
+import { RegrantPage } from "./screens/Regrant.tsx";
 import { RequestsPage } from "./screens/Requests.tsx";
+import { RestorePage } from "./screens/Restore.tsx";
 import { renderSecretPage } from "./screens/SecretRoutes.tsx";
 import { SessionEndedPage } from "./screens/SessionEnded.tsx";
+import { SettingsPage } from "./screens/Settings.tsx";
+import { SettingsAdminsPage } from "./screens/SettingsAdmins.tsx";
+import { SettingsBackupPage } from "./screens/SettingsBackup.tsx";
 import { SetupPage } from "./screens/Setup.tsx";
 import { SetupRecoveryPage } from "./screens/SetupRecovery.tsx";
 import { SignInPage } from "./screens/SignIn.tsx";
 import { UnlockPage } from "./screens/Unlock.tsx";
+import { WasYouPage } from "./screens/WasYou.tsx";
 
 /** Pages that render without a session check. */
 const PUBLIC_PAGES: ReadonlySet<PageId> = new Set<PageId>([
@@ -34,6 +45,7 @@ const PUBLIC_PAGES: ReadonlySet<PageId> = new Set<PageId>([
   "sessionEnded",
   "forgot",
   "recover",
+  "wasYou",
   "notFound",
 ]);
 
@@ -78,8 +90,11 @@ function renderPage(
     case "sessionEnded":
       return <SessionEndedPage />;
     case "forgot":
+      return <ForgotPage />;
     case "recover":
-      return <ComingSoonPage id={page.id} shell={false} />;
+      return <RecoverPage />;
+    case "wasYou":
+      return <WasYouPage />;
     case "notFound":
       return <NotFoundPage />;
     default:
@@ -134,6 +149,55 @@ function renderPage(
       return (
         <ShellFrame>
           <DevicesPage />
+        </ShellFrame>
+      );
+    // ADR 24 part 5: settings, offboarding, give access again, account password, quota.
+    case "settings":
+      return (
+        <ShellFrame>
+          <SettingsPage />
+        </ShellFrame>
+      );
+    case "settingsAdmins":
+      return (
+        <ShellFrame>
+          <SettingsAdminsPage />
+        </ShellFrame>
+      );
+    case "settingsBackup":
+      return (
+        <ShellFrame>
+          <SettingsBackupPage />
+        </ShellFrame>
+      );
+    case "restore":
+      return (
+        <ShellFrame>
+          <RestorePage />
+        </ShellFrame>
+      );
+    case "offboard":
+      return (
+        <ShellFrame>
+          <OffboardPage />
+        </ShellFrame>
+      );
+    case "regrant":
+      return (
+        <ShellFrame>
+          <RegrantPage id={page.name} />
+        </ShellFrame>
+      );
+    case "password":
+      return (
+        <ShellFrame>
+          <PasswordChangePage />
+        </ShellFrame>
+      );
+    case "quota":
+      return (
+        <ShellFrame>
+          <QuotaReachedPage />
         </ShellFrame>
       );
     default: {

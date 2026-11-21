@@ -6,8 +6,10 @@ import {
   lockPrivateKey,
   lockWithRecoveryKey,
   newRecoveryKey,
+  recoveryEntropy,
   recoveryPhrase,
   unlockPrivateKey,
+  unlockWithRecoveryKey,
 } from "@cfs/core";
 
 export interface NewVault {
@@ -43,3 +45,26 @@ export async function createRecoveryKey(): Promise<NewRecoveryKey> {
 /** Seals the private key under the recovery key. The result is what the server stores. */
 export const lockRecovery = (privateKey: string, entropy: Uint8Array): Promise<string> =>
   lockWithRecoveryKey(privateKey, entropy);
+
+/** Locks an unlocked private key with a vault password. The result is what the server stores. */
+export const lockWithPassword = (privateKey: string, password: string): Promise<string> =>
+  lockPrivateKey(privateKey, password);
+
+/** Opens the private key with the 24 words of the recovery key (ADR 20). Rejects a bad phrase or lock. */
+export async function openWithRecoveryKey(lockedRecovery: string, phrase: string): Promise<string> {
+  const entropy = await recoveryEntropy(phrase);
+  return unlockWithRecoveryKey(lockedRecovery, entropy);
+}
+
+/**
+ * Opens the private key with the current password and locks the same key with the new one (ADR 20).
+ * The public key does not change, so group access does not change.
+ */
+export async function relockWithNewPassword(
+  lockedKey: string,
+  oldPassword: string,
+  newPassword: string,
+): Promise<{ privateKey: string; lockedKey: string }> {
+  const privateKey = await unlockPrivateKey(lockedKey, oldPassword);
+  return { privateKey, lockedKey: await lockPrivateKey(privateKey, newPassword) };
+}

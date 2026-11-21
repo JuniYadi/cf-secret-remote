@@ -488,3 +488,41 @@ describe("ADR 20: vault password and recovery key", () => {
     expect((await api("GET", "/whoami", p.token)).body.publicKey).toBe(next.kp.publicKey);
   });
 });
+
+// Web part 5 (ADR 24): the admin's list of pending requests, and the recovery-key flag on the directory.
+describe("ADR 20: pending list and recovery-key status for the web", () => {
+  it("an admin lists pending requests; a member is refused; a cancelled one leaves the list", async () => {
+    const a = await person({ role: "admin" });
+    const p = await person();
+    expect((await api("GET", "/recovery", p.token)).status).toBe(403);
+
+    const { r } = await startRecovery(p);
+    expect(r.status).toBe(201);
+    const listed = await api("GET", "/recovery", a.token);
+    expect(listed.status).toBe(200);
+    // Other tests in this file leave requests behind, so look for this one by id.
+    expect(listed.body).toContainEqual(
+      expect.objectContaining({ id: r.body.id, name: p.name, attempts: 0 }),
+    );
+    // The list holds names and counts only, never the key or the cancel token.
+    expect(JSON.stringify(listed.body)).not.toContain(r.body.cancelToken);
+    expect(JSON.stringify(listed.body)).not.toContain("publicKey");
+
+    await api("POST", `/recovery/${r.body.id}/cancel`, p.token, { token: r.body.cancelToken });
+    const after = (await api("GET", "/recovery", a.token)).body as { id: string }[];
+    expect(after.map((x) => x.id)).not.toContain(r.body.id);
+  });
+
+  it("the directory says whether each person has a recovery key, never the key itself", async () => {
+    const a = await person({ role: "admin" });
+    const withKey = await person();
+    await api("PUT", "/me/recovery", withKey.token, {
+      lockedKey: `rk1.v1.${"A".repeat(16)}.${"B".repeat(16)}`,
+    });
+    const dir = await api("GET", "/identities", a.token);
+    const rows = dir.body as { name: string; recoverySet: number | boolean }[];
+    expect(Boolean(rows.find((r) => r.name === withKey.name)?.recoverySet)).toBe(true);
+    expect(Boolean(rows.find((r) => r.name === a.name)?.recoverySet)).toBe(false);
+    expect(JSON.stringify(dir.body)).not.toContain("rk1.");
+  });
+});

@@ -6,6 +6,7 @@ import { t } from "../lib/i18n.ts";
 import { lock, touch } from "../lib/keystore.ts";
 import { signOut } from "../lib/session.ts";
 import { NAV_ITEMS, PATHS } from "../routes.ts";
+import { QuotaBanner } from "./parts.tsx";
 import { BrandRow, Icon, LangToggle } from "./shared.tsx";
 
 /** The signed-in layout: sidebar with Lock vault and Sign out, then the page. */
@@ -64,7 +65,10 @@ export function Shell({ children }: { children: ComponentChildren }) {
           </div>
         </div>
       </aside>
-      <main class="main">{children}</main>
+      <main class="main">
+        <QuotaBanner />
+        {children}
+      </main>
       {keys.warning && keys.lockAt !== null && <AutoLockWarning lockAt={keys.lockAt} />}
     </div>
   );
