@@ -1,6 +1,6 @@
 # cf-secret-remote
 
-Bun workspaces monorepo. Read `DESIGN.md` before changing behaviour: it records every product and protocol decision.
+Bun workspaces monorepo. Follow the decisions in `docs/adr/`. Read `DESIGN.md` before changing behaviour: it records every product and protocol decision.
 
 ## Layout
 - `apps/api`: Cloudflare Worker (Hono), D1 migrations in `apps/api/migrations`. Serves `apps/web/dist` as static assets.
