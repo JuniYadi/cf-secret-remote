@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+.app{display:flex;flex-wrap:wrap;min-height:820px;width:100%}
+.side{flex:0 0 244px;background:#fff;border-right:1px solid #DDE2E8;padding:20px 14px;display:flex;flex-direction:column;gap:22px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px}
+.logo{width:32px;height:32px;border-radius:8px;background:#0B7A75;display:flex;align-items:center;justify-content:center}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:7px;color:#131A22;text-decoration:none;font-size:15px;min-height:44px}
+.nav a:hover{background:#F0F3F6;color:#131A22}
+.nav a.on{background:#E3F3F2;color:#075E5A;font-weight:600}
+.me{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #DDE2E8;border-radius:9px;text-decoration:none;color:#131A22}
+.ava{width:32px;height:32px;border-radius:99px;background:#131A22;color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff;align-self:flex-start}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+.main{flex:999 1 640px;min-width:0;padding:24px 32px 40px;display:flex;flex-direction:column;gap:18px}
+h1{font:700 28px/1.2 'Space Grotesk',sans-serif;margin:0}
+h2{font:600 16px/1.3 'Space Grotesk',sans-serif;margin:0}
+.card{background:#fff;border:1px solid #DDE2E8;border-radius:10px;min-width:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border-radius:8px;border:1px solid #C9D0D8;background:#fff;color:#131A22;font:600 13.5px 'Inter',sans-serif;text-decoration:none}
+.btn:hover{background:#F0F3F6;color:#131A22}
+.btn:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font:500 12.5px 'Inter',sans-serif;border:1px solid #DDE2E8;color:#5B6672;background:#fff;white-space:nowrap}
+.pill.ok{color:#17703F;border-color:#9FD3B5;background:#E8F5EE}
+.pill.warn{color:#8F5F00;border-color:#E6C878;background:#FFF4D6}
+.tabs{display:flex;gap:4px;border-bottom:1px solid #DDE2E8;overflow-x:auto}
+.tabs a{padding:0 16px;min-height:44px;display:flex;align-items:center;gap:8px;color:#5B6672;text-decoration:none;font-size:15px;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs a.on{color:#131A22;font-weight:600;border-bottom-color:#0B7A75}
+.kv{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #EEF1F4;font-size:14.5px}
+.kv:last-child{border-bottom:none}
+.kv span:first-child{color:#5B6672}
+.meter{position:relative;height:8px;border-radius:99px;background:#EEF1F4;margin:6px 0 2px}
+.meter i{display:block;height:100%;border-radius:99px;background:#0B7A75}
+.use{padding:10px 0;border-bottom:1px solid #EEF1F4}
+.use:last-child{border-bottom:none}
+.use .t{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;font-size:14.5px}
+.use .t span:last-child{color:#5B6672}
+</style>
+</helmet>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(1.1 -1.7)"><circle cx="17" cy="32" r="10" fill="none" stroke="#fff" stroke-width="7"/><circle cx="40" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="45" r="4" fill="#fff"/></g></svg></div><div><div style="font:700 17px 'Space Grotesk',sans-serif;line-height:1">cfs</div><div style="font-size:12px;color:#5B6672">myorg</div></div></div>
+    <nav class="nav" aria-label="Main">
+      <a href="Secrets.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3"/></svg>{{t.navSecrets}}</a>
+      <a href="Keyring.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8"/></svg>{{t.navGroups}}</a>
+      <a href="Policies.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{{t.navPerms}}</a>
+      <a href="AppRoles.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6 M12 19h8"/></svg>{{t.navApps}}</a>
+      <a href="Audit.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01"/></svg>{{t.navActivity}}</a>
+      <a class="on" href="Settings.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6"/></svg>{{t.navSettings}}</a>
+    </nav>
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:12px">
+      <div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div>
+      <a class="me" href="Devices.dc.html"><div class="ava">A</div><div style="min-width:0"><div style="font-size:14px;font-weight:600">Alice Wijaya</div><div style="font-size:12.5px;color:#5B6672">{{t.admin}}</div></div></a>
+      <div style="display:flex;gap:8px"><a href="Unlock.dc.html" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:36px;border:1px solid #C9D0D8;border-radius:8px;color:#131A22;text-decoration:none;font-size:13px;font-weight:600;background:#fff">{{t.lock}}</a><a href="Main.dc.html" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:36px;border:1px solid #C9D0D8;border-radius:8px;color:#131A22;text-decoration:none;font-size:13px;font-weight:600;background:#fff">{{t.signout}}</a></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div>
+      <h1>{{t.navSettings}}</h1>
+      <p style="margin:8px 0 0;color:#5B6672;font-size:15px;max-width:66ch;line-height:1.5">{{t.sub}}</p>
+    </div>
+    <div class="tabs" role="tablist"><a class="on" href="Settings.dc.html">{{t.tGeneral}}</a><a href="Settings-Admins.dc.html">{{t.tAdmins}}</a><a href="Settings-Backup.dc.html">{{t.tBackup}}</a></div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+      <div class="card" style="flex:1 1 400px;padding:6px 20px">
+        <div style="padding:14px 0 4px;display:flex;justify-content:space-between;gap:8px;align-items:center"><h2>{{t.depTitle}}</h2><span class="pill ok">{{t.allGood}}</span></div>
+        <div class="kv"><span>{{t.k1}}</span><span>0.4.1 <span class="pill ok">{{t.upToDate}}</span></span></div>
+        <div class="kv"><span>{{t.k2}}</span><span class="pill ok">{{t.healthy}}</span></div>
+        <div class="kv"><span>{{t.k3}}</span><span class="pill ok">{{t.active}}</span></div>
+        <div class="kv"><span>{{t.k4}}</span><span>vault.myorg.com</span></div>
+        <div class="kv"><span>{{t.k5}}</span><span>12 {{t.of}} 50</span></div>
+      </div>
+
+      <div class="card" style="flex:1 1 400px;padding:6px 20px">
+        <div style="padding:14px 0 4px;display:flex;justify-content:space-between;gap:8px;align-items:center"><h2>{{t.useTitle}}</h2><span style="font-size:13px;color:#5B6672">{{t.resets}}</span></div>
+        <div class="use"><div class="t"><span>{{t.u1}}</span><span>62,400 / 100,000</span></div><div class="meter"><i style="width:62%"></i></div></div>
+        <div class="use"><div class="t"><span>{{t.u2}}</span><span>41,200 / 100,000</span></div><div class="meter"><i style="width:41%"></i></div></div>
+        <div class="use"><div class="t"><span>{{t.u3}}</span><span>1.2M / 5M</span></div><div class="meter"><i style="width:24%"></i></div></div>
+        <div class="use"><div class="t"><span>{{t.u4}}</span><span>18 MB / 5 GB</span></div><div class="meter"><i style="width:2%"></i></div></div>
+        <div style="padding:12px 0"><a class="btn" href="Quota-Reached.dc.html">{{t.limit}}</a></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+      <div class="card" style="flex:1 1 400px;padding:6px 20px">
+        <div style="padding:14px 0 4px"><h2>{{t.logTitle}}</h2></div>
+        <div class="kv"><span>{{t.l1}}</span><span>90 {{t.days}}</span></div>
+        <div class="kv"><span>{{t.l2}}</span><span>{{t.l2v}}</span></div>
+        <div class="kv"><span>{{t.l3}}</span><span><a href="Integrity.dc.html">{{t.verified}}</a></span></div>
+      </div>
+      <div class="card" style="flex:1 1 400px;padding:6px 20px">
+        <div style="padding:14px 0 4px"><h2>{{t.notifTitle}}</h2></div>
+        <div class="kv"><span>Slack</span><span class="pill ok">{{t.connected}}</span></div>
+        <div class="kv"><span>{{t.email}}</span><span class="pill">{{t.off}}</span></div>
+        <div style="padding:12px 0"><a class="btn" href="Alerts.dc.html">{{t.alerts}}</a></div>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+navSecrets: d('Secrets', 'Secret'), navGroups: d('Groups', 'Grup'), navPerms: d('Permissions', 'Izin'), navApps: d('Apps & bots', 'Aplikasi & bot'), navActivity: d('Activity', 'Aktivitas'), navSettings: d('Settings', 'Pengaturan'),
+admin: d('Admin', 'Admin'), lock: d('Lock vault', 'Kunci vault'), signout: d('Sign out', 'Keluar'),
+sub: d('How your vault is running, how much of the free plan you’re using, and who looks after it.', 'Bagaimana vault-mu berjalan, seberapa banyak paket gratis terpakai, dan siapa yang mengurusnya.'),
+tGeneral: d('General', 'Umum'), tAdmins: d('Admins', 'Admin'), tBackup: d('Backup', 'Cadangan'),
+depTitle: d('Your deployment', 'Deployment-mu'), allGood: d('All good', 'Semua baik'),
+k1: d('Worker version', 'Versi Worker'), upToDate: d('Up to date', 'Terbaru'),
+k2: d('Database', 'Database'), healthy: d('Healthy', 'Sehat'),
+k3: d('Sign-in protection', 'Perlindungan login'), active: d('Active', 'Aktif'),
+k4: d('Address', 'Alamat'), k5: d('People', 'Orang'), of: d('of', 'dari'),
+useTitle: d('Free plan usage today', 'Pemakaian paket gratis hari ini'), resets: d('Resets at 00:00 UTC', 'Reset pukul 00:00 UTC'),
+u1: d('Saves and log entries', 'Penyimpanan dan entri log'), u2: d('Requests', 'Permintaan'), u3: d('Items read', 'Item dibaca'), u4: d('Storage', 'Penyimpanan'),
+limit: d('What happens at the limit', 'Yang terjadi saat batas tercapai'),
+logTitle: d('Activity log', 'Log aktivitas'), l1: d('Kept for', 'Disimpan selama'), days: d('days', 'hari'),
+l2: d('Daily fingerprint', 'Sidik jari harian'), l2v: d('Sent to Slack and email', 'Dikirim ke Slack dan email'), l3: d('Integrity', 'Integritas'), verified: d('Verified', 'Terverifikasi'),
+notifTitle: d('Notifications', 'Notifikasi'), connected: d('Connected', 'Terhubung'), email: d('Email', 'Email'), off: d('Off', 'Mati'), alerts: d('Alert settings', 'Pengaturan peringatan')
+}
+};
+}
+}
+</script>
+</body>
+</html>

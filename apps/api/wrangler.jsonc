@@ -1,0 +1,35 @@
+{
+  // One Worker serves the API and the web app, on one hostname.
+  "name": "cfs",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-21",
+
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    // Unknown paths get index.html, so deep links into the SPA work.
+    "not_found_handling": "single-page-application",
+    // Only /api/* runs the Worker. Everything else is served as a static file.
+    "run_worker_first": ["/api/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cfs",
+      // Replaced by `cfs deploy` when it creates the database.
+      "database_id": "REPLACE_ME",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "vars": {
+    // The first person to sign in with this email becomes admin.
+    "BOOTSTRAP_ADMIN_EMAIL": "",
+    // Cloudflare Access team domain and application audience, used to check sign-in tokens.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+
+  "observability": { "enabled": true }
+}

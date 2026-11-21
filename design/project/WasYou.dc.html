@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Was this you?</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+h1{font:700 26px/1.2 'Space Grotesk',sans-serif;margin:0}
+.btn{display:flex;align-items:center;justify-content:center;min-height:48px;padding:0 20px;border-radius:8px;border:1px solid #C9D0D8;background:#fff;color:#131A22;font:600 15px 'Inter',sans-serif;text-decoration:none;flex:1 1 180px}
+.btn:hover{background:#F0F3F6;color:#131A22}
+.btn.danger{background:#B42318;border-color:#B42318;color:#fff}
+.btn.danger:hover{background:#8A1F14;color:#fff}
+.btn:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+.row{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;padding:12px 0;border-bottom:1px solid #EEF1F4;font-size:14.5px}
+.row:last-child{border-bottom:none}
+.row span:first-child{color:#5B6672}
+.li{display:flex;gap:10px;font-size:14px;line-height:1.5;color:#2B3541}
+.li i{flex:none;width:6px;height:6px;border-radius:99px;background:#0B7A75;margin-top:8px}
+</style>
+</helmet>
+<div style="min-height:820px;padding:24px 32px 40px;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:flex-end"><div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div></div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center">
+    <div style="width:100%;max-width:520px;display:flex;flex-direction:column;gap:20px">
+      <div style="display:flex;align-items:center;gap:10px;justify-content:center">
+        <div style="width:32px;height:32px;border-radius:8px;background:#0B7A75;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(1.1 -1.7)"><circle cx="17" cy="32" r="10" fill="none" stroke="#fff" stroke-width="7"/><circle cx="40" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="45" r="4" fill="#fff"/></g></svg></div>
+        <span style="font:700 18px 'Space Grotesk',sans-serif">cfs</span>
+      </div>
+      <div style="background:#fff;border:1px solid #DDE2E8;border-radius:12px;padding:28px;display:flex;flex-direction:column;gap:20px">
+        <div style="width:52px;height:52px;border-radius:99px;background:#FFF4D6;color:#8F5F00;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4 M12 17h.01 M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></div>
+        <div>
+          <h1>{{t.title}}</h1>
+          <p style="margin:8px 0 0;color:#5B6672;font-size:15px;line-height:1.5">{{t.sub}}</p>
+        </div>
+        <div>
+          <div class="row"><span>{{t.when}}</span><span>{{t.whenV}}</span></div>
+          <div class="row"><span>{{t.where}}</span><span>Jakarta, Indonesia</span></div>
+          <div class="row"><span>{{t.device}}</span><span>Chrome · macOS</span></div>
+          <div class="row"><span>{{t.asked}}</span><span>{{t.askedV}}</span></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px"><a class="btn" href="Forgot.dc.html">{{t.yes}}</a><a class="btn danger" href="Main.dc.html">{{t.no}}</a></div>
+        <div style="display:flex;flex-direction:column;gap:8px;border-top:1px solid #EEF1F4;padding-top:16px">
+          <b style="font-size:14px">{{t.ifNo}}</b>
+          <div class="li"><i></i><span>{{t.n1}}</span></div>
+          <div class="li"><i></i><span>{{t.n2}}</span></div>
+          <div class="li"><i></i><span>{{t.n3}}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+title: d('Was this you?', 'Apakah ini kamu?'),
+sub: d('Someone asked to reset the vault password for rina@myorg.com and get her groups back. If it wasn’t you, cancel it now.', 'Seseorang meminta reset vault password untuk rina@myorg.com dan meminta grupnya kembali. Jika bukan kamu, batalkan sekarang.'),
+when: d('When', 'Kapan'), whenV: d('Today, 14:32', 'Hari ini, 14:32'),
+where: d('Where it came from', 'Asalnya'), device: d('Device', 'Perangkat'),
+asked: d('What was asked', 'Yang diminta'), askedV: d('New key for Myapp team and Backend team', 'Kunci baru untuk Tim Myapp dan Tim Backend'),
+yes: d('Yes, that was me', 'Ya, itu saya'), no: d('No, cancel it', 'Bukan, batalkan'),
+ifNo: d('If you cancel:', 'Jika kamu membatalkan:'),
+n1: d('The request is thrown away. Nothing is unlocked.', 'Permintaan dibuang. Tidak ada yang terbuka.'),
+n2: d('The admins are told it wasn’t you.', 'Admin diberi tahu bahwa itu bukan kamu.'),
+n3: d('Change your work password, since someone may have your account.', 'Ganti password kerjamu, karena seseorang mungkin memegang akunmu.')
+}
+};
+}
+}
+</script>
+</body>
+</html>

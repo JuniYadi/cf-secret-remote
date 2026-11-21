@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Signed-in devices</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+.app{display:flex;flex-wrap:wrap;min-height:820px;width:100%}
+.side{flex:0 0 244px;background:#fff;border-right:1px solid #DDE2E8;padding:20px 14px;display:flex;flex-direction:column;gap:22px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px}
+.logo{width:32px;height:32px;border-radius:8px;background:#0B7A75;display:flex;align-items:center;justify-content:center}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:7px;color:#131A22;text-decoration:none;font-size:15px;min-height:44px}
+.nav a:hover{background:#F0F3F6;color:#131A22}
+.me{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #0B7A75;background:#F2FAF9;border-radius:9px;text-decoration:none;color:#131A22}
+.ava{width:32px;height:32px;border-radius:99px;background:#131A22;color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff;align-self:flex-start}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+.main{flex:999 1 640px;min-width:0;padding:24px 32px 40px;display:flex;flex-direction:column;gap:18px}
+h1{font:700 28px/1.2 'Space Grotesk',sans-serif;margin:0}
+.card{background:#fff;border:1px solid #DDE2E8;border-radius:10px;min-width:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:8px;border:1px solid #C9D0D8;background:#fff;color:#131A22;font:600 14px 'Inter',sans-serif;text-decoration:none}
+.btn:hover{background:#F0F3F6;color:#131A22}
+.btn.danger{color:#B42318;border-color:#B42318}
+.btn.sm{min-height:36px;padding:0 12px;font-size:13px}
+.btn:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font:500 12.5px 'Inter',sans-serif;border:1px solid #DDE2E8;color:#5B6672;background:#fff;white-space:nowrap}
+.pill.ok{color:#17703F;border-color:#9FD3B5;background:#E8F5EE}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{font:500 12.5px 'Inter',sans-serif;color:#5B6672;text-align:left;padding:12px 16px;border-bottom:1px solid #DDE2E8;white-space:nowrap}
+td{padding:14px 16px;border-bottom:1px solid #EEF1F4;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.sub{font-size:13px;color:#5B6672}
+</style>
+</helmet>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(1.1 -1.7)"><circle cx="17" cy="32" r="10" fill="none" stroke="#fff" stroke-width="7"/><circle cx="40" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="45" r="4" fill="#fff"/></g></svg></div><div><div style="font:700 17px 'Space Grotesk',sans-serif;line-height:1">cfs</div><div style="font-size:12px;color:#5B6672">myorg</div></div></div>
+    <nav class="nav" aria-label="Main">
+      <a href="Secrets.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3"/></svg>{{t.navSecrets}}</a>
+      <a href="Keyring.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8"/></svg>{{t.navGroups}}</a>
+      <a href="Policies.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{{t.navPerms}}</a>
+      <a href="AppRoles.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6 M12 19h8"/></svg>{{t.navApps}}</a>
+      <a href="Audit.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01"/></svg>{{t.navActivity}}</a>
+      <a href="Settings.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6"/></svg>{{t.navSettings}}</a>
+    </nav>
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:12px">
+      <div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div>
+      <a class="me" href="Devices.dc.html"><div class="ava">A</div><div style="min-width:0"><div style="font-size:14px;font-weight:600">Alice Wijaya</div><div style="font-size:12.5px;color:#5B6672">{{t.admin}}</div></div></a>
+      <div style="display:flex;gap:8px"><a href="Unlock.dc.html" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:36px;border:1px solid #C9D0D8;border-radius:8px;color:#131A22;text-decoration:none;font-size:13px;font-weight:600;background:#fff">{{t.lock}}</a><a href="Main.dc.html" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:36px;border:1px solid #C9D0D8;border-radius:8px;color:#131A22;text-decoration:none;font-size:13px;font-weight:600;background:#fff">{{t.signout}}</a></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div style="font-size:14px;color:#5B6672">{{t.account}} / {{t.title}}</div>
+    <div>
+      <h1>{{t.title}}</h1>
+      <p style="margin:8px 0 0;color:#5B6672;font-size:15px;max-width:62ch;line-height:1.5">{{t.sub}}</p>
+    </div>
+
+    <div class="card tw">
+      <table>
+        <thead><tr><th>{{t.cDevice}}</th><th>{{t.cWhere}}</th><th>{{t.cSigned}}</th><th>{{t.cLast}}</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><div style="font-weight:600">Alice’s MacBook Pro</div><div class="sub">cfs 0.4.1 · macOS</div></td><td>Jakarta, ID</td><td>{{t.d2}}</td><td><span class="pill ok">{{t.now}}</span></td><td style="text-align:right"><a class="btn danger sm" href="Devices.dc.html">{{t.signOut}}</a></td></tr>
+          <tr><td><div style="font-weight:600">office-desktop</div><div class="sub">cfs 0.4.0 · Ubuntu</div></td><td>Jakarta, ID</td><td>{{t.d9}}</td><td>{{t.h5}}</td><td style="text-align:right"><a class="btn danger sm" href="Devices.dc.html">{{t.signOut}}</a></td></tr>
+          <tr><td><div style="font-weight:600">Alice’s old laptop</div><div class="sub">cfs 0.3.2 · Windows</div></td><td>Bandung, ID</td><td>{{t.w6}}</td><td>{{t.w3}}</td><td style="text-align:right"><a class="btn danger sm" href="Devices.dc.html">{{t.signOut}}</a></td></tr>
+        </tbody>
+      </table>
+      <div style="padding:14px 16px;background:#F8FAFB;border-top:1px solid #EEF1F4;font-size:13.5px;color:#5B6672;line-height:1.5">{{t.note}}</div>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:10px"><a class="btn" href="Password-Change.dc.html">{{t.pwBtn}}</a><a class="btn danger" href="Devices.dc.html">{{t.all}}</a></div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+navSecrets: d('Secrets', 'Secret'), navGroups: d('Groups', 'Grup'), navPerms: d('Permissions', 'Izin'), navApps: d('Apps & bots', 'Aplikasi & bot'), navActivity: d('Activity', 'Aktivitas'), navSettings: d('Settings', 'Pengaturan'),
+admin: d('Admin', 'Admin'), pwBtn: d('Change vault password', 'Ganti vault password'), lock: d('Lock vault', 'Kunci vault'), signout: d('Sign out', 'Keluar'), account: d('Account', 'Akun'),
+title: d('Signed-in devices', 'Perangkat yang masuk'),
+sub: d('Every computer where you’ve signed in to cfs. Sign out of any you don’t recognize or no longer use.', 'Semua komputer tempat kamu masuk ke cfs. Keluarkan yang tidak kamu kenali atau tidak lagi dipakai.'),
+cDevice: d('Device', 'Perangkat'), cWhere: d('Where', 'Lokasi'), cSigned: d('Signed in', 'Masuk'), cLast: d('Last used', 'Terakhir dipakai'),
+now: d('Just now', 'Baru saja'), d2: d('2 days ago', '2 hari lalu'), d9: d('9 days ago', '9 hari lalu'), w6: d('6 weeks ago', '6 minggu lalu'), h5: d('5 hours ago', '5 jam lalu'), w3: d('3 weeks ago', '3 minggu lalu'),
+signOut: d('Sign out', 'Keluarkan'), all: d('Sign out everywhere', 'Keluarkan di semua tempat'),
+note: d('Signing out ends the session right away. A vault already unlocked on that device locks itself within an hour.', 'Keluar mengakhiri sesi seketika. Vault yang sudah terbuka di perangkat itu terkunci sendiri dalam satu jam.')
+}
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Use your recovery key</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+h1{font:700 26px/1.2 'Space Grotesk',sans-serif;margin:0}
+.btn{display:flex;align-items:center;justify-content:center;min-height:48px;padding:0 20px;border-radius:8px;border:1px solid #0B7A75;background:#0B7A75;color:#fff;font:600 15px 'Inter',sans-serif;text-decoration:none;width:100%}
+.btn:hover{background:#075E5A;color:#fff}
+.btn:focus-visible,a:focus-visible,input:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+label{font-size:14px;font-weight:600}
+.f{display:flex;flex-direction:column;gap:6px}
+textarea{font:13.5px/1.7 'JetBrains Mono',monospace;padding:12px;border:1px solid #C9D0D8;border-radius:8px;background:#fff;color:#131A22;width:100%;min-height:120px;resize:vertical}
+input[type=password]{font:14px 'Inter',sans-serif;min-height:48px;padding:0 12px;border:1px solid #C9D0D8;border-radius:8px;width:100%;background:#fff;color:#131A22}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+</style>
+</helmet>
+<div style="min-height:820px;padding:24px 32px 40px;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:flex-end"><div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div></div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center">
+    <div style="width:100%;max-width:520px;display:flex;flex-direction:column;gap:20px">
+      <div style="display:flex;align-items:center;gap:10px;justify-content:center">
+        <div style="width:32px;height:32px;border-radius:8px;background:#0B7A75;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(1.1 -1.7)"><circle cx="17" cy="32" r="10" fill="none" stroke="#fff" stroke-width="7"/><circle cx="40" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="45" r="4" fill="#fff"/></g></svg></div>
+        <span style="font:700 18px 'Space Grotesk',sans-serif">cfs</span>
+      </div>
+      <div style="background:#fff;border:1px solid #DDE2E8;border-radius:12px;padding:28px;display:flex;flex-direction:column;gap:20px">
+        <div>
+          <h1>{{t.title}}</h1>
+          <p style="margin:8px 0 0;color:#5B6672;font-size:15px;line-height:1.5">{{t.sub}}</p>
+        </div>
+        <div class="f"><label for="rk">{{t.words}}</label><textarea id="rk">anchor velvet kiwi sixty harbor pepper lantern orbit copper river maple signal quiet bridge amber falcon cedar marble ocean violet thunder garden pencil window</textarea></div>
+        <div class="f"><label for="p1">{{t.newPw}}</label><input id="p1" type="password" value="lantern-orbit-pepper-seven"></div>
+        <div class="f"><label for="p2">{{t.repeat}}</label><input id="p2" type="password" value="lantern-orbit-pepper-seven"></div>
+        <a class="btn" href="Secrets.dc.html">{{t.go}}</a>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#5B6672;border-top:1px solid #EEF1F4;padding-top:16px;line-height:1.5">
+          <span>{{t.n1}}</span>
+          <span>{{t.n2}}</span>
+          <span><a href="Forgot.dc.html">{{t.noKey}}</a></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+title: d('Use your recovery key', 'Pakai kunci pemulihanmu'),
+sub: d('Enter the 24 words you saved when you set up your vault, then choose a new vault password.', 'Masukkan 24 kata yang kamu simpan saat menyiapkan vault, lalu pilih vault password baru.'),
+words: d('Your 24 recovery words', '24 kata pemulihanmu'), newPw: d('New vault password', 'Vault password baru'), repeat: d('Type it again', 'Ketik ulang'),
+go: d('Recover my vault', 'Pulihkan vault saya'),
+n1: d('Your groups and secrets stay exactly as they were. Nobody needs to share anything again.', 'Grup dan secret-mu tetap seperti semula. Tidak ada yang perlu membagikan ulang.'),
+n2: d('These words are used up. You’ll get a new recovery key to save.', 'Kata ini sudah terpakai. Kamu akan mendapat kunci pemulihan baru untuk disimpan.'),
+noKey: d('Don’t have it? Ask an admin to give you access instead', 'Tidak punya? Minta admin memberimu akses saja')
+}
+};
+}
+}
+</script>
+</body>
+</html>

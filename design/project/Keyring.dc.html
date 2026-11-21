@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Groups</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+.app{display:flex;flex-wrap:wrap;min-height:820px;width:100%}
+.side{flex:0 0 244px;background:#fff;border-right:1px solid #DDE2E8;padding:20px 14px;display:flex;flex-direction:column;gap:22px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px}
+.logo{width:32px;height:32px;border-radius:8px;background:#0B7A75;display:flex;align-items:center;justify-content:center}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:7px;color:#131A22;text-decoration:none;font-size:15px;min-height:44px}
+.nav a:hover{background:#F0F3F6;color:#131A22}
+.nav a.on{background:#E3F3F2;color:#075E5A;font-weight:600}
+.me{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #DDE2E8;border-radius:9px}
+.ava{width:32px;height:32px;border-radius:99px;background:#131A22;color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff;align-self:flex-start}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+.main{flex:999 1 640px;min-width:0;padding:24px 32px 40px;display:flex;flex-direction:column;gap:18px}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+h1{font:700 28px/1.2 'Space Grotesk',sans-serif;margin:0}
+h2{font:600 16px/1.3 'Space Grotesk',sans-serif;margin:0}
+.card{background:#fff;border:1px solid #DDE2E8;border-radius:10px;min-width:0}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px;border-radius:8px;border:1px solid #0B7A75;background:#0B7A75;color:#fff;font:600 14px 'Inter',sans-serif;text-decoration:none}
+.btn:hover{background:#075E5A;color:#fff}
+.btn.ghost{background:#fff;color:#131A22;border-color:#C9D0D8}
+.btn.danger{background:#fff;color:#B42318;border-color:#B42318}
+.btn.danger:hover{background:#FDECEA;color:#B42318}
+.btn.sm{min-height:36px;padding:0 12px;font-size:13px}
+.btn:focus-visible,a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font:500 12.5px 'Inter',sans-serif;border:1px solid #DDE2E8;color:#5B6672;background:#fff;white-space:nowrap}
+.pill.ok{color:#17703F;border-color:#9FD3B5;background:#E8F5EE}
+.pill.warn{color:#8F5F00;border-color:#E6C878;background:#FFF4D6}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{font:500 12.5px 'Inter',sans-serif;color:#5B6672;text-align:left;padding:12px 16px;border-bottom:1px solid #DDE2E8;white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid #EEF1F4;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.tabs{display:flex;gap:4px;border-bottom:1px solid #DDE2E8;overflow-x:auto}
+.tabs a{padding:0 16px;min-height:44px;display:flex;align-items:center;color:#5B6672;text-decoration:none;font-size:15px;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs a.on{color:#131A22;font-weight:600;border-bottom-color:#0B7A75}
+.li{display:flex;gap:10px;font-size:14px;line-height:1.5;color:#2B3541}
+.li i{flex:none;width:6px;height:6px;border-radius:99px;background:#B42318;margin-top:8px}
+details{padding:14px 16px}
+summary{cursor:pointer;font-size:14px;color:#5B6672;min-height:32px;display:flex;align-items:center}
+.tech{margin-top:10px;font:12.5px/1.8 'JetBrains Mono',monospace;color:#2B3541}
+</style>
+</helmet>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(1.1 -1.7)"><circle cx="17" cy="32" r="10" fill="none" stroke="#fff" stroke-width="7"/><circle cx="40" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="45" r="4" fill="#fff"/></g></svg></div><div><div style="font:700 17px 'Space Grotesk',sans-serif;line-height:1">cfs</div><div style="font-size:12px;color:#5B6672">myorg</div></div></div>
+    <nav class="nav" aria-label="Main">
+      <a href="Secrets.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3"/></svg>{{t.navSecrets}}</a>
+      <a class="on" href="Keyring.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8"/></svg>{{t.navGroups}}</a>
+      <a href="Policies.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{{t.navPerms}}</a>
+      <a href="AppRoles.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6 M12 19h8"/></svg>{{t.navApps}}</a>
+      <a href="Audit.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01"/></svg>{{t.navActivity}}</a>
+      <a href="Settings.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6"/></svg>{{t.navSettings}}</a>
+    </nav>
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:12px">
+      <div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div>
+      <div class="me"><div class="ava">A</div><div style="min-width:0"><div style="font-size:14px;font-weight:600">Alice Wijaya</div><div style="font-size:12.5px;color:#5B6672">{{t.admin}}</div></div></div>
+      <div style="display:flex;gap:8px"><a href="Unlock.dc.html" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:36px;border:1px solid #C9D0D8;border-radius:8px;color:#131A22;text-decoration:none;font-size:13px;font-weight:600;background:#fff">{{t.lock}}</a><a href="Main.dc.html" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:36px;border:1px solid #C9D0D8;border-radius:8px;color:#131A22;text-decoration:none;font-size:13px;font-weight:600;background:#fff">{{t.signout}}</a></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div style="display:flex;gap:12px;padding:12px 16px;border-radius:9px;background:#FFF4D6;color:#6B4700;font-size:14px;line-height:1.5;align-items:center;flex-wrap:wrap;justify-content:space-between"><span><b>{{t.adminWarnB}}</b> {{t.adminWarn}}</span><a href="Settings-Admins.dc.html" style="font-weight:600">{{t.adminWarnLink}}</a></div>
+    <div class="top">
+      <div>
+        <h1>{{t.navGroups}}</h1>
+        <p style="margin:8px 0 0;color:#5B6672;font-size:15px;max-width:62ch;line-height:1.5">{{t.sub}}</p>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px"><a class="btn ghost" href="Offboard.dc.html">{{t.offboard}}</a><a class="btn ghost" href="Invite.dc.html">{{t.invite}}</a><a class="btn ghost" href="Group-New.dc.html">{{t.newGroup}}</a><a class="btn" href="Group-AddMember.dc.html">{{t.addMember}}</a></div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <a class="on" href="Keyring.dc.html">{{t.gMyapp}}</a>
+      <a href="Keyring.dc.html">{{t.gBackend}}</a>
+      <a href="Keyring.dc.html">{{t.gInfra}}</a>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+      <div style="flex:999 1 520px;min-width:0;display:flex;flex-direction:column;gap:16px">
+        <div class="card tw">
+          <table>
+            <thead><tr><th>{{t.cWho}}</th><th>{{t.cType}}</th><th>{{t.cOpen}}</th><th>{{t.cCan}}</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><div style="font-weight:600">Alice Wijaya</div><div style="font-size:13px;color:#5B6672">alice@myorg.com</div></td><td><span class="pill">{{t.person}}</span></td><td><span class="pill ok">{{t.yes}}</span></td><td>{{t.viewEdit}}</td><td></td></tr>
+              <tr><td><div style="font-weight:600">Bob Santoso</div><div style="font-size:13px;color:#5B6672">bob@myorg.com · {{t.newbie}}</div></td><td><span class="pill">{{t.person}}</span></td><td><span class="pill ok">{{t.yes}}</span></td><td>{{t.view}}</td><td style="text-align:right"><a class="btn danger sm" href="Keyring.dc.html">{{t.remove}}</a></td></tr>
+              <tr><td><div style="font-weight:600">deploy-ci</div><div style="font-size:13px;color:#5B6672">{{t.appBot}}</div></td><td><span class="pill">{{t.app}}</span></td><td><span class="pill ok">{{t.yes}}</span></td><td>{{t.view}}</td><td style="text-align:right"><a class="btn danger sm" href="Keyring.dc.html">{{t.remove}}</a></td></tr>
+              <tr><td><div style="font-weight:600">Rina Putri</div><div style="font-size:13px;color:#5B6672">rina@myorg.com</div></td><td><span class="pill">{{t.person}}</span></td><td><span class="pill warn">{{t.notYet}}</span></td><td>{{t.view}}</td><td style="text-align:right"><a class="btn sm" href="Group-AddMember.dc.html">{{t.give}}</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:10px;padding:14px 16px;border-radius:9px;background:#FFF4D6;color:#6B4700;font-size:14px;line-height:1.5">
+          <svg style="flex:none;margin-top:2px" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4 M12 17h.01 M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          <span><b>{{t.rinaB}}</b> {{t.rina}}</span>
+        </div>
+        <div class="card">
+          <details>
+            <summary>{{t.tech}}</summary>
+            <div class="tech">{{t.techLine1}}<br>{{t.techLine2}}<br>{{t.techLine3}}</div>
+          </details>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1 1 300px;padding:18px;display:flex;flex-direction:column;gap:14px;border-color:#F0A8A1">
+        <h2 style="color:#B42318">{{t.removeQ}}</h2>
+        <p style="margin:0;font-size:14.5px;color:#2B3541;line-height:1.5">{{t.removeLead}}</p>
+        <div class="li"><i></i><span>{{t.c1}}</span></div>
+        <div class="li"><i></i><span>{{t.c2}}</span></div>
+        <div class="li"><i></i><span><b>{{t.c3b}}</b> {{t.c3}}</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px">
+          <a class="btn danger" href="Group-Rotating.dc.html" style="flex:1 1 150px;justify-content:center">{{t.confirm}}</a>
+          <a class="btn ghost" href="Keyring.dc.html" style="flex:1 1 90px;justify-content:center">{{t.cancel}}</a>
+        </div>
+        <div style="font-size:13px;color:#5B6672;line-height:1.5">{{t.needUnlock}}</div>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+navSecrets: d('Secrets', 'Secret'), navGroups: d('Groups', 'Grup'), navPerms: d('Permissions', 'Izin'), navApps: d('Apps & bots', 'Aplikasi & bot'), navActivity: d('Activity', 'Aktivitas'), navSettings: d('Settings', 'Pengaturan'),
+admin: d('Admin', 'Admin'), invite: d('Invite a teammate', 'Undang anggota'), offboard: d('Offboard a teammate', 'Keluarkan anggota'), adminWarnB: d('Only one admin has a key.', 'Hanya satu admin yang punya kunci.'), adminWarn: d('If they’re locked out, nobody can manage the vault.', 'Jika ia terkunci, tidak ada yang bisa mengelola vault.'), adminWarnLink: d('Add another admin', 'Tambah admin lagi'), newGroup: d('+ New group', '+ Grup baru'), lock: d('Lock vault', 'Kunci vault'), signout: d('Sign out', 'Keluar'),
+sub: d('A group decides who can actually open its secrets. Permissions only decide who can reach them, so people need both.', 'Grup menentukan siapa yang benar-benar bisa membuka secret-nya. Izin hanya menentukan siapa yang bisa menjangkaunya, jadi orang butuh keduanya.'),
+addMember: d('+ Add member', '+ Tambah anggota'),
+gMyapp: d('Myapp team', 'Tim Myapp'), gBackend: d('Backend team', 'Tim Backend'), gInfra: d('Infra team', 'Tim Infra'),
+cWho: d('Member', 'Anggota'), cType: d('Type', 'Tipe'), cOpen: d('Can open values', 'Bisa membuka nilai'), cCan: d('Permission', 'Izin'),
+person: d('Person', 'Orang'), app: d('App', 'Aplikasi'), appBot: d('CI server', 'Server CI'),
+yes: d('Yes', 'Ya'), notYet: d('Not yet', 'Belum'),
+viewEdit: d('View and edit', 'Lihat dan ubah'), view: d('View only', 'Hanya lihat'),
+newbie: d('new teammate', 'anggota baru'),
+remove: d('Remove', 'Keluarkan'), give: d('Give access', 'Beri akses'),
+rinaB: d('Rina has permission but can’t open anything yet.', 'Rina punya izin tetapi belum bisa membuka apa pun.'),
+rina: d('An existing member has to give her access, with their vault unlocked. Press “Give access”.', 'Anggota yang sudah ada perlu memberinya akses, dengan vault terbuka. Tekan “Beri akses”.'),
+tech: d('Technical details', 'Detail teknis'),
+techLine1: d('Group key fingerprint: 4F:A1:9C:07:E2:5B', 'Sidik jari kunci grup: 4F:A1:9C:07:E2:5B'),
+techLine2: d('Key version: k3, rotated 12 days ago', 'Versi kunci: k3, diputar 12 hari lalu'),
+techLine3: d('6 secrets · 19 items locked with this key', '6 secret · 19 item dikunci dengan kunci ini'),
+removeQ: d('Remove Bob from this group?', 'Keluarkan Bob dari grup ini?'),
+removeLead: d('We’ll re-lock everything in this group with a fresh key, right here in your browser.', 'Kami akan mengunci ulang semua isi grup ini dengan kunci baru, langsung di browsermu.'),
+c1: d('6 secrets are re-locked.', '6 secret dikunci ulang.'),
+c2: d('Bob can’t open any new version.', 'Bob tidak bisa membuka versi baru mana pun.'),
+c3b: d('He still knows what he already opened.', 'Ia tetap tahu apa yang sudah pernah dibukanya.'),
+c3: d('Change those passwords and keys at their source, like the database or the API provider.', 'Ganti password dan key itu di sumbernya, seperti database atau penyedia API.'),
+confirm: d('Remove and re-lock', 'Keluarkan dan kunci ulang'), cancel: d('Cancel', 'Batal'),
+needUnlock: d('Needs your vault unlocked. The server never sees the values.', 'Butuh vault-mu terbuka. Server tidak pernah melihat nilainya.')
+}
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<title>cfs Icon Directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: six concept cards in a grid, then a recommendation and an in-product check. Palette: cool neutrals plus the product teal. */
+:root{
+  --bg:#F4F6F8; --surface:#FFFFFF; --ink:#131A22; --muted:#5B6672; --line:#DDE2E8;
+  --tile:#0B7A75; --tile-ink:#FFFFFF; --soft:#E3F3F2; --soft-ink:#075E5A; --warn:#8F5F00; --warn-bg:#FFF4D6;
+  --f-head:'Space Grotesk',system-ui,sans-serif; --f-body:'Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1116; --surface:#141A21; --ink:#E5E9EE; --muted:#93A0AD; --line:#27303A;
+  --tile:#0B7A75; --tile-ink:#FFFFFF; --soft:#12302E; --soft-ink:#6FD6CE; --warn:#E5B93C; --warn-bg:#2B2410; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1116; --surface:#141A21; --ink:#E5E9EE; --muted:#93A0AD; --line:#27303A;
+  --tile:#0B7A75; --tile-ink:#FFFFFF; --soft:#12302E; --soft-ink:#6FD6CE; --warn:#E5B93C; --warn-bg:#2B2410; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);
+  padding-block:32px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1{font:700 clamp(28px,4vw,38px)/1.1 var(--f-head);margin:0 0 10px;text-wrap:balance}
+h2{font:700 20px/1.25 var(--f-head);margin:0}
+.lede{max-width:66ch;color:var(--muted);margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.card.pick{border-color:var(--tile);box-shadow:0 0 0 1px var(--tile)}
+.head{display:flex;gap:14px;align-items:center;justify-content:space-between}
+.tag{font:600 12px var(--f-body);color:var(--soft-ink);background:var(--soft);border-radius:99px;padding:3px 10px}
+.name{font:700 17px var(--f-head);margin:0}
+.name small{display:block;font:500 13px var(--f-body);color:var(--muted);margin-top:2px}
+.sizes{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;padding:16px;border-radius:10px;background:var(--bg)}
+.sz{display:flex;flex-direction:column;gap:6px;align-items:center;font-size:11.5px;color:var(--muted)}
+.tile{display:grid;place-items:center;background:var(--tile);color:var(--tile-ink);border-radius:22%}
+.tile.dark{background:#0A0F14;color:#6FD6CE}
+.mono{color:var(--ink)}
+.tile svg{width:66%;height:66%}
+.mono svg{display:block}
+.pc{display:flex;gap:8px;font-size:14px;line-height:1.5}
+.pc b{flex:none;width:58px;font:600 12px var(--f-body);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
+.reco{background:var(--soft);border:1px solid var(--tile);border-radius:12px;padding:22px;display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between}
+.reco p{margin:6px 0 0;max-width:62ch;color:var(--ink)}
+.ctx{display:flex;flex-wrap:wrap;gap:20px;align-items:stretch}
+.side,.tab{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.side{padding:14px 16px;display:flex;align-items:center;gap:10px;font:700 17px var(--f-head);flex:0 1 240px}
+.side small{display:block;font:400 12px var(--f-body);color:var(--muted);line-height:1.2}
+.tab{padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--muted);flex:0 1 280px}
+.note{font-size:13.5px;color:var(--muted);margin:0}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <mask id="cm"><rect width="64" height="64" fill="#fff"/><circle cx="32" cy="32.5" r="4.2" fill="#000"/><path d="M30 35.5 H34 L35.2 43 H28.8 Z" fill="#000"/></mask>
+    <mask id="dm"><rect width="64" height="64" fill="#fff"/><circle cx="51" cy="32" r="2.8" fill="#000"/></mask>
+    <mask id="fm"><rect width="64" height="64" fill="#fff"/><rect x="22" y="26" width="20" height="14" rx="2.5" fill="none" stroke="#000" stroke-width="3"/><path d="M22.5 27 L32 34.5 L41.5 27" fill="none" stroke="#000" stroke-width="3" stroke-linejoin="round"/></mask>
+    <symbol id="a" viewBox="0 0 64 64"><g transform="translate(32 32) scale(.8) translate(-34.5 -33)"><circle cx="19" cy="32" r="9" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="37" cy="32" r="3.6" fill="currentColor"/><circle cx="47" cy="32" r="3.6" fill="currentColor"/><circle cx="57" cy="32" r="3.6" fill="currentColor"/><circle cx="47" cy="42" r="2.8" fill="currentColor"/><circle cx="57" cy="42" r="2.8" fill="currentColor"/></g></symbol>
+    <symbol id="b" viewBox="0 0 64 64"><path d="M25 14 C19 14 19 18 19 23 V26 C19 29 17 32 13 32 C17 32 19 35 19 38 V41 C19 46 19 50 25 50 M39 14 C45 14 45 18 45 23 V26 C45 29 47 32 51 32 C47 32 45 35 45 38 V41 C45 46 45 50 39 50" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="29" r="5" fill="currentColor"/><path d="M29 33 L35 33 L36.5 43 L27.5 43 Z" fill="currentColor"/></symbol>
+    <symbol id="c" viewBox="0 0 64 64"><path mask="url(#cm)" fill="currentColor" d="M17 46 C9 46 7 35 15 33 C15 23 27 19 33 25 C39 19 51 24 49 33 C57 35 55 46 47 46 Z"/></symbol>
+    <symbol id="d" viewBox="0 0 64 64"><g mask="url(#dm)" fill="currentColor"><rect x="6" y="23" width="14" height="18" rx="3.5"/><rect x="25" y="23" width="14" height="18" rx="3.5"/><rect x="44" y="23" width="14" height="18" rx="3.5"/><rect x="19" y="30" width="7" height="4"/><rect x="38" y="30" width="7" height="4"/></g></symbol>
+    <symbol id="e" viewBox="0 0 64 64"><circle cx="20" cy="32" r="12" fill="none" stroke="currentColor" stroke-width="4.5"/><path d="M15 27 L21 32 L15 37 M24 38 H28" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 32 H57 M47 32 V40 M54 32 V38" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></symbol>
+    <symbol id="f" viewBox="0 0 64 64"><path mask="url(#fm)" fill="currentColor" d="M32 7 L52 14 V31 C52 43 43 51 32 57 C21 51 12 43 12 31 V14 Z"/></symbol>
+  </defs>
+</svg>
+
+<main class="wrap">
+  <header>
+    <h1>Six ways to be more than a padlock</h1>
+    <p class="lede">A lock says “security” and nothing else, so every vault and password manager looks the same. These directions each borrow something specific to cfs: masked values, .env files, Cloudflare, the audit chain, the CLI, and end-to-end sealing. Check each one at 16px, because that is where favicons live.</p>
+  </header>
+
+  <section class="grid" aria-label="Icon directions">
+    <article class="card pick">
+      <div class="head"><p class="name">A · Masked key<small>A key drawn from ••• dots</small></p><span class="tag">Recommended</span></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile" style="width:64px;height:64px"><svg><use href="#a"/></svg></div>64</div>
+        <div class="sz"><div class="tile" style="width:32px;height:32px"><svg><use href="#a"/></svg></div>32</div>
+        <div class="sz"><div class="tile" style="width:24px;height:24px"><svg><use href="#a"/></svg></div>24</div>
+        <div class="sz"><div class="tile" style="width:16px;height:16px"><svg><use href="#a"/></svg></div>16</div>
+        <div class="sz"><div class="tile dark" style="width:32px;height:32px"><svg><use href="#a"/></svg></div>dark</div>
+        <div class="sz"><div class="mono"><svg width="28" height="28" viewBox="0 0 64 64"><use href="#a"/></svg></div>mono</div>
+      </div>
+      <div class="pc"><b>Idea</b><span>The masked dots are what people see all over the app where a value is hidden. The same dots become the key’s shaft and teeth.</span></div>
+      <div class="pc"><b>Good</b><span>Ownable and tied to the product. Reads as “hidden value” even without the key.</span></div>
+      <div class="pc"><b>Watch</b><span>At 16px the dots start to merge, so the favicon may need a bolder cut with two dots.</span></div>
+    </article>
+
+    <article class="card">
+      <div class="head"><p class="name">B · Braces and keyhole<small>{ } around a keyhole</small></p></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile" style="width:64px;height:64px"><svg><use href="#b"/></svg></div>64</div>
+        <div class="sz"><div class="tile" style="width:32px;height:32px"><svg><use href="#b"/></svg></div>32</div>
+        <div class="sz"><div class="tile" style="width:24px;height:24px"><svg><use href="#b"/></svg></div>24</div>
+        <div class="sz"><div class="tile" style="width:16px;height:16px"><svg><use href="#b"/></svg></div>16</div>
+        <div class="sz"><div class="tile dark" style="width:32px;height:32px"><svg><use href="#b"/></svg></div>dark</div>
+        <div class="sz"><div class="mono"><svg width="28" height="28" viewBox="0 0 64 64"><use href="#b"/></svg></div>mono</div>
+      </div>
+      <div class="pc"><b>Idea</b><span>Braces stand for .env and JSON. The keyhole is the secret inside.</span></div>
+      <div class="pc"><b>Good</b><span>Instantly a developer tool. Holds up well at small sizes.</span></div>
+      <div class="pc"><b>Watch</b><span>Many dev tools use braces. Less friendly for non-technical teammates.</span></div>
+    </article>
+
+    <article class="card">
+      <div class="head"><p class="name">C · Sealed cloud<small>A cloud with a keyhole cut out</small></p></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile" style="width:64px;height:64px"><svg><use href="#c"/></svg></div>64</div>
+        <div class="sz"><div class="tile" style="width:32px;height:32px"><svg><use href="#c"/></svg></div>32</div>
+        <div class="sz"><div class="tile" style="width:24px;height:24px"><svg><use href="#c"/></svg></div>24</div>
+        <div class="sz"><div class="tile" style="width:16px;height:16px"><svg><use href="#c"/></svg></div>16</div>
+        <div class="sz"><div class="tile dark" style="width:32px;height:32px"><svg><use href="#c"/></svg></div>dark</div>
+        <div class="sz"><div class="mono"><svg width="28" height="28" viewBox="0 0 64 64"><use href="#c"/></svg></div>mono</div>
+      </div>
+      <div class="pc"><b>Idea</b><span>It runs on Cloudflare and nothing in the cloud can read it.</span></div>
+      <div class="pc"><b>Good</b><span>Clear at a glance and friendly. Strong silhouette at 16px.</span></div>
+      <div class="pc"><b>Watch</b><span>Close to Cloudflare’s own cloud and to every “secure cloud” icon. Least ownable.</span></div>
+    </article>
+
+    <article class="card">
+      <div class="head"><p class="name">D · Chained blocks<small>Linked entries, one sealed</small></p></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile" style="width:64px;height:64px"><svg><use href="#d"/></svg></div>64</div>
+        <div class="sz"><div class="tile" style="width:32px;height:32px"><svg><use href="#d"/></svg></div>32</div>
+        <div class="sz"><div class="tile" style="width:24px;height:24px"><svg><use href="#d"/></svg></div>24</div>
+        <div class="sz"><div class="tile" style="width:16px;height:16px"><svg><use href="#d"/></svg></div>16</div>
+        <div class="sz"><div class="tile dark" style="width:32px;height:32px"><svg><use href="#d"/></svg></div>dark</div>
+        <div class="sz"><div class="mono"><svg width="28" height="28" viewBox="0 0 64 64"><use href="#d"/></svg></div>mono</div>
+      </div>
+      <div class="pc"><b>Idea</b><span>The tamper-evident audit log: each entry linked to the one before it.</span></div>
+      <div class="pc"><b>Good</b><span>Points at what sets cfs apart from other vaults.</span></div>
+      <div class="pc"><b>Watch</b><span>Reads as blockchain or a link chain. Says “audit”, not “secrets”.</span></div>
+    </article>
+
+    <article class="card">
+      <div class="head"><p class="name">E · Terminal key<small>A key whose head holds &gt;_</small></p></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile" style="width:64px;height:64px"><svg><use href="#e"/></svg></div>64</div>
+        <div class="sz"><div class="tile" style="width:32px;height:32px"><svg><use href="#e"/></svg></div>32</div>
+        <div class="sz"><div class="tile" style="width:24px;height:24px"><svg><use href="#e"/></svg></div>24</div>
+        <div class="sz"><div class="tile" style="width:16px;height:16px"><svg><use href="#e"/></svg></div>16</div>
+        <div class="sz"><div class="tile dark" style="width:32px;height:32px"><svg><use href="#e"/></svg></div>dark</div>
+        <div class="sz"><div class="mono"><svg width="28" height="28" viewBox="0 0 64 64"><use href="#e"/></svg></div>mono</div>
+      </div>
+      <div class="pc"><b>Idea</b><span>The CLI is how most people use cfs: cfs run -- your command.</span></div>
+      <div class="pc"><b>Good</b><span>Obvious to developers. Works well as the CLI’s own icon.</span></div>
+      <div class="pc"><b>Watch</b><span>Terminal-plus-key icons are common. The prompt gets tiny at 16px.</span></div>
+    </article>
+
+    <article class="card">
+      <div class="head"><p class="name">F · Sealed envelope<small>An envelope inside a shield</small></p></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile" style="width:64px;height:64px"><svg><use href="#f"/></svg></div>64</div>
+        <div class="sz"><div class="tile" style="width:32px;height:32px"><svg><use href="#f"/></svg></div>32</div>
+        <div class="sz"><div class="tile" style="width:24px;height:24px"><svg><use href="#f"/></svg></div>24</div>
+        <div class="sz"><div class="tile" style="width:16px;height:16px"><svg><use href="#f"/></svg></div>16</div>
+        <div class="sz"><div class="tile dark" style="width:32px;height:32px"><svg><use href="#f"/></svg></div>dark</div>
+        <div class="sz"><div class="mono"><svg width="28" height="28" viewBox="0 0 64 64"><use href="#f"/></svg></div>mono</div>
+      </div>
+      <div class="pc"><b>Idea</b><span>End-to-end sealing: a message locked so only the recipient can open it.</span></div>
+      <div class="pc"><b>Good</b><span>Explains the main promise to non-technical people.</span></div>
+      <div class="pc"><b>Watch</b><span>Reads as an email security product. The envelope loses detail below 24px.</span></div>
+    </article>
+  </section>
+
+  <section class="reco" aria-label="Recommendation">
+    <div>
+      <h2>My pick: A, with B for the docs</h2>
+      <p>A is the only one that comes from how the product actually looks: values shown as dots. Use it as the app icon and the sidebar logo, and write “cfs” beside it in Space Grotesk Bold. Keep B for the documentation and CLI help, where the braces tell developers it’s about .env and JSON. If the favicon turns to mush at 16px, draw a two-dot version just for that size.</p>
+    </div>
+  </section>
+
+  <section aria-label="In the product">
+    <h2 style="margin-bottom:12px">A in the product</h2>
+    <div class="ctx">
+      <div class="side"><div class="tile" style="width:34px;height:34px"><svg><use href="#a"/></svg></div><div>cfs<small>myorg</small></div></div>
+      <div class="tab"><div class="tile" style="width:16px;height:16px"><svg><use href="#a"/></svg></div>Secrets · cfs</div>
+      <div class="tab"><div class="tile dark" style="width:16px;height:16px"><svg><use href="#a"/></svg></div>Secrets · cfs (dark browser)</div>
+    </div>
+    <p class="note" style="margin-top:12px">Marks are quick sketches for choosing a direction, not final artwork. Whichever you pick should be redrawn on a grid before it ships.</p>
+  </section>
+</main>

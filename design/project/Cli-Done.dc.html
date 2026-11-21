@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Signed in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+h1{font:700 26px/1.2 'Space Grotesk',sans-serif;margin:0}
+a:focus-visible,button:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+.code{background:#131A22;color:#E5E9EE;border-radius:8px;padding:14px 16px;font:13.5px/1.8 'JetBrains Mono',monospace;overflow-x:auto;white-space:pre;text-align:left}
+.code .c{color:#7E8B98}
+</style>
+</helmet>
+<div style="min-height:820px;padding:24px 32px 40px;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:flex-end"><div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div></div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center">
+    <div style="width:100%;max-width:460px;display:flex;flex-direction:column;gap:20px">
+      <div style="background:#fff;border:1px solid #DDE2E8;border-radius:12px;padding:32px;display:flex;flex-direction:column;gap:20px;text-align:center;align-items:center">
+        <div style="width:56px;height:56px;border-radius:99px;background:#E8F5EE;color:#17703F;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div>
+          <h1>{{t.title}}</h1>
+          <p style="margin:8px 0 0;color:#5B6672;font-size:15px;line-height:1.5">{{t.sub}}</p>
+        </div>
+        <div class="code" style="width:100%"><span class="c">{{t.c1}}</span>
+$ cfs unlock
+<span class="c">{{t.c2}}</span>
+$ cfs run -- bun run dev</div>
+        <p style="margin:0;font-size:14px;color:#5B6672;line-height:1.5">{{t.note}}</p>
+        <a href="Devices.dc.html" style="font-size:14px">{{t.devices}}</a>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+title: d('You’re signed in', 'Kamu sudah masuk'),
+sub: d('Go back to your terminal. You can close this tab.', 'Kembali ke terminalmu. Tab ini boleh ditutup.'),
+c1: d('# open your vault on this device', '# buka vault di perangkat ini'),
+c2: d('# then run your project', '# lalu jalankan proyekmu'),
+note: d('cfs asks for your vault password once, then stays unlocked for an hour.', 'cfs meminta vault password sekali, lalu tetap terbuka selama satu jam.'),
+devices: d('See all signed-in devices', 'Lihat semua perangkat yang masuk')
+}
+};
+}
+}
+</script>
+</body>
+</html>

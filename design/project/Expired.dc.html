@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Session ended</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+h1{font:700 26px/1.2 'Space Grotesk',sans-serif;margin:0}
+.btn{display:flex;align-items:center;justify-content:center;min-height:48px;padding:0 20px;border-radius:8px;border:1px solid #0B7A75;background:#0B7A75;color:#fff;font:600 15px 'Inter',sans-serif;text-decoration:none;width:100%}
+.btn:hover{background:#075E5A;color:#fff}
+.btn:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+</style>
+</helmet>
+<div style="min-height:820px;padding:24px 32px 40px;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:flex-end"><div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div></div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center">
+    <div style="width:100%;max-width:440px;background:#fff;border:1px solid #DDE2E8;border-radius:12px;padding:36px;display:flex;flex-direction:column;gap:20px;text-align:center;align-items:center">
+      <div style="width:56px;height:56px;border-radius:99px;background:#FFF4D6;color:#8F5F00;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"/></svg></div>
+      <div>
+        <h1>{{t.title}}</h1>
+        <p style="margin:8px 0 0;color:#5B6672;font-size:15px;line-height:1.5">{{t.sub}}</p>
+      </div>
+      <a class="btn" href="Main.dc.html">{{t.signin}}</a>
+      <p style="margin:0;font-size:13.5px;color:#5B6672;line-height:1.5">{{t.note}}</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+title: d('Your session ended', 'Sesimu berakhir'),
+sub: d('For your safety you’re signed out after 12 hours. Sign in again to carry on.', 'Demi keamananmu, kamu keluar otomatis setelah 12 jam. Masuk lagi untuk melanjutkan.'),
+signin: d('Sign in again', 'Masuk lagi'),
+note: d('Anything you were editing and hadn’t saved wasn’t kept, because unsaved values never leave your browser.', 'Yang sedang kamu edit dan belum disimpan tidak tersimpan, karena nilai yang belum disimpan tidak pernah meninggalkan browsermu.')
+}
+};
+}
+}
+</script>
+</body>
+</html>

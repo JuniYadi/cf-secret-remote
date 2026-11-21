@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="cfs" color="#131A22">
+  <title>cfs</title>
+  <circle cx="18.1" cy="30.4" r="10" fill="none" stroke="currentColor" stroke-width="7"/>
+  <circle cx="40.3" cy="30.4" r="5.2" fill="currentColor"/>
+  <circle cx="54.2" cy="30.4" r="5.2" fill="currentColor"/>
+  <circle cx="54.2" cy="43.1" r="4" fill="currentColor"/>
+</svg>

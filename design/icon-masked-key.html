@@ -1,0 +1,154 @@
+<title>cfs Masked Key Variations</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: one comparison row of five cards, then an in-product check. Same palette as the first icon page. */
+:root{
+  --bg:#F4F6F8; --surface:#FFFFFF; --ink:#131A22; --muted:#5B6672; --line:#DDE2E8;
+  --tile:#0B7A75; --tile-ink:#FFFFFF; --soft:#E3F3F2; --soft-ink:#075E5A;
+  --f-head:'Space Grotesk',system-ui,sans-serif; --f-body:'Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1116; --surface:#141A21; --ink:#E5E9EE; --muted:#93A0AD; --line:#27303A;
+  --tile:#0B7A75; --tile-ink:#FFFFFF; --soft:#12302E; --soft-ink:#6FD6CE; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1116; --surface:#141A21; --ink:#E5E9EE; --muted:#93A0AD; --line:#27303A;
+  --tile:#0B7A75; --tile-ink:#FFFFFF; --soft:#12302E; --soft-ink:#6FD6CE; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);
+  padding-block:32px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+h1{font:700 clamp(26px,4vw,36px)/1.1 var(--f-head);margin:0 0 10px;text-wrap:balance}
+h2{font:700 20px/1.25 var(--f-head);margin:0}
+.lede{max-width:66ch;color:var(--muted);margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.card.pick{border-color:var(--tile);box-shadow:0 0 0 1px var(--tile)}
+.head{display:flex;gap:14px;align-items:center;justify-content:space-between}
+.tag{font:600 12px var(--f-body);color:var(--soft-ink);background:var(--soft);border-radius:99px;padding:3px 10px;white-space:nowrap}
+.name{font:700 17px var(--f-head);margin:0}
+.name small{display:block;font:500 13px var(--f-body);color:var(--muted);margin-top:2px}
+.sizes{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;padding:16px;border-radius:10px;background:var(--bg)}
+.sz{display:flex;flex-direction:column;gap:6px;align-items:center;font-size:11.5px;color:var(--muted)}
+.tile{display:grid;place-items:center;background:var(--tile);color:var(--tile-ink);border-radius:22%}
+.tile.dark{background:#0A0F14;color:#6FD6CE}
+.tile svg{width:86%;height:86%}
+.tile.old svg{width:66%;height:66%}
+.mono{color:var(--ink)}
+.mono svg{display:block}
+.pc{display:flex;gap:8px;font-size:14px;line-height:1.5}
+.pc b{flex:none;width:58px;font:600 12px var(--f-body);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
+.reco{background:var(--soft);border:1px solid var(--tile);border-radius:12px;padding:22px}
+.reco p{margin:6px 0 0;max-width:66ch}
+.ctx{display:flex;flex-wrap:wrap;gap:20px;align-items:stretch}
+.side,.tab{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.side{padding:14px 16px;display:flex;align-items:center;gap:10px;font:700 17px var(--f-head);flex:0 1 240px}
+.side small{display:block;font:400 12px var(--f-body);color:var(--muted);line-height:1.2}
+.tab{padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--muted);flex:0 1 280px}
+.note{font-size:13.5px;color:var(--muted);margin:0}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <mask id="m3"><rect width="64" height="64" fill="#fff"/><circle cx="17" cy="32" r="5.4" fill="#000"/></mask>
+    <symbol id="o" viewBox="0 0 64 64"><g transform="translate(32 32) scale(.8) translate(-34.5 -33)"><circle cx="19" cy="32" r="9" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="37" cy="32" r="3.6" fill="currentColor"/><circle cx="47" cy="32" r="3.6" fill="currentColor"/><circle cx="57" cy="32" r="3.6" fill="currentColor"/><circle cx="47" cy="42" r="2.8" fill="currentColor"/><circle cx="57" cy="42" r="2.8" fill="currentColor"/></g></symbol>
+    <symbol id="v1" viewBox="0 0 64 64"><g transform="translate(1.1 -1.7)"><circle cx="17" cy="32" r="10" fill="none" stroke="currentColor" stroke-width="7"/><circle cx="40" cy="32" r="5.2" fill="currentColor"/><circle cx="53" cy="32" r="5.2" fill="currentColor"/><circle cx="53" cy="45" r="4" fill="currentColor"/></g></symbol>
+    <symbol id="v2" viewBox="0 0 64 64"><g transform="translate(32 32) rotate(45) translate(-31 -34)"><circle cx="14" cy="32" r="9" fill="none" stroke="currentColor" stroke-width="6.5"/><circle cx="32" cy="32" r="4.6" fill="currentColor"/><circle cx="44" cy="32" r="4.6" fill="currentColor"/><circle cx="56" cy="32" r="4.6" fill="currentColor"/><circle cx="44" cy="43" r="3.6" fill="currentColor"/><circle cx="56" cy="43" r="3.6" fill="currentColor"/></g></symbol>
+    <symbol id="v3" viewBox="0 0 64 64"><g transform="translate(2 -1.7)"><circle mask="url(#m3)" cx="17" cy="32" r="13" fill="currentColor"/><circle cx="38" cy="32" r="5.4" fill="currentColor"/><circle cx="52" cy="32" r="5.4" fill="currentColor"/><circle cx="52" cy="45" r="4.2" fill="currentColor"/></g></symbol>
+    <symbol id="v4" viewBox="0 0 64 64"><g transform="translate(-2 -2)"><circle cx="29" cy="29" r="19" fill="none" stroke="currentColor" stroke-width="6.5"/><circle cx="21" cy="29" r="3.8" fill="currentColor"/><circle cx="29" cy="29" r="3.8" fill="currentColor"/><circle cx="37" cy="29" r="3.8" fill="currentColor"/><path d="M43 43 L60 60 M52 52 L58 46" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/></g></symbol>
+  </defs>
+</svg>
+
+<main class="wrap">
+  <header>
+    <h1>Masked key, but bigger</h1>
+    <p class="lede">The first version only filled about two thirds of its tile and used thin dots. These four fill the tile and use heavier shapes, so they hold up at 16px. The original is on the left of each comparison at the same tile size.</p>
+  </header>
+
+  <section class="grid" aria-label="Variations">
+    <article class="card">
+      <div class="head"><p class="name">Original<small>For comparison</small></p></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile old" style="width:64px;height:64px"><svg><use href="#o"/></svg></div>64</div>
+        <div class="sz"><div class="tile old" style="width:32px;height:32px"><svg><use href="#o"/></svg></div>32</div>
+        <div class="sz"><div class="tile old" style="width:24px;height:24px"><svg><use href="#o"/></svg></div>24</div>
+        <div class="sz"><div class="tile old" style="width:16px;height:16px"><svg><use href="#o"/></svg></div>16</div>
+      </div>
+      <div class="pc"><b>Note</b><span>Thin ring, small dots, lots of empty tile around them.</span></div>
+    </article>
+
+    <article class="card pick">
+      <div class="head"><p class="name">V1 · Bold key<small>Same idea, heavier and larger</small></p><span class="tag">Recommended</span></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile" style="width:64px;height:64px"><svg><use href="#v1"/></svg></div>64</div>
+        <div class="sz"><div class="tile" style="width:32px;height:32px"><svg><use href="#v1"/></svg></div>32</div>
+        <div class="sz"><div class="tile" style="width:24px;height:24px"><svg><use href="#v1"/></svg></div>24</div>
+        <div class="sz"><div class="tile" style="width:16px;height:16px"><svg><use href="#v1"/></svg></div>16</div>
+        <div class="sz"><div class="tile dark" style="width:32px;height:32px"><svg><use href="#v1"/></svg></div>dark</div>
+        <div class="sz"><div class="mono"><svg width="28" height="28" viewBox="0 0 64 64"><use href="#v1"/></svg></div>mono</div>
+      </div>
+      <div class="pc"><b>Change</b><span>Thicker ring, two big dots instead of three small ones, one tooth.</span></div>
+      <div class="pc"><b>Good</b><span>Still reads as a key and as masked dots, and keeps the clear space around it small.</span></div>
+    </article>
+
+    <article class="card">
+      <div class="head"><p class="name">V2 · Diagonal key<small>Tilted to use the square</small></p></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile" style="width:64px;height:64px"><svg><use href="#v2"/></svg></div>64</div>
+        <div class="sz"><div class="tile" style="width:32px;height:32px"><svg><use href="#v2"/></svg></div>32</div>
+        <div class="sz"><div class="tile" style="width:24px;height:24px"><svg><use href="#v2"/></svg></div>24</div>
+        <div class="sz"><div class="tile" style="width:16px;height:16px"><svg><use href="#v2"/></svg></div>16</div>
+        <div class="sz"><div class="tile dark" style="width:32px;height:32px"><svg><use href="#v2"/></svg></div>dark</div>
+        <div class="sz"><div class="mono"><svg width="28" height="28" viewBox="0 0 64 64"><use href="#v2"/></svg></div>mono</div>
+      </div>
+      <div class="pc"><b>Change</b><span>The key runs corner to corner, so it can be longer without shrinking.</span></div>
+      <div class="pc"><b>Good</b><span>More energy and the most dots at a readable size.</span></div>
+      <div class="pc"><b>Watch</b><span>Diagonal keys are common in key-themed icons.</span></div>
+    </article>
+
+    <article class="card">
+      <div class="head"><p class="name">V3 · Solid bow<small>A filled head with a hole</small></p></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile" style="width:64px;height:64px"><svg><use href="#v3"/></svg></div>64</div>
+        <div class="sz"><div class="tile" style="width:32px;height:32px"><svg><use href="#v3"/></svg></div>32</div>
+        <div class="sz"><div class="tile" style="width:24px;height:24px"><svg><use href="#v3"/></svg></div>24</div>
+        <div class="sz"><div class="tile" style="width:16px;height:16px"><svg><use href="#v3"/></svg></div>16</div>
+        <div class="sz"><div class="tile dark" style="width:32px;height:32px"><svg><use href="#v3"/></svg></div>dark</div>
+        <div class="sz"><div class="mono"><svg width="28" height="28" viewBox="0 0 64 64"><use href="#v3"/></svg></div>mono</div>
+      </div>
+      <div class="pc"><b>Change</b><span>The head is a solid disc with a small hole, so there is more mass.</span></div>
+      <div class="pc"><b>Good</b><span>The strongest shape at 16px. A good favicon.</span></div>
+      <div class="pc"><b>Watch</b><span>Less delicate, and it looks a little like a toggle or a pin.</span></div>
+    </article>
+
+    <article class="card">
+      <div class="head"><p class="name">V4 · Masked field<small>••• inside a key head</small></p></div>
+      <div class="sizes">
+        <div class="sz"><div class="tile" style="width:64px;height:64px"><svg><use href="#v4"/></svg></div>64</div>
+        <div class="sz"><div class="tile" style="width:32px;height:32px"><svg><use href="#v4"/></svg></div>32</div>
+        <div class="sz"><div class="tile" style="width:24px;height:24px"><svg><use href="#v4"/></svg></div>24</div>
+        <div class="sz"><div class="tile" style="width:16px;height:16px"><svg><use href="#v4"/></svg></div>16</div>
+        <div class="sz"><div class="tile dark" style="width:32px;height:32px"><svg><use href="#v4"/></svg></div>dark</div>
+        <div class="sz"><div class="mono"><svg width="28" height="28" viewBox="0 0 64 64"><use href="#v4"/></svg></div>mono</div>
+      </div>
+      <div class="pc"><b>Change</b><span>A big ring holds the three dots, like a password field turned into a key.</span></div>
+      <div class="pc"><b>Good</b><span>Fills the tile the most and ties closest to the screens.</span></div>
+      <div class="pc"><b>Watch</b><span>The tail is short, so it reads a bit less like a key.</span></div>
+    </article>
+  </section>
+
+  <section class="reco" aria-label="Recommendation">
+    <h2>My pick: V1 for the app, V3 for the favicon</h2>
+    <p>V1 keeps what you liked about the idea and fixes the size problem. At 16px, V3 has the most mass, so use it as the browser-tab icon. Both share the same ring-and-dots shape, so they still read as one family.</p>
+  </section>
+
+  <section aria-label="In the product">
+    <h2 style="margin-bottom:12px">V1 in the product</h2>
+    <div class="ctx">
+      <div class="side"><div class="tile" style="width:34px;height:34px"><svg><use href="#v1"/></svg></div><div>cfs<small>myorg</small></div></div>
+      <div class="tab"><div class="tile" style="width:16px;height:16px"><svg><use href="#v3"/></svg></div>Secrets · cfs</div>
+      <div class="tab"><div class="tile dark" style="width:16px;height:16px"><svg><use href="#v3"/></svg></div>Secrets · cfs (dark browser)</div>
+    </div>
+    <p class="note" style="margin-top:12px">Quick sketches to choose a direction, not final artwork. The chosen mark should be redrawn on a grid before it ships.</p>
+  </section>
+</main>

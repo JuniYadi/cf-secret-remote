@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forgot vault password</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+h1{font:700 26px/1.2 'Space Grotesk',sans-serif;margin:0}
+.btn{display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 20px;border-radius:8px;border:1px solid #C9D0D8;background:#fff;color:#131A22;font:600 14px 'Inter',sans-serif;text-decoration:none}
+.btn:hover{background:#F0F3F6;color:#131A22}
+.btn.pri{background:#0B7A75;border-color:#0B7A75;color:#fff}
+.btn.pri:hover{background:#075E5A;color:#fff}
+.btn.danger{color:#B42318;border-color:#B42318}
+.btn:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+.st{display:flex;gap:14px;align-items:flex-start;font-size:15px;line-height:1.5}
+.st i{flex:none;width:28px;height:28px;border-radius:99px;border:1px solid #C9D0D8;display:flex;align-items:center;justify-content:center;font:600 13px 'Inter',sans-serif;font-style:normal;color:#5B6672}
+.st.done i{background:#17703F;border-color:#17703F;color:#fff}
+.st.now i{background:#8F5F00;border-color:#8F5F00;color:#fff}
+.st small{display:block;color:#5B6672;font-size:13.5px;margin-top:2px}
+.st .body{flex:1;min-width:0}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font:500 12.5px 'Inter',sans-serif;border:1px solid #E6C878;color:#8F5F00;background:#FFF4D6}
+.chip{display:inline-flex;align-items:center;min-height:32px;padding:0 10px;border-radius:8px;background:#E3F3F2;color:#075E5A;font-size:13.5px;font-weight:500}
+.code{font:600 22px 'JetBrains Mono',monospace;letter-spacing:.02em;text-align:center;padding:16px;border:1px solid #9ED3CF;background:#F2FAF9;border-radius:10px;margin-top:8px;word-break:break-word}
+</style>
+</helmet>
+<div style="min-height:820px;padding:24px 32px 40px;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:flex-end"><div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div></div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center">
+    <div style="width:100%;max-width:560px;display:flex;flex-direction:column;gap:20px">
+      <div style="display:flex;align-items:center;gap:10px;justify-content:center">
+        <div style="width:32px;height:32px;border-radius:8px;background:#0B7A75;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(1.1 -1.7)"><circle cx="17" cy="32" r="10" fill="none" stroke="#fff" stroke-width="7"/><circle cx="40" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="45" r="4" fill="#fff"/></g></svg></div>
+        <span style="font:700 18px 'Space Grotesk',sans-serif">cfs</span>
+      </div>
+      <div style="background:#fff;border:1px solid #DDE2E8;border-radius:12px;padding:28px;display:flex;flex-direction:column;gap:22px">
+        <div>
+          <h1>{{t.title}}</h1>
+          <p style="margin:8px 0 0;color:#5B6672;font-size:15px;line-height:1.5">{{t.sub}}</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div class="st done"><i>✓</i><div class="body">{{t.s1}}<small>{{t.s1s}}</small></div></div>
+          <div class="st done"><i>✓</i><div class="body">{{t.s2}}<small>{{t.s2s}}</small></div></div>
+          <div class="st now"><i>3</i><div class="body">{{t.s3}} <span class="pill">{{t.waiting}}</span><small>{{t.s3s}}</small><div class="code">anchor-velvet-kiwi-sixty</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center"><span style="font-size:13.5px;color:#5B6672">{{t.send}}</span><span class="chip">Alice Wijaya</span><span class="chip">Dewi Lestari</span></div></div></div>
+          <div class="st"><i>4</i><div class="body">{{t.s4}}<small>{{t.s4s}}</small></div></div>
+        </div>
+        <div style="display:flex;gap:12px;padding:14px 16px;border-radius:9px;background:#E3F3F2;color:#075E5A;font-size:14px;line-height:1.5"><span>{{t.safe}}</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px"><a class="btn" href="Forgot.dc.html" style="flex:1 1 150px">{{t.copy}}</a><a class="btn danger" href="Main.dc.html" style="flex:1 1 150px">{{t.cancel}}</a></div>
+        <div style="font-size:13.5px;color:#5B6672;line-height:1.5;border-top:1px solid #EEF1F4;padding-top:14px">{{t.recoverQ}} <a href="Recover.dc.html">{{t.recoverLink}}</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+title: d('Forgot your vault password?', 'Lupa vault password?'),
+sub: d('We can’t reset it, because nobody but you can open your key. An admin can give you access with a new one, once they’ve checked it’s you.', 'Kami tidak bisa mereset, karena tidak ada yang bisa membuka kuncimu selain kamu. Admin bisa memberimu akses dengan kunci baru, setelah memastikan itu kamu.'),
+s1: d('You signed in again to confirm it’s you', 'Kamu masuk ulang untuk memastikan itu kamu'), s1s: d('With your company login, just now.', 'Dengan login perusahaan, baru saja.'),
+s2: d('You made a new vault password', 'Kamu membuat vault password baru'), s2s: d('It locks a brand-new key made just now.', 'Password ini mengunci kunci baru yang baru saja dibuat.'),
+s3: d('Send this code to an admin', 'Kirim kode ini ke admin'), waiting: d('Waiting', 'Menunggu'),
+s3s: d('Send it by DM, chat, or say it on a call. Don’t put it in the request itself, so only the real you can pass it on.', 'Kirim lewat DM, chat, atau sebutkan lewat telepon. Jangan taruh di permintaan itu sendiri, supaya hanya kamu yang asli yang bisa meneruskannya.'),
+send: d('Send it to:', 'Kirim ke:'),
+s4: d('The admin types the code and gives you access', 'Admin mengetik kode dan memberimu akses'), s4s: d('They can only continue if the code they type matches.', 'Mereka hanya bisa lanjut kalau kode yang diketik cocok.'),
+safe: d('We emailed you and your other signed-in devices. If this wasn’t you, you can cancel it from there. Your secrets stay locked until an admin approves.', 'Kami mengirim email ke kamu dan ke perangkat lain yang sedang masuk. Jika ini bukan kamu, kamu bisa membatalkannya dari sana. Secret-mu tetap terkunci sampai admin menyetujui.'),
+copy: d('Copy code', 'Salin kode'), cancel: d('Cancel this request', 'Batalkan permintaan ini'),
+recoverQ: d('Saved a recovery key when you set up?', 'Sudah menyimpan kunci pemulihan saat menyiapkan?'), recoverLink: d('Use it instead', 'Pakai itu saja')
+}
+};
+}
+}
+</script>
+</body>
+</html>

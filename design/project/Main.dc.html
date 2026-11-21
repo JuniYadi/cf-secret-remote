@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+h1{font:700 28px/1.2 'Space Grotesk',sans-serif;margin:0}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:0 16px;border-radius:8px;border:1px solid #C9D0D8;background:#fff;color:#131A22;font:600 14px 'Inter',sans-serif;text-decoration:none;width:100%}
+.btn:hover{background:#F0F3F6;color:#131A22}
+.btn.pri{background:#0B7A75;border-color:#0B7A75;color:#fff}
+.btn.pri:hover{background:#075E5A;color:#fff}
+.btn:focus-visible,a:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+input{font:14px 'Inter',sans-serif;min-height:48px;padding:0 12px;border:1px solid #C9D0D8;border-radius:8px;width:100%;background:#fff;color:#131A22}
+.fact{display:flex;gap:14px;align-items:flex-start}
+.fact b{display:block;font-weight:600;color:#fff;margin-bottom:2px}
+.fact span{color:#B4BFCA;font-size:14px;line-height:1.5}
+.dot{flex:none;width:30px;height:30px;border-radius:8px;border:1px solid #33404D;display:flex;align-items:center;justify-content:center;color:#6FD6CE}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+</style>
+</helmet>
+<div style="display:flex;flex-wrap:wrap;min-height:820px">
+  <section style="flex:1 1 480px;min-width:0;background:#131A22;color:#fff;padding:56px;display:flex;flex-direction:column;justify-content:space-between;gap:40px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:36px;height:36px;border-radius:9px;background:#0B7A75;display:flex;align-items:center;justify-content:center">
+        <svg width="31" height="31" viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(1.1 -1.7)"><circle cx="17" cy="32" r="10" fill="none" stroke="#fff" stroke-width="7"/><circle cx="40" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="45" r="4" fill="#fff"/></g></svg>
+      </div>
+      <span style="font:700 20px 'Space Grotesk',sans-serif">cfs</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:28px;max-width:480px">
+      <h1 style="font-size:40px;color:#fff;text-wrap:balance">{{t.headline}}</h1>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="fact"><div class="dot"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11h14v10H5z M8 11V7a4 4 0 0 1 8 0v4"/></svg></div><div><b>{{t.f1h}}</b><span>{{t.f1b}}</span></div></div>
+        <div class="fact"><div class="dot"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01"/></svg></div><div><b>{{t.f2h}}</b><span>{{t.f2b}}</span></div></div>
+        <div class="fact"><div class="dot"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg></div><div><b>{{t.f3h}}</b><span>{{t.f3b}}</span></div></div>
+      </div>
+    </div>
+    <span style="font-size:13px;color:#93A0AD">{{t.foot}}</span>
+  </section>
+  <section style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;padding:24px 40px 40px">
+    <div style="display:flex;justify-content:flex-end"><div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div></div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center">
+      <div style="width:100%;max-width:400px;display:flex;flex-direction:column;gap:22px">
+        <div>
+          <h1>{{t.signIn}}</h1>
+          <p style="margin:8px 0 0;color:#5B6672;font-size:14px;line-height:1.5">{{t.signInSub}}</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <a class="btn pri" href="Unlock.dc.html">{{t.google}}</a>
+          <a class="btn" href="Unlock.dc.html">{{t.github}}</a>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;color:#5B6672;font-size:12px"><span style="flex:1;height:1px;background:#DDE2E8"></span>{{t.or}}<span style="flex:1;height:1px;background:#DDE2E8"></span></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <label for="em" style="font-size:13px;font-weight:600">{{t.email}}</label>
+          <input id="em" type="text" value="name@myorg.com">
+          <a class="btn" href="Unlock.dc.html">{{t.sendCode}}</a>
+        </div>
+        <p style="margin:0;font-size:13px;color:#5B6672">{{t.first}} <a href="Setup.dc.html">{{t.firstLink}}</a></p>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+headline: d('Share secrets with your team, safely.', 'Bagikan secret ke tim dengan aman.'),
+f1h: d('Locked before it leaves your device', 'Dikunci sebelum keluar dari perangkatmu'),
+f1b: d('Only the people you choose can open a secret. Not even our server can read it.', 'Hanya orang yang kamu pilih yang bisa membukanya. Server kami pun tidak bisa membacanya.'),
+f2h: d('See who opened what', 'Lihat siapa membuka apa'),
+f2b: d('Every access is recorded, including by AI agents.', 'Setiap akses tercatat, termasuk oleh agen AI.'),
+f3h: d('New teammate? One command.', 'Anggota baru? Cukup satu perintah.'),
+f3b: d('They can run the project without ever seeing the passwords.', 'Mereka bisa menjalankan proyek tanpa pernah melihat passwordnya.'),
+foot: d('Runs on Cloudflare.', 'Berjalan di Cloudflare.'),
+signIn: d('Sign in', 'Masuk'),
+signInSub: d('Use your work account. After that you’ll unlock the vault with your own vault password.', 'Pakai akun kerjamu. Setelah itu kamu membuka vault dengan vault password milikmu sendiri.'),
+google: d('Continue with Google Workspace', 'Lanjut dengan Google Workspace'),
+github: d('Continue with GitHub', 'Lanjut dengan GitHub'),
+or: d('or use your work email', 'atau pakai email kantor'),
+email: d('Email', 'Email'),
+sendCode: d('Email me a one-time code', 'Kirim kode sekali pakai'),
+first: d('First time here?', 'Pertama kali di sini?'),
+firstLink: d('Set up your vault password', 'Buat vault password')
+}
+};
+}
+}
+</script>
+</body>
+</html>

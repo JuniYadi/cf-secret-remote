@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admins</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+.app{display:flex;flex-wrap:wrap;min-height:820px;width:100%}
+.side{flex:0 0 244px;background:#fff;border-right:1px solid #DDE2E8;padding:20px 14px;display:flex;flex-direction:column;gap:22px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px}
+.logo{width:32px;height:32px;border-radius:8px;background:#0B7A75;display:flex;align-items:center;justify-content:center}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:7px;color:#131A22;text-decoration:none;font-size:15px;min-height:44px}
+.nav a:hover{background:#F0F3F6;color:#131A22}
+.nav a.on{background:#E3F3F2;color:#075E5A;font-weight:600}
+.me{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #DDE2E8;border-radius:9px;text-decoration:none;color:#131A22}
+.ava{width:32px;height:32px;border-radius:99px;background:#131A22;color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff;align-self:flex-start}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+.main{flex:999 1 640px;min-width:0;padding:24px 32px 40px;display:flex;flex-direction:column;gap:18px}
+h1{font:700 28px/1.2 'Space Grotesk',sans-serif;margin:0}
+h2{font:600 16px/1.3 'Space Grotesk',sans-serif;margin:0}
+.card{background:#fff;border:1px solid #DDE2E8;border-radius:10px;min-width:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:8px;border:1px solid #0B7A75;background:#0B7A75;color:#fff;font:600 14px 'Inter',sans-serif;text-decoration:none}
+.btn:hover{background:#075E5A;color:#fff}
+.btn.ghost{background:#fff;color:#131A22;border-color:#C9D0D8}
+.btn.ghost:hover{background:#F0F3F6;color:#131A22}
+.btn.sm{min-height:36px;padding:0 12px;font-size:13px}
+.btn:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font:500 12.5px 'Inter',sans-serif;border:1px solid #DDE2E8;color:#5B6672;background:#fff;white-space:nowrap}
+.pill.ok{color:#17703F;border-color:#9FD3B5;background:#E8F5EE}
+.pill.warn{color:#8F5F00;border-color:#E6C878;background:#FFF4D6}
+.tabs{display:flex;gap:4px;border-bottom:1px solid #DDE2E8;overflow-x:auto}
+.tabs a{padding:0 16px;min-height:44px;display:flex;align-items:center;gap:8px;color:#5B6672;text-decoration:none;font-size:15px;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs a.on{color:#131A22;font-weight:600;border-bottom-color:#0B7A75}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{font:500 12.5px 'Inter',sans-serif;color:#5B6672;text-align:left;padding:12px 16px;border-bottom:1px solid #DDE2E8;white-space:nowrap}
+td{padding:13px 16px;border-bottom:1px solid #EEF1F4;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.li{display:flex;gap:10px;font-size:14.5px;line-height:1.5;color:#2B3541}
+.li i{flex:none;width:6px;height:6px;border-radius:99px;background:#0B7A75;margin-top:9px}
+</style>
+</helmet>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(1.1 -1.7)"><circle cx="17" cy="32" r="10" fill="none" stroke="#fff" stroke-width="7"/><circle cx="40" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="45" r="4" fill="#fff"/></g></svg></div><div><div style="font:700 17px 'Space Grotesk',sans-serif;line-height:1">cfs</div><div style="font-size:12px;color:#5B6672">myorg</div></div></div>
+    <nav class="nav" aria-label="Main">
+      <a href="Secrets.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3"/></svg>{{t.navSecrets}}</a>
+      <a href="Keyring.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8"/></svg>{{t.navGroups}}</a>
+      <a href="Policies.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>{{t.navPerms}}</a>
+      <a href="AppRoles.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6 M12 19h8"/></svg>{{t.navApps}}</a>
+      <a href="Audit.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01"/></svg>{{t.navActivity}}</a>
+      <a class="on" href="Settings.dc.html"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6"/></svg>{{t.navSettings}}</a>
+    </nav>
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:12px">
+      <div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div>
+      <a class="me" href="Devices.dc.html"><div class="ava">A</div><div style="min-width:0"><div style="font-size:14px;font-weight:600">Alice Wijaya</div><div style="font-size:12.5px;color:#5B6672">{{t.admin}}</div></div></a>
+      <div style="display:flex;gap:8px"><a href="Unlock.dc.html" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:36px;border:1px solid #C9D0D8;border-radius:8px;color:#131A22;text-decoration:none;font-size:13px;font-weight:600;background:#fff">{{t.lock}}</a><a href="Main.dc.html" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:36px;border:1px solid #C9D0D8;border-radius:8px;color:#131A22;text-decoration:none;font-size:13px;font-weight:600;background:#fff">{{t.signout}}</a></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div style="font-size:14px;color:#5B6672"><a href="Settings.dc.html">{{t.navSettings}}</a> / {{t.title}}</div>
+    <div>
+      <h1>{{t.title}}</h1>
+      <p style="margin:8px 0 0;color:#5B6672;font-size:15px;max-width:66ch;line-height:1.5">{{t.sub}}</p>
+    </div>
+    <div class="tabs" role="tablist"><a href="Settings.dc.html">{{t.tGeneral}}</a><a class="on" href="Settings-Admins.dc.html">{{t.tAdmins}} <span class="pill warn">1</span></a><a href="Settings-Backup.dc.html">{{t.tBackup}}</a></div>
+
+    <div style="display:flex;gap:14px;padding:18px 20px;border-radius:10px;background:#FFF4D6;color:#6B4700;align-items:flex-start;flex-wrap:wrap;justify-content:space-between">
+      <div style="flex:1 1 420px"><div style="font:600 16px 'Space Grotesk',sans-serif">{{t.warnTitle}}</div><div style="font-size:14.5px;line-height:1.5;margin-top:4px">{{t.warn}}</div></div>
+      <a class="btn" href="Invite.dc.html">{{t.addAdmin}}</a>
+    </div>
+
+    <div class="card tw">
+      <div style="padding:16px 16px 6px"><h2>{{t.current}}</h2></div>
+      <table>
+        <thead><tr><th>{{t.cName}}</th><th>{{t.cKey}}</th><th>{{t.cRec}}</th><th>{{t.cLast}}</th></tr></thead>
+        <tbody>
+          <tr><td><b>Alice Wijaya</b><div style="font-size:13px;color:#5B6672">alice@myorg.com</div></td><td><span class="pill ok">{{t.ready}}</span></td><td><span class="pill ok">{{t.saved}}</span></td><td>{{t.now}}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card tw">
+      <div style="padding:16px 16px 6px"><h2>{{t.cand}}</h2></div>
+      <table>
+        <thead><tr><th>{{t.cName}}</th><th>{{t.cKey}}</th><th>{{t.cRec}}</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><b>Dewi Lestari</b><div style="font-size:13px;color:#5B6672">dewi@myorg.com</div></td><td><span class="pill ok">{{t.ready}}</span></td><td><span class="pill warn">{{t.none}}</span></td><td style="text-align:right"><a class="btn sm" href="Settings-Admins.dc.html">{{t.make}}</a></td></tr>
+          <tr><td><b>Rina Putri</b><div style="font-size:13px;color:#5B6672">rina@myorg.com</div></td><td><span class="pill ok">{{t.ready}}</span></td><td><span class="pill ok">{{t.saved}}</span></td><td style="text-align:right"><a class="btn sm" href="Settings-Admins.dc.html">{{t.make}}</a></td></tr>
+          <tr><td><b>Bob Santoso</b><div style="font-size:13px;color:#5B6672">bob@myorg.com</div></td><td><span class="pill warn">{{t.notSet}}</span></td><td><span class="pill">—</span></td><td style="text-align:right"><a class="btn ghost sm" href="Invite.dc.html">{{t.nudge}}</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:8px;background:#FBFCFD">
+      <h2>{{t.whyTitle}}</h2>
+      <div class="li"><i></i><span>{{t.y1}}</span></div>
+      <div class="li"><i></i><span>{{t.y2}}</span></div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+navSecrets: d('Secrets', 'Secret'), navGroups: d('Groups', 'Grup'), navPerms: d('Permissions', 'Izin'), navApps: d('Apps & bots', 'Aplikasi & bot'), navActivity: d('Activity', 'Aktivitas'), navSettings: d('Settings', 'Pengaturan'),
+admin: d('Admin', 'Admin'), lock: d('Lock vault', 'Kunci vault'), signout: d('Sign out', 'Keluar'),
+title: d('Admins', 'Admin'),
+sub: d('Admins manage groups, permissions and bots. They also hold keys, so it matters who they are and whether they can get back in.', 'Admin mengelola grup, izin, dan bot. Mereka juga memegang kunci, jadi penting siapa mereka dan apakah mereka bisa masuk kembali.'),
+tGeneral: d('General', 'Umum'), tAdmins: d('Admins', 'Admin'), tBackup: d('Backup', 'Cadangan'),
+warnTitle: d('Only one admin can open the vault', 'Hanya satu admin yang bisa membuka vault'),
+warn: d('If Alice forgets her vault password and has no recovery key, nobody can manage this vault again. Add at least one more admin.', 'Jika Alice lupa vault password dan tidak punya kunci pemulihan, tidak ada yang bisa mengelola vault ini lagi. Tambahkan setidaknya satu admin lagi.'),
+addAdmin: d('Add another admin', 'Tambah admin lagi'),
+current: d('Current admins', 'Admin saat ini'),
+cName: d('Person', 'Orang'), cKey: d('Vault key', 'Kunci vault'), cRec: d('Recovery key', 'Kunci pemulihan'), cLast: d('Last unlocked', 'Terakhir dibuka'),
+ready: d('Ready', 'Siap'), saved: d('Saved', 'Tersimpan'), now: d('Just now', 'Baru saja'),
+cand: d('Make someone an admin', 'Jadikan seseorang admin'),
+none: d('None', 'Tidak ada'), notSet: d('Hasn’t set up', 'Belum menyiapkan'), make: d('Make admin', 'Jadikan admin'), nudge: d('Remind them', 'Ingatkan'),
+whyTitle: d('Why two?', 'Kenapa dua?'),
+y1: d('Your secrets are locked with keys that only people hold. We can’t reset them for you.', 'Secret-mu dikunci dengan kunci yang hanya dipegang orang. Kami tidak bisa mengatur ulangnya untukmu.'),
+y2: d('A second admin can give the first one access again if they forget their password.', 'Admin kedua bisa memberi admin pertama akses lagi jika ia lupa password.')
+}
+};
+}
+}
+</script>
+</body>
+</html>

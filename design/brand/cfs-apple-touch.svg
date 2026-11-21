@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="180" height="180" role="img" aria-label="cfs">
+  <title>cfs</title>
+  <rect width="64" height="64" fill="#0B7A75"/>
+  <g transform="translate(32 32) scale(.85) translate(-32 -32)" fill="#fff">
+    <circle cx="18.1" cy="30.4" r="10" fill="none" stroke="#fff" stroke-width="7"/>
+    <circle cx="40.3" cy="30.4" r="5.2"/>
+    <circle cx="54.2" cy="30.4" r="5.2"/>
+    <circle cx="54.2" cy="43.1" r="4"/>
+  </g>
+</svg>

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Authorize cfs</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+body{margin:0;font-family:'Inter',system-ui,sans-serif;color:#131A22;background:#F4F6F8}
+*{box-sizing:border-box}
+a{color:#0B7A75}a:hover{color:#075E5A}
+h1{font:700 26px/1.2 'Space Grotesk',sans-serif;margin:0}
+.btn{display:flex;align-items:center;justify-content:center;min-height:48px;padding:0 20px;border-radius:8px;border:1px solid #0B7A75;background:#0B7A75;color:#fff;font:600 15px 'Inter',sans-serif;text-decoration:none;flex:1 1 140px}
+.btn:hover{background:#075E5A;color:#fff}
+.btn.ghost{background:#fff;color:#131A22;border-color:#C9D0D8}
+.btn.ghost:hover{background:#F0F3F6;color:#131A22}
+.btn:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid #0B7A75;outline-offset:2px}
+.lang{display:inline-flex;border:1px solid #C9D0D8;border-radius:8px;overflow:hidden;background:#fff}
+.lang button{border:0;background:none;min-height:36px;min-width:44px;font:600 12px 'Inter',sans-serif;color:#5B6672;cursor:pointer}
+.lang button.on{background:#131A22;color:#fff}
+.row{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;padding:12px 0;border-bottom:1px solid #EEF1F4;font-size:14.5px}
+.row:last-child{border-bottom:none}
+.row span:first-child{color:#5B6672}
+</style>
+</helmet>
+<div style="min-height:820px;padding:24px 32px 40px;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:flex-end"><div class="lang" role="group" aria-label="Language"><button class="{{enCls}}" onClick="{{setEn}}">EN</button><button class="{{idCls}}" onClick="{{setId}}">ID</button></div></div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center">
+    <div style="width:100%;max-width:460px;display:flex;flex-direction:column;gap:20px">
+      <div style="display:flex;align-items:center;gap:10px;justify-content:center">
+        <div style="width:32px;height:32px;border-radius:8px;background:#0B7A75;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(1.1 -1.7)"><circle cx="17" cy="32" r="10" fill="none" stroke="#fff" stroke-width="7"/><circle cx="40" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="32" r="5.2" fill="#fff"/><circle cx="53" cy="45" r="4" fill="#fff"/></g></svg></div>
+        <span style="font:700 18px 'Space Grotesk',sans-serif">cfs</span>
+      </div>
+      <div style="background:#fff;border:1px solid #DDE2E8;border-radius:12px;padding:28px;display:flex;flex-direction:column;gap:20px">
+        <div>
+          <h1>{{t.title}}</h1>
+          <p style="margin:8px 0 0;color:#5B6672;font-size:15px;line-height:1.5">{{t.sub}}</p>
+        </div>
+        <div style="border:1px solid #9ED3CF;background:#F2FAF9;border-radius:10px;padding:16px;text-align:center">
+          <div style="font-size:13px;color:#5B6672">{{t.codeLabel}}</div>
+          <div style="font:600 32px 'JetBrains Mono',monospace;letter-spacing:.14em;margin-top:4px">FJ7-K2Q</div>
+        </div>
+        <div>
+          <div class="row"><span>{{t.device}}</span><span>Alice’s MacBook Pro</span></div>
+          <div class="row"><span>{{t.client}}</span><span>cfs 0.4.1 · macOS</span></div>
+          <div class="row"><span>{{t.where}}</span><span>Jakarta, Indonesia</span></div>
+          <div class="row"><span>{{t.expires}}</span><span>9:41</span></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px"><a class="btn ghost" href="Main.dc.html">{{t.cancel}}</a><a class="btn" href="Cli-Done.dc.html">{{t.authorize}}</a></div>
+        <p style="margin:0;font-size:13.5px;color:#5B6672;line-height:1.5">{{t.note}}</p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+state = { lang: 'en' };
+componentDidMount() {
+try { const s = localStorage.getItem('cfs-lang'); if (s) this.setState({ lang: s }); window.addEventListener('storage', (e) => { if (e.key === 'cfs-lang' && e.newValue) this.setState({ lang: e.newValue }); }); } catch (e) {}
+}
+setLang(l) { this.setState({ lang: l }); try { localStorage.setItem('cfs-lang', l); } catch (e) {} }
+renderVals() {
+const L = this.state.lang; const d = (en, id) => (L === 'id' ? id : en);
+return {
+enCls: L === 'en' ? 'on' : '', idCls: L === 'id' ? 'on' : '',
+setEn: () => this.setLang('en'), setId: () => this.setLang('id'),
+t: {
+title: d('Authorize cfs on this device?', 'Izinkan cfs di perangkat ini?'),
+sub: d('A terminal is asking to sign in as Alice. Only continue if you started this.', 'Sebuah terminal meminta masuk sebagai Alice. Lanjutkan hanya jika kamu yang memulainya.'),
+codeLabel: d('Check this code matches your terminal', 'Pastikan kode ini sama dengan di terminalmu'),
+device: d('Device', 'Perangkat'), client: d('Program', 'Program'), where: d('Looks like it’s from', 'Tampaknya dari'), expires: d('Code expires in', 'Kode kedaluwarsa dalam'),
+cancel: d('Cancel', 'Batal'), authorize: d('Authorize', 'Izinkan'),
+note: d('This lets the device fetch your locked secrets. You’ll still need your vault password to open them.', 'Ini memungkinkan perangkat mengambil secret terkunci milikmu. Kamu tetap butuh vault password untuk membukanya.')
+}
+};
+}
+}
+</script>
+</body>
+</html>
