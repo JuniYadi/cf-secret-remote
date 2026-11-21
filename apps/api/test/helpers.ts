@@ -12,12 +12,14 @@ export async function api<T = any>(
   path: string,
   token?: string | null,
   body?: unknown,
+  extraHeaders: Record<string, string> = {},
 ): Promise<Res<T>> {
   const r = await SELF.fetch(`http://t.test/api/v1${path}`, {
     method,
     headers: {
       "content-type": "application/json",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...extraHeaders,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });

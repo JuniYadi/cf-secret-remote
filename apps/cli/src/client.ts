@@ -29,11 +29,18 @@ export interface Client {
     method: string,
     path: string,
     body?: unknown,
-    token?: string,
+    headers?: Record<string, string>,
   ): Promise<{ status: number; body: T }>;
 }
 
-async function raw<T>(host: string, method: string, path: string, body?: unknown, token?: string) {
+async function raw<T>(
+  host: string,
+  method: string,
+  path: string,
+  body?: unknown,
+  token?: string,
+  headers: Record<string, string> = {},
+) {
   let r: Response;
   try {
     r = await fetch(`${host}/api/v1${path}`, {
@@ -41,6 +48,7 @@ async function raw<T>(host: string, method: string, path: string, body?: unknown
       headers: {
         "content-type": "application/json",
         ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...headers,
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -79,7 +87,11 @@ export async function connect(
     if (!r.body.token)
       throw new CliError("The access kit was refused. It may be revoked or expired.");
     const token = r.body.token;
-    return { host, privateKey: kit.privateKey, call: (m, p, b) => raw(host, m, p, b, token) };
+    return {
+      host,
+      privateKey: kit.privateKey,
+      call: (m, p, b, h) => raw(host, m, p, b, token, h),
+    };
   }
   const resolved = resolveHost(hostFlag);
   if (!resolved)
@@ -98,7 +110,7 @@ export async function connect(
   return {
     host,
     privateKey: await loadUnlock(pickStore(), host),
-    call: (m, p, b) => raw(host, m, p, b, s.token),
+    call: (m, p, b, h) => raw(host, m, p, b, s.token, h),
   };
 }
 

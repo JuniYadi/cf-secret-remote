@@ -8,7 +8,13 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations, BOOTSTRAP_ADMIN_EMAIL: "admin@test.dev" },
+          bindings: {
+            TEST_MIGRATIONS: migrations,
+            BOOTSTRAP_ADMIN_EMAIL: "admin@test.dev",
+            // ADR 20 tests sign Access JWTs for these values (see test/access-jwt.ts).
+            ACCESS_TEAM_DOMAIN: "team.test",
+            ACCESS_AUD: "aud-test",
+          },
         },
       }),
     ],

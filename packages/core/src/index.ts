@@ -7,4 +7,6 @@ export * from "./envelope.ts";
 export * from "./fingerprint.ts";
 export * from "./keys.ts";
 export * from "./kit.ts";
+export * from "./recovery.ts";
 export * from "./secret.ts";
+export * from "./words.ts";

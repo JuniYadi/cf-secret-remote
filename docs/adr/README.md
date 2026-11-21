@@ -25,7 +25,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [17](0017-agent-proxy-and-rules.md) | Agent proxy and rules | planned |
 | [18](0018-alerts-and-notifications.md) | Alerts and notifications | implemented |
 | [19](0019-audit-retention-and-quota.md) | Audit checkpoints, retention, quota | implemented |
-| [20](0020-recovery-and-vault-password.md) | Recovery, vault password, admins | planned |
+| [20](0020-recovery-and-vault-password.md) | Recovery, vault password, admins | implemented |
 | [21](0021-offboarding.md) | Offboarding | planned |
 | [22](0022-secrets-versions-and-metadata.md) | Versions, history, import, metadata | implemented |
 | [23](0023-backup-and-restore.md) | Backup and restore | planned |
