@@ -1,6 +1,6 @@
 import { b64uDecode, fingerprintWords, isPrivateKeyLock, normalizeWords } from "@cfs/core";
 import { type Context, Hono } from "hono";
-import { verifyAccessClaims } from "../access.ts";
+import { accessJwtFrom, verifyAccessClaims } from "../access.ts";
 import { RECOVERY_ACTION } from "../alerts.ts";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
@@ -66,7 +66,7 @@ export const recovery = new Hono<AppEnv>();
 recovery.post("/recovery/request", async (c) => {
   const db = c.env.DB;
   const who = c.get("who");
-  const claims = await verifyAccessClaims(c.env, c.req.header("Cf-Access-Jwt-Assertion"));
+  const claims = await verifyAccessClaims(c.env, accessJwtFrom(c.req)?.jwt);
   const t = now();
   const fresh =
     claims !== null &&

@@ -70,3 +70,35 @@ export async function verifyAccessClaims(
     return null;
   }
 }
+
+/**
+ * Where an Access JWT came from. Paths behind an Access *bypass* policy (ADR 4: /api/v1/*) do not get the
+ * `Cf-Access-Jwt-Assertion` header, but the browser still sends the `CF_Authorization` cookie, so we accept both.
+ * The JWT is verified the same way either way.
+ */
+export function accessJwtFrom(req: {
+  header: (name: string) => string | undefined;
+}): { jwt: string; via: "header" | "cookie" } | null {
+  const header = req.header("Cf-Access-Jwt-Assertion");
+  if (header) return { jwt: header, via: "header" };
+  const cookie = req.header("Cookie");
+  const m = cookie?.match(/(?:^|;\s*)CF_Authorization=([^;\s]+)/);
+  return m?.[1] ? { jwt: m[1], via: "cookie" } : null;
+}
+
+/**
+ * CSRF guard for cookie-authenticated requests: a page on another site can make the browser send the cookie,
+ * so a state-changing request must come from our own origin.
+ */
+export function sameOrigin(req: {
+  header: (name: string) => string | undefined;
+  url: string;
+}): boolean {
+  const origin = req.header("Origin");
+  if (!origin) return false;
+  try {
+    return new URL(origin).host === new URL(req.url).host;
+  } catch {
+    return false;
+  }
+}
