@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
+import { lapsedGrant } from "../grants.ts";
 import { NAME_RE } from "../limits.ts";
 import { type Cap, can, prefixOf, type Rule, validPath } from "../policy.ts";
 import type { AppEnv, Who } from "../types.ts";
@@ -137,6 +138,19 @@ secrets.get("/secret", async (c) => {
   const path = c.req.query("path") ?? "";
   if (!validPath(path)) return c.json({ error: "bad path" }, 400);
   if (!(await check(c, path, "read"))) return c.json({ error: "denied" }, 403);
+  // ADR 16: ciphertext is refused once the caller's time-boxed group key has lapsed.
+  const who = c.get("who");
+  if (await lapsedGrant(c.env.DB, who.id, prefixOf(path), now())) {
+    await audit(c.env.DB, {
+      who: who.name,
+      action: "secret.read",
+      path,
+      result: "denied",
+      note: "access expired",
+      ip: c.req.header("CF-Connecting-IP"),
+    });
+    return c.json({ error: "access has expired" }, 403);
+  }
   const want = c.req.query("version");
   const row = await c.env.DB.prepare(
     `SELECT v.version, v.keyring_version AS keyringVersion, v.names, v.wrapped_dek AS wrappedDek, v.ciphertext, v.created_at AS createdAt
@@ -146,7 +160,6 @@ secrets.get("/secret", async (c) => {
     .bind(want ? Number(want) : null, path)
     .first<{ version: number; names: string }>();
   if (!row) return c.json({ error: "not found" }, 404);
-  const who = c.get("who");
   await audit(c.env.DB, {
     who: who.name,
     action: "secret.read",

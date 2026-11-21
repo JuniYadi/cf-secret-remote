@@ -54,9 +54,10 @@ async function memberGate(
   if (adminMayPass && who.role === "admin") return group;
   const mine = await db
     .prepare(
-      "SELECT 1 AS ok FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND version = ?",
+      `SELECT 1 AS ok FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND version = ?
+       AND (expires_at IS NULL OR expires_at > ?)`,
     )
-    .bind(group.id, who.id, group.version)
+    .bind(group.id, who.id, group.version, now())
     .first();
   if (!mine) {
     await audit(db, {
@@ -83,9 +84,10 @@ membership.get("/keyrings/:prefix/members", async (c) => {
   const rows = await c.env.DB.prepare(
     `SELECT i.id AS identityId, i.name, i.role, i.status FROM keyring_member m
      JOIN identity i ON i.id = m.identity_id
-     WHERE m.keyring_id = ? AND m.version = ? ORDER BY i.name`,
+     WHERE m.keyring_id = ? AND m.version = ? AND (m.expires_at IS NULL OR m.expires_at > ?)
+     ORDER BY i.name`,
   )
-    .bind(g.id, g.version)
+    .bind(g.id, g.version, now())
     .all();
   return c.json(rows.results);
 });
@@ -159,8 +161,11 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
     return c.json({ error: "you cannot remove yourself from the group" }, 400);
 
   const current = await db
-    .prepare("SELECT identity_id AS id FROM keyring_member WHERE keyring_id = ? AND version = ?")
-    .bind(g.id, g.version)
+    .prepare(
+      `SELECT identity_id AS id FROM keyring_member WHERE keyring_id = ? AND version = ?
+       AND (expires_at IS NULL OR expires_at > ?)`,
+    )
+    .bind(g.id, g.version, now())
     .all<{ id: string }>();
   const ids = current.results.map((r) => r.id);
   if (!ids.includes(removeId)) return c.json({ error: "not in this group" }, 404);

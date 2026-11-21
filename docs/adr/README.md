@@ -21,7 +21,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [13](0013-cli-host-config-and-run.md) | CLI host, config and run | partly; rest in 25 |
 | [14](0014-membership-and-rotation.md) | Membership and key rotation | implemented |
 | [15](0015-apps-and-bots-lifecycle.md) | Apps and bots lifecycle | implemented |
-| [16](0016-access-requests.md) | Access requests with approval | planned |
+| [16](0016-access-requests.md) | Access requests with approval | implemented |
 | [17](0017-agent-proxy-and-rules.md) | Agent proxy and rules | planned |
 | [18](0018-alerts-and-notifications.md) | Alerts and notifications | planned |
 | [19](0019-audit-retention-and-quota.md) | Audit checkpoints, retention, quota | implemented |
