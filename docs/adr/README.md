@@ -30,7 +30,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [22](0022-secrets-versions-and-metadata.md) | Versions, history, import, metadata | implemented |
 | [23](0023-backup-and-restore.md) | Backup and restore | planned |
 | [24](0024-web-app.md) | Web app | planned |
-| [25](0025-deploy-and-distribution.md) | Deploy, init, hosts, releases | CLI half implemented, deploy pending |
+| [25](0025-deploy-and-distribution.md) | Deploy, init, hosts, releases | implemented |
 | [26](0026-testing-strategy.md) | Testing strategy | planned, starts first |
 | [27](0027-hardening-and-limits.md) | Hardening and rate limits | planned |
 
