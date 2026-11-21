@@ -23,7 +23,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [15](0015-apps-and-bots-lifecycle.md) | Apps and bots lifecycle | implemented |
 | [16](0016-access-requests.md) | Access requests with approval | implemented |
 | [17](0017-agent-proxy-and-rules.md) | Agent proxy and rules | planned |
-| [18](0018-alerts-and-notifications.md) | Alerts and notifications | planned |
+| [18](0018-alerts-and-notifications.md) | Alerts and notifications | implemented |
 | [19](0019-audit-retention-and-quota.md) | Audit checkpoints, retention, quota | implemented |
 | [20](0020-recovery-and-vault-password.md) | Recovery, vault password, admins | planned |
 | [21](0021-offboarding.md) | Offboarding | planned |

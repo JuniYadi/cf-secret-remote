@@ -1,5 +1,6 @@
 import { PROTOCOL_VERSION } from "@cfs/core";
 import { Hono } from "hono";
+import { withAlertContext } from "./alerts.ts";
 import { authenticate } from "./auth.ts";
 import { runDaily } from "./cron.ts";
 import { bodyLimit } from "./limits.ts";
@@ -68,7 +69,9 @@ app.onError((e, c) => {
 });
 
 export default {
-  fetch: (req: Request, env: Env, ctx: ExecutionContext) => app.fetch(req, env, ctx),
+  // ADR 18: the request context lets alert evaluation run under ctx.waitUntil.
+  fetch: (req: Request, env: Env, ctx: ExecutionContext) =>
+    withAlertContext(env, ctx, () => app.fetch(req, env, ctx)),
   // ADR 19: the 00:05 UTC cron.
   scheduled: (event: ScheduledController, env: Env, ctx: ExecutionContext) =>
     ctx.waitUntil(runDaily(env, Math.floor(event.scheduledTime / 1000))),
