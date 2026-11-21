@@ -24,7 +24,7 @@ export type Channel = (typeof CHANNELS)[number];
 
 // Audit actions that the recovery (ADR 20) and access request (ADR 16) routes write. Those routes must use these names.
 export const RECOVERY_ACTION = "recovery.requested";
-export const ACCESS_ACTION = "access.requested";
+export const ACCESS_ACTION = "request.create";
 
 const DEDUPE_SECONDS = 15 * 60;
 const BURST_WINDOW_SECONDS = 5 * 60;

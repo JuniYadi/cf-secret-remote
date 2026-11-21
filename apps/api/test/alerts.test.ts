@@ -271,6 +271,25 @@ describe("ADR 18: access_request", () => {
   });
 });
 
+describe("ADR 18: access_request (real route)", () => {
+  it("fires when a request is made through POST /requests, so the action names match", async () => {
+    await db
+      .prepare(
+        "INSERT OR IGNORE INTO keyring (id, prefix, created_at) VALUES ('kr-alert', 'alertgrp', 1)",
+      )
+      .run();
+    const who = await makeIdentity();
+    const r = await api("POST", "/requests", who.token, {
+      path: "alertgrp/prod",
+      reason: "deploy",
+      duration: 3600,
+    });
+    expect(r.status).toBe(201);
+    await settle();
+    expect(titled("Access requested")).toHaveLength(1);
+  });
+});
+
 describe("ADR 18: dedupe", () => {
   it("sends one message per (rule, subject) inside 15 minutes, and one per subject", async () => {
     await ev({ who: "eve@test.dev", action: "secret.read", result: "denied" });
