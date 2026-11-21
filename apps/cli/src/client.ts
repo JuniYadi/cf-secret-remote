@@ -1,5 +1,6 @@
 import {
   decodeKit,
+  fingerprints,
   type Kit,
   openSecret,
   sealSecret,
@@ -99,17 +100,27 @@ async function groupKey(c: Client, prefix: string): Promise<{ key: Uint8Array; v
   };
 }
 
+interface SealedVersion {
+  version: number;
+  keyringVersion: number;
+  wrappedDek: string;
+  ciphertext: string;
+}
+
+/** Fetches one version (the current one if omitted). Each fetch is audited as an open (ADR 22). */
+async function fetchVersion(c: Client, path: string, version?: number) {
+  const q = version ? `&version=${version}` : "";
+  return c.call<SealedVersion>("GET", `/secret?path=${encodeURIComponent(path)}${q}`);
+}
+
 export async function readSecret(
   c: Client,
   path: string,
+  version?: number,
 ): Promise<{ values: Values; version: number }> {
-  const r = await c.call<{
-    version: number;
-    keyringVersion: number;
-    wrappedDek: string;
-    ciphertext: string;
-  }>("GET", `/secret?path=${encodeURIComponent(path)}`);
-  if (r.status === 404) throw new CliError(`No secret at "${path}".`);
+  const r = await fetchVersion(c, path, version);
+  if (r.status === 404)
+    throw new CliError(version ? `No version ${version} of "${path}".` : `No secret at "${path}".`);
   if (r.status !== 200) fail(r.status, r.body, `read ${path}`);
   const prefix = path.split("/")[0] as string;
   const { key } = await groupKey(c, prefix);
@@ -119,14 +130,32 @@ export async function readSecret(
   };
 }
 
-export async function writeSecret(c: Client, path: string, change: Values): Promise<number> {
+/**
+ * Saves the next version of a secret. `next` receives the current values and returns the new ones.
+ * The client seals the values and computes the per-name fingerprints (ADR 22), so the server never sees them in clear.
+ */
+export async function saveVersion(
+  c: Client,
+  path: string,
+  next: (current: Values) => Values,
+): Promise<number> {
   const prefix = path.split("/")[0] as string;
   const { key, version: keyringVersion } = await groupKey(c, prefix);
+  const probe = await fetchVersion(c, path);
   let current: { values: Values; version: number } = { values: {}, version: 0 };
-  const probe = await c.call("GET", `/secret?path=${encodeURIComponent(path)}`);
-  if (probe.status === 200) current = await readSecret(c, path);
+  if (probe.status === 200)
+    current = {
+      values: await openSecret(
+        key,
+        path,
+        probe.body.version,
+        probe.body.wrappedDek,
+        probe.body.ciphertext,
+      ),
+      version: probe.body.version,
+    };
   else if (probe.status !== 404) fail(probe.status, probe.body, `read ${path}`);
-  const values = { ...current.values, ...change };
+  const values = next(current.values);
   const version = current.version + 1;
   const sealed = await sealSecret(key, path, version, values);
   const w = await c.call<{ version: number }>("PUT", "/secret", {
@@ -134,8 +163,28 @@ export async function writeSecret(c: Client, path: string, change: Values): Prom
     names: Object.keys(values),
     keyringVersion,
     version,
+    fps: await fingerprints(key, path, values),
     ...sealed,
   });
   if (w.status !== 200 && w.status !== 201) fail(w.status, w.body, `write ${path}`);
   return version;
+}
+
+/** Current values of a secret, or none if it does not exist yet. */
+export async function currentValues(
+  c: Client,
+  path: string,
+): Promise<{ values: Values; version: number }> {
+  const r = await fetchVersion(c, path);
+  if (r.status === 404) return { values: {}, version: 0 };
+  if (r.status !== 200) fail(r.status, r.body, `read ${path}`);
+  const { key } = await groupKey(c, path.split("/")[0] as string);
+  return {
+    values: await openSecret(key, path, r.body.version, r.body.wrappedDek, r.body.ciphertext),
+    version: r.body.version,
+  };
+}
+
+export async function writeSecret(c: Client, path: string, change: Values): Promise<number> {
+  return saveVersion(c, path, (current) => ({ ...current, ...change }));
 }

@@ -50,3 +50,49 @@ export async function openSecret(
   const dek = await open(groupKey, wrappedDek, dekAad(path, version));
   return JSON.parse(fromUtf8(await open(dek, ciphertext, valAad(path, version)))) as Values;
 }
+
+// ADR 22: per-name fingerprints let the UI show added, changed and removed names between versions
+// without showing values. A fingerprint needs the group key to check or to guess, so it is computed
+// on the client only. The server stores it as-is.
+export type Fingerprints = Record<string, string>;
+
+/** `{ NAME: hex(HMAC-SHA256(groupKey, "fp|<path>|<NAME>|<value>")[0..8]) }`. */
+export async function fingerprints(
+  groupKey: Uint8Array,
+  path: string,
+  values: Values,
+): Promise<Fingerprints> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    groupKey as BufferSource,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const entries: [string, string][] = [];
+  for (const [name, value] of Object.entries(values)) {
+    const mac = new Uint8Array(
+      await crypto.subtle.sign("HMAC", key, utf8(`fp|${path}|${name}|${value}`) as BufferSource),
+    );
+    entries.push([
+      name,
+      Array.from(mac.slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join(""),
+    ]);
+  }
+  return Object.fromEntries(entries);
+}
+
+export interface FingerprintDiff {
+  added: string[];
+  changed: string[];
+  removed: string[];
+}
+
+/** Compares two fingerprint maps. `from` is the older version, `to` the newer. Names only, sorted. */
+export function diffFingerprints(from: Fingerprints, to: Fingerprints): FingerprintDiff {
+  const names = (o: Fingerprints) => Object.keys(o).sort();
+  const added = names(to).filter((n) => !Object.hasOwn(from, n));
+  const removed = names(from).filter((n) => !Object.hasOwn(to, n));
+  const changed = names(to).filter((n) => Object.hasOwn(from, n) && from[n] !== to[n]);
+  return { added, changed, removed };
+}

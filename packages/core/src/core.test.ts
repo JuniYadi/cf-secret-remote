@@ -82,7 +82,56 @@ describe("audit chain", () => {
   });
 });
 
-import { newGroupKey, openSecret, sealSecret, unwrapGroupKey, wrapGroupKey } from "./index.ts";
+import vector from "../test-vectors/fingerprint.json";
+import {
+  diffFingerprints,
+  fingerprints,
+  newGroupKey,
+  openSecret,
+  sealSecret,
+  unwrapGroupKey,
+  wrapGroupKey,
+} from "./index.ts";
+
+const hexBytes = (hex: string) =>
+  Uint8Array.from(hex.match(/../g)?.map((b) => Number.parseInt(b, 16)) ?? []);
+
+describe("fingerprints (ADR 22)", () => {
+  it("matches the shared test vector", async () => {
+    const cases = vector.cases as {
+      path: string;
+      values: Record<string, string>;
+      fps: Record<string, string>;
+    }[];
+    for (const c of cases) {
+      expect(await fingerprints(hexBytes(vector.groupKeyHex), c.path, c.values)).toEqual(c.fps);
+    }
+  });
+  it("depends on the group key, the path, the name and the value", async () => {
+    const k = await newGroupKey();
+    const base = await fingerprints(k, "pay/prod", { KEY: "a" });
+    expect(await fingerprints(k, "pay/prod", { KEY: "b" })).not.toEqual(base);
+    expect(await fingerprints(k, "pay/prod", { KEY2: "a" })).not.toEqual(base);
+    expect(await fingerprints(k, "pay/dev", { KEY: "a" })).not.toEqual(base);
+    expect(await fingerprints(await newGroupKey(), "pay/prod", { KEY: "a" })).not.toEqual(base);
+    expect(base.KEY).toMatch(/^[0-9a-f]{16}$/);
+  });
+  it("diffs two maps into added, changed and removed names", () => {
+    expect(
+      diffFingerprints(
+        { A: "1", B: "2", C: "3", SAME: "9" },
+        { A: "1", B: "x", D: "4", SAME: "9" },
+      ),
+    ).toEqual({ added: ["D"], changed: ["B"], removed: ["C"] });
+    expect(diffFingerprints({}, {})).toEqual({ added: [], changed: [], removed: [] });
+    // Names like "constructor" are inherited properties of plain objects; they must count as absent.
+    expect(diffFingerprints({}, { constructor: "1" })).toEqual({
+      added: ["constructor"],
+      changed: [],
+      removed: [],
+    });
+  });
+});
 
 describe("secret hierarchy", () => {
   it("round-trips and is bound to path and version", async () => {
