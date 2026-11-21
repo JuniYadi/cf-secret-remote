@@ -35,7 +35,7 @@ async function login(roleId: string, secretId: string, ip?: string) {
     headers: { "content-type": "application/json", ...(ip ? { "CF-Connecting-IP": ip } : {}) },
     body: JSON.stringify({ roleId, secretId }),
   });
-  return { status: r.status, body: (await r.json()) as any };
+  return { status: r.status, body: (await r.json()) as { token?: string; expiresIn?: number } };
 }
 
 const auditText = async () =>

@@ -48,7 +48,7 @@ function parseV6(s: string): bigint | null {
   let all: number[] | null;
   if (halves.length === 1) {
     all = groups(halves[0] as string, true);
-    if (!all || all.length !== 8) return null;
+    if (all?.length !== 8) return null;
   } else {
     const left = groups(halves[0] as string, false);
     const right = groups(halves[1] as string, true);
