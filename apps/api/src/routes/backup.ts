@@ -43,8 +43,17 @@ export const BACKUP_TABLES = [
 ] as const;
 export type BackupTable = (typeof BACKUP_TABLES)[number];
 
-/** Tables never exported: sessions and CLI login codes (ADR 23), rate-limit counters, and the maintenance flag. */
-export const EXCLUDED_TABLES = ["session", "cli_login", "login_attempt", "maintenance"] as const;
+/**
+ * Tables never exported: sessions and CLI login codes (ADR 23), rate-limit counters, the maintenance flag, and
+ * in-flight recovery requests (ADR 20: short-lived, hold cancel-token hashes; restoring a stale one would revive it).
+ */
+export const EXCLUDED_TABLES = [
+  "session",
+  "cli_login",
+  "login_attempt",
+  "maintenance",
+  "recovery_request",
+] as const;
 
 /**
  * Settings never written to a backup (ADR 23: the alert webhook is masked out). A webhook URL is a credential,
@@ -64,6 +73,7 @@ export const COLUMNS: Record<BackupTable, readonly string[]> = {
     "status",
     "created_at",
     "owner_id",
+    "recovery_locked_key",
   ],
   app_role: [
     "identity_id",

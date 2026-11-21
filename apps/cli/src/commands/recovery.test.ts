@@ -42,6 +42,8 @@ function fakeClient(
       if (!reply) return { status: 404, body: { error: "not found" } };
       return reply;
     }) as Client["call"],
+    send: (() => Promise.reject(new Error("send is not used here"))) as Client["send"],
+    download: (() => Promise.reject(new Error("download is not used here"))) as Client["download"],
   };
   return { client, calls };
 }
