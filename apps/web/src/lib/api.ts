@@ -324,6 +324,105 @@ export interface SecretWrite {
   fps: Record<string, string>;
 }
 
+// --- Groups, permissions, apps (ADR 14, 5, 15). Shapes match apps/api/src/routes. ---
+
+export interface KeyringRow {
+  prefix: string;
+  version: number;
+}
+
+export interface GroupMember {
+  identityId: string;
+  name: string;
+  role: "admin" | "member";
+  status: string;
+}
+
+export interface Rule {
+  path: string;
+  caps: Cap[];
+}
+
+export type Cap = "create" | "read" | "update" | "delete" | "list";
+
+export interface PolicyAssignee {
+  identityId: string;
+  name: string;
+  kind: "user" | "app";
+  expiresAt: number | null;
+}
+
+export interface PolicyRow {
+  id: string;
+  name: string;
+  rules: Rule[];
+  assignees: PolicyAssignee[];
+}
+
+export interface SecretListRow {
+  path: string;
+  version: number;
+  updatedAt: number;
+  names: string[];
+}
+
+/** One stored version. Ciphertext only; opening it needs the group key. */
+export interface SecretVersion {
+  version: number;
+  keyringVersion: number;
+  names: string[];
+  wrappedDek: string;
+  ciphertext: string;
+  createdAt: number;
+}
+
+export interface RotateSecret {
+  path: string;
+  names: string[];
+  wrappedDek: string;
+  ciphertext: string;
+  version: number;
+}
+
+/** An app or bot as the list and detail pages read it. A superset of AppSummary. */
+export interface AppRow {
+  id: string;
+  name: string;
+  status: string;
+  createdAt: number;
+  owner: string | null;
+  roleId: string;
+  tokenTtl: number;
+  maxUses: number | null;
+  uses: number;
+  cidr: string[] | null;
+  expiresAt: number | null;
+  firstLoginAt: number | null;
+  lastLoginAt: number | null;
+  lastIp: string | null;
+  waiting: boolean;
+}
+
+export interface AppDetail extends AppRow {
+  sessions: { id: string; createdAt: number; expiresAt: number }[];
+  activity: {
+    at: number;
+    action: string;
+    result: string;
+    ip: string | null;
+    note: string | null;
+  }[];
+}
+
+export interface NewAppBody {
+  name: string;
+  publicKey: string;
+  tokenTtl?: number;
+  maxUses?: number | null;
+  expiresAt?: number | null;
+  cidr?: string | null;
+}
+
 export const api = {
   whoami: (fetchImpl?: FetchLike) => request<Me>("GET", "/whoami", undefined, fetchImpl),
   createVault: (publicKey: string, lockedKey: string) =>
@@ -370,7 +469,7 @@ export const api = {
   keyrings: () => request<{ prefix: string; version: number }[]>("GET", "/keyrings"),
 
   // Agent rules (ADR 17)
-  apps: () => request<AppSummary[]>("GET", "/apps"),
+  apps: () => request<AppRow[]>("GET", "/apps"),
   agentRules: (appId: string) => request<AgentRule[]>("GET", `/apps/${appId}/rules`),
   createAgentRule: (appId: string, input: AgentRuleInput & { alias: string }) =>
     request<AgentRule>("POST", `/apps/${appId}/rules`, input),
@@ -386,4 +485,73 @@ export const api = {
   // CLI login (ADR 11)
   cliLogin: (code: string) => request<CliLoginInfo>("GET", `/cli/login${queryString({ code })}`),
   cliApprove: (userCode: string) => request<{ ok: true }>("POST", "/cli/approve", { userCode }),
+
+  // Groups (ADR 3, 14). `identities` is above, shared with the access requests part.
+  keyrings: () => request<KeyringRow[]>("GET", "/keyrings"),
+  keyringMembers: (prefix: string) =>
+    request<GroupMember[]>("GET", `/keyrings/${encodeURIComponent(prefix)}/members`),
+  myGroupKey: (prefix: string) =>
+    request<{ wrappedKey: string; version: number }>(
+      "GET",
+      `/keyrings/${encodeURIComponent(prefix)}/key`,
+    ),
+  createKeyring: (prefix: string, members: { identityId: string; wrappedKey: string }[]) =>
+    request<{ id: string; prefix: string }>("POST", "/keyrings", { prefix, members }),
+  addGroupMember: (prefix: string, identityId: string, wrappedKey: string) =>
+    request<{ ok: true }>("POST", `/keyrings/${encodeURIComponent(prefix)}/members`, {
+      identityId,
+      wrappedKey,
+    }),
+  rotateStart: (
+    prefix: string,
+    removeIdentityId: string,
+    members: { identityId: string; wrappedKey: string }[],
+  ) =>
+    request<{ version: number; secrets: number }>(
+      "POST",
+      `/keyrings/${encodeURIComponent(prefix)}/rotate/start`,
+      { removeIdentityId, members },
+    ),
+  rotateChunk: (prefix: string, keyringVersion: number, secrets: RotateSecret[]) =>
+    request<{ staged: number }>("POST", `/keyrings/${encodeURIComponent(prefix)}/rotate/chunk`, {
+      keyringVersion,
+      secrets,
+    }),
+  rotateCommit: (prefix: string) =>
+    request<{ version: number; status: string }>(
+      "POST",
+      `/keyrings/${encodeURIComponent(prefix)}/rotate/commit`,
+    ),
+  rotateAbort: (prefix: string) =>
+    request<{ version: number; status: string }>(
+      "POST",
+      `/keyrings/${encodeURIComponent(prefix)}/rotate/abort`,
+    ),
+
+  // People (admins)
+  invite: (email: string, role: "admin" | "member") =>
+    request<{ ok: true }>("POST", "/invites", { email, role }),
+
+  // Secrets, read only here (names and ciphertext for re-locking)
+  secrets: () => request<SecretListRow[]>("GET", "/secrets"),
+  secretVersion: (path: string) =>
+    request<SecretVersion>("GET", `/secret?path=${encodeURIComponent(path)}`),
+
+  // Permissions (ADR 5)
+  policies: () => request<PolicyRow[]>("GET", "/policies"),
+  createPolicy: (name: string, rules: Rule[]) =>
+    request<{ id: string }>("POST", "/policies", { name, rules }),
+  assignPolicy: (policyId: string, identityId: string) =>
+    request<{ ok: true }>("POST", `/policies/${encodeURIComponent(policyId)}/assign`, {
+      identityId,
+    }),
+
+  // Apps and bots (ADR 15). `apps` is above.
+  app: (id: string) => request<AppDetail>("GET", `/apps/${encodeURIComponent(id)}`),
+  createApp: (body: NewAppBody) =>
+    request<{ id: string; roleId: string; secretId: string }>("POST", "/apps", body),
+  rotateApp: (id: string) =>
+    request<{ roleId: string; secretId: string }>("POST", `/apps/${encodeURIComponent(id)}/rotate`),
+  disableApp: (id: string) =>
+    request<{ ok: true }>("POST", `/apps/${encodeURIComponent(id)}/disable`),
 };

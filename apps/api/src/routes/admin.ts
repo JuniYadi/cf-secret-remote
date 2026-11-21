@@ -12,15 +12,35 @@ admin.use("/policies", requireAdmin);
 admin.use("/audit/*", requireAdmin);
 admin.use("/audit", requireAdmin);
 
-admin.get("/policies", async (c) =>
-  c.json(
-    (
-      await c.env.DB.prepare("SELECT id, name, rules FROM policy ORDER BY name").all<{
-        rules: string;
-      }>()
-    ).results.map((p) => ({ ...p, rules: JSON.parse(p.rules) })),
-  ),
-);
+// Each policy lists who holds it (identity id, name, kind, and expiry if any), so the web can show roles.
+admin.get("/policies", async (c) => {
+  const db = c.env.DB;
+  const policies = await db
+    .prepare("SELECT id, name, rules FROM policy ORDER BY name")
+    .all<{ id: string; name: string; rules: string }>();
+  const holders = await db
+    .prepare(
+      `SELECT ip.policy_id AS policyId, i.id AS identityId, i.name, i.kind, ip.expires_at AS expiresAt
+       FROM identity_policy ip JOIN identity i ON i.id = ip.identity_id ORDER BY i.name`,
+    )
+    .all<{
+      policyId: string;
+      identityId: string;
+      name: string;
+      kind: string;
+      expiresAt: number | null;
+    }>();
+  return c.json(
+    policies.results.map((p) => ({
+      id: p.id,
+      name: p.name,
+      rules: JSON.parse(p.rules),
+      assignees: holders.results
+        .filter((h) => h.policyId === p.id)
+        .map(({ identityId, name, kind, expiresAt }) => ({ identityId, name, kind, expiresAt })),
+    })),
+  );
+});
 
 admin.post("/policies", async (c) => {
   const b = await c.req.json<{ name?: string; rules?: { path: string; caps: string[] }[] }>();

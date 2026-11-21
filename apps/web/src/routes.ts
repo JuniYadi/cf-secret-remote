@@ -30,6 +30,11 @@ export const PATHS = {
   devices: "/account/devices",
   cliAuthorize: "/cli/authorize",
   cliDone: "/cli/done",
+  groupNew: "/groups/new",
+  invite: "/invite",
+  permNew: "/permissions/new",
+  roleNew: "/permissions/roles/new",
+  appNew: "/apps/new",
   secretsNew: "/secrets/new",
   secretsImport: "/secrets/import",
   secretsImportReview: "/secrets/import/review",
@@ -41,6 +46,13 @@ export const SECRET_TABS = {
   versions: "/versions",
   history: "/history",
 } as const;
+
+/** Paths with a name or id in them. Each is built with encodeURIComponent, so a slash stays inside one segment. */
+export const groupPath = (prefix: string) => `${PATHS.groups}/${encodeURIComponent(prefix)}`;
+export const groupAddPath = (prefix: string) => `${groupPath(prefix)}/add`;
+export const groupRelockPath = (prefix: string) => `${groupPath(prefix)}/relock`;
+export const appPath = (id: string) => `${PATHS.apps}/${encodeURIComponent(id)}`;
+export const appKitPath = (id: string) => `${appPath(id)}/kit`;
 
 export type PageId =
   | "root"
@@ -71,7 +83,17 @@ export type PageId =
   | "secretDetail"
   | "secretEdit"
   | "secretVersions"
-  | "secretHistory";
+  | "secretHistory"
+  | "groupNew"
+  | "groupDetail"
+  | "groupAdd"
+  | "groupRelock"
+  | "invite"
+  | "permNew"
+  | "roleNew"
+  | "appNew"
+  | "appDetail"
+  | "appKit";
 
 /** Pages inside the signed-in shell (sidebar and header). They need an unlocked vault. */
 export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
@@ -93,6 +115,16 @@ export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
   "secretEdit",
   "secretVersions",
   "secretHistory",
+  "groupNew",
+  "groupDetail",
+  "groupAdd",
+  "groupRelock",
+  "invite",
+  "permNew",
+  "roleNew",
+  "appNew",
+  "appDetail",
+  "appKit",
 ]);
 
 export interface Crumb {
@@ -130,6 +162,11 @@ const STATIC_PATHS: Readonly<Record<string, PageId>> = {
   [PATHS.secretsNew]: "secretsNew",
   [PATHS.secretsImport]: "secretsImport",
   [PATHS.secretsImportReview]: "secretsImportReview",
+  [PATHS.groupNew]: "groupNew",
+  [PATHS.invite]: "invite",
+  [PATHS.permNew]: "permNew",
+  [PATHS.roleNew]: "roleNew",
+  [PATHS.appNew]: "appNew",
 };
 
 function decodeSegment(segment: string): string | undefined {
@@ -141,6 +178,15 @@ function decodeSegment(segment: string): string | undefined {
   }
 }
 
+/** Parameterised paths, tried in order after the fixed ones. The first capture is the decoded name or id. */
+const PARAM_PATHS: readonly { re: RegExp; id: PageId }[] = [
+  { re: /^\/groups\/([^/]+)\/add$/, id: "groupAdd" },
+  { re: /^\/groups\/([^/]+)\/relock$/, id: "groupRelock" },
+  { re: /^\/groups\/([^/]+)$/, id: "groupDetail" },
+  { re: /^\/apps\/([^/]+)\/kit$/, id: "appKit" },
+  { re: /^\/apps\/([^/]+)$/, id: "appDetail" },
+];
+
 /** Maps a pathname to a page. Unknown paths map to notFound. Trailing slashes are ignored. */
 export function matchPage(pathname: string): MatchedPage {
   const path = pathname.replace(/\/+$/, "") || "/";
@@ -149,8 +195,15 @@ export function matchPage(pathname: string): MatchedPage {
     const name = decodeSegment(denied[1]);
     return name ? { id: "denied", name } : { id: "notFound" };
   }
-  const known = STATIC_PATHS[path];
-  if (known) return { id: known };
+  const fixed = STATIC_PATHS[path];
+  if (fixed !== undefined) return { id: fixed };
+  for (const { re, id } of PARAM_PATHS) {
+    const found = path.match(re);
+    if (found?.[1] !== undefined) {
+      const name = decodeSegment(found[1]);
+      return name ? { id, name } : { id: "notFound" };
+    }
+  }
   return matchSecretPage(path);
 }
 
@@ -178,6 +231,7 @@ function matchSecretPage(path: string): MatchedPage {
 export function pageCrumbs(id: PageId, name?: string): Crumb[] {
   const secrets = { label: t("Secrets", "Secret"), href: PATHS.secrets };
   const activity = { label: t("Activity", "Aktivitas"), href: PATHS.activity };
+  const groups = { label: t("Groups", "Grup"), href: PATHS.groups };
   const permissions = { label: t("Permissions", "Izin"), href: PATHS.permissions };
   const apps = { label: t("Apps & bots", "Aplikasi & bot"), href: PATHS.apps };
   switch (id) {
@@ -253,6 +307,29 @@ export function pageCrumbs(id: PageId, name?: string): Crumb[] {
         secrets,
         { label: name ?? "", href: secretHref(name) },
         { label: t("Access history", "Riwayat akses") },
+    case "groupNew":
+      return [groups, { label: t("New group", "Grup baru") }];
+    case "groupDetail":
+      return [groups, { label: name ?? "" }];
+    case "groupAdd":
+      return [groups, { label: t("Add member", "Tambah anggota") }];
+    case "groupRelock":
+      return [groups, { label: t(`Re-locking ${name ?? ""}`, `Mengunci ulang ${name ?? ""}`) }];
+    case "invite":
+      return [groups, { label: t("Invite a teammate", "Undang anggota baru") }];
+    case "permNew":
+      return [permissions, { label: t("New permission set", "Set izin baru") }];
+    case "roleNew":
+      return [permissions, { label: t("New role", "Peran baru") }];
+    case "appNew":
+      return [apps, { label: t("New app or bot", "Aplikasi atau bot baru") }];
+    case "appDetail":
+      return [apps, { label: name ?? "" }];
+    case "appKit":
+      return [
+        apps,
+        { label: name ?? "" },
+        { label: t(`Kit for ${name ?? ""}`, `Kit untuk ${name ?? ""}`) },
       ];
   }
 }
