@@ -20,6 +20,7 @@ import {
   NotFoundPage,
 } from "./screens/Placeholders.tsx";
 import { RequestsPage } from "./screens/Requests.tsx";
+import { renderSecretPage } from "./screens/SecretRoutes.tsx";
 import { SessionEndedPage } from "./screens/SessionEnded.tsx";
 import { SetupPage } from "./screens/Setup.tsx";
 import { SetupRecoveryPage } from "./screens/SetupRecovery.tsx";
@@ -134,7 +135,9 @@ function renderPage(
           <DevicesPage />
         </ShellFrame>
       );
-    default:
+    default: {
+      const secretScreen = SHELL_PAGES.has(page.id) ? renderSecretPage(page) : null;
+      if (secretScreen !== null) return <ShellFrame>{secretScreen}</ShellFrame>;
       if (SHELL_PAGES.has(page.id)) {
         return (
           <ShellFrame>
@@ -143,6 +146,7 @@ function renderPage(
         );
       }
       return <NotFoundPage />;
+    }
   }
 }
 

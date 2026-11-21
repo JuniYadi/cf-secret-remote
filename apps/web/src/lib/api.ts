@@ -260,6 +260,70 @@ export interface CliLoginInfo {
   expiresAt: number;
 }
 
+/** Cleartext metadata of a secret (ADR 22). Owner is an identity name; rotateBy is YYYY-MM-DD. */
+export interface Meta {
+  description?: string;
+  owner?: string;
+  rotateBy?: string;
+}
+
+/** One row of GET /secrets. Names and metadata only, never values. */
+export interface SecretSummary {
+  path: string;
+  version: number;
+  updatedAt: number;
+  names: string[];
+  meta: Meta;
+}
+
+/** GET /secret: the sealed version. The client opens it with the group key. */
+export interface SecretRecord {
+  path: string;
+  version: number;
+  keyringVersion: number;
+  names: string[];
+  wrappedDek: string;
+  ciphertext: string;
+  createdAt: number;
+}
+
+/** GET /secret/versions: metadata and fingerprints for each version, newest first. */
+export interface VersionRow {
+  version: number;
+  names: string[];
+  fps: Record<string, string> | null;
+  createdAt: number;
+  createdBy: string;
+}
+
+/** GET /secret/history: aggregates over 30 days from the audit log. */
+export interface SecretHistory {
+  path: string;
+  windowDays: number;
+  opens: number;
+  readers: number;
+  lastReader: { who: string; at: number; version: number } | null;
+  lostAccess: number;
+  people: {
+    name: string;
+    opens: number;
+    lastOpened: number;
+    lastVersion: number;
+    hasAccess: boolean;
+  }[];
+}
+
+/** PUT /secret body. Values are already sealed by @cfs/core. */
+export interface SecretWrite {
+  path: string;
+  names: string[];
+  wrappedDek: string;
+  ciphertext: string;
+  keyringVersion: number;
+  version: number;
+  fps: Record<string, string>;
+}
+
 export const api = {
   whoami: (fetchImpl?: FetchLike) => request<Me>("GET", "/whoami", undefined, fetchImpl),
   createVault: (publicKey: string, lockedKey: string) =>
@@ -292,6 +356,18 @@ export const api = {
   groupKey: (prefix: string) =>
     request<{ wrappedKey: string; version: number }>("GET", `/keyrings/${prefix}/key`),
   identities: () => request<Identity[]>("GET", "/identities"),
+
+  // Secrets (ADR 10, 22)
+  secrets: () => request<SecretSummary[]>("GET", "/secrets"),
+  secret: (path: string, version?: number) =>
+    request<SecretRecord>("GET", `/secret${queryString({ path, version })}`),
+  writeSecret: (body: SecretWrite) =>
+    request<{ path: string; version: number }>("PUT", "/secret", body),
+  secretVersions: (path: string) =>
+    request<VersionRow[]>("GET", `/secret/versions${queryString({ path })}`),
+  secretHistory: (path: string) =>
+    request<SecretHistory>("GET", `/secret/history${queryString({ path })}`),
+  keyrings: () => request<{ prefix: string; version: number }[]>("GET", "/keyrings"),
 
   // Agent rules (ADR 17)
   apps: () => request<AppSummary[]>("GET", "/apps"),
