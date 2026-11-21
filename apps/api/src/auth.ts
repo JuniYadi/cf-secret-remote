@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import { verifyAccessJwt } from "./access.ts";
+import { accessJwtFrom, sameOrigin, verifyAccessJwt } from "./access.ts";
 import { audit } from "./audit.ts";
 import type { AppEnv, Who } from "./types.ts";
 import { newId, now, sha256Hex } from "./util.ts";
@@ -22,7 +22,24 @@ export const authenticate: MiddlewareHandler<AppEnv> = async (c, next) => {
       .bind(await sha256Hex(bearer), now())
       .first<Who>();
   } else {
-    const email = await verifyAccessJwt(c.env, c.req.header("Cf-Access-Jwt-Assertion"));
+    const found = accessJwtFrom(c.req);
+    // A cookie can be sent by another site's page, so cookie logins may only change data from our own origin.
+    const safe =
+      !found ||
+      found.via === "header" ||
+      ["GET", "HEAD"].includes(c.req.method) ||
+      sameOrigin({ header: (n) => c.req.header(n), url: c.req.url });
+    if (found && !safe) {
+      await audit(db, {
+        who: "anonymous",
+        action: "auth.denied",
+        note: "cross-site cookie request",
+        result: "denied",
+        ip: ip(c),
+      });
+      return c.json({ error: "forbidden" }, 403);
+    }
+    const email = await verifyAccessJwt(c.env, found?.jwt);
     if (email) who = await upsertUser(c.env.DB, email, c.env.BOOTSTRAP_ADMIN_EMAIL);
   }
 
