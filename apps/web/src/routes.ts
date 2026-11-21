@@ -30,6 +30,16 @@ export const PATHS = {
   devices: "/account/devices",
   cliAuthorize: "/cli/authorize",
   cliDone: "/cli/done",
+  secretsNew: "/secrets/new",
+  secretsImport: "/secrets/import",
+  secretsImportReview: "/secrets/import/review",
+} as const;
+
+/** Suffixes of a secret's own pages. The secret name comes first: /secrets/myapp/dev/versions. */
+export const SECRET_TABS = {
+  edit: "/edit",
+  versions: "/versions",
+  history: "/history",
 } as const;
 
 export type PageId =
@@ -54,7 +64,14 @@ export type PageId =
   | "devices"
   | "cliAuthorize"
   | "cliDone"
-  | "notFound";
+  | "notFound"
+  | "secretsNew"
+  | "secretsImport"
+  | "secretsImportReview"
+  | "secretDetail"
+  | "secretEdit"
+  | "secretVersions"
+  | "secretHistory";
 
 /** Pages inside the signed-in shell (sidebar and header). They need an unlocked vault. */
 export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
@@ -69,6 +86,13 @@ export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
   "requests",
   "agentRules",
   "devices",
+  "secretsNew",
+  "secretsImport",
+  "secretsImportReview",
+  "secretDetail",
+  "secretEdit",
+  "secretVersions",
+  "secretHistory",
 ]);
 
 export interface Crumb {
@@ -103,6 +127,9 @@ const STATIC_PATHS: Readonly<Record<string, PageId>> = {
   [PATHS.devices]: "devices",
   [PATHS.cliAuthorize]: "cliAuthorize",
   [PATHS.cliDone]: "cliDone",
+  [PATHS.secretsNew]: "secretsNew",
+  [PATHS.secretsImport]: "secretsImport",
+  [PATHS.secretsImportReview]: "secretsImportReview",
 };
 
 function decodeSegment(segment: string): string | undefined {
@@ -122,7 +149,29 @@ export function matchPage(pathname: string): MatchedPage {
     const name = decodeSegment(denied[1]);
     return name ? { id: "denied", name } : { id: "notFound" };
   }
-  return { id: STATIC_PATHS[path] ?? "notFound" };
+  const known = STATIC_PATHS[path];
+  if (known) return { id: known };
+  return matchSecretPage(path);
+}
+
+/** /secrets/<name> and its tabs. Names contain slashes, so the tab is the suffix after the name. */
+function matchSecretPage(path: string): MatchedPage {
+  const prefix = `${PATHS.secrets}/`;
+  if (!path.startsWith(prefix)) return { id: "notFound" };
+  const rest = path.slice(prefix.length);
+  const tabs: [string, PageId][] = [
+    [SECRET_TABS.edit, "secretEdit"],
+    [SECRET_TABS.versions, "secretVersions"],
+    [SECRET_TABS.history, "secretHistory"],
+  ];
+  for (const [suffix, id] of tabs) {
+    if (rest.endsWith(suffix) && rest.length > suffix.length) {
+      const name = decodeSegment(rest.slice(0, -suffix.length));
+      return name ? { id, name } : { id: "notFound" };
+    }
+  }
+  const name = decodeSegment(rest);
+  return name ? { id: "secretDetail", name } : { id: "notFound" };
 }
 
 /** The crumbs for a page. The last one is the title. Empty for the root redirect. */
@@ -179,8 +228,37 @@ export function pageCrumbs(id: PageId, name?: string): Crumb[] {
       return [{ label: t("You're signed in", "Kamu sudah masuk") }];
     case "notFound":
       return [{ label: t("Page not found", "Halaman tidak ditemukan") }];
+    case "secretsNew":
+      return [secrets, { label: t("New secret", "Secret baru") }];
+    case "secretsImport":
+      return [secrets, { label: t("Import a .env file", "Impor file .env") }];
+    case "secretsImportReview":
+      return [
+        secrets,
+        { label: t("Import a .env file", "Impor file .env"), href: PATHS.secretsImport },
+        { label: t("Review before saving", "Tinjau sebelum menyimpan") },
+      ];
+    case "secretDetail":
+      return [secrets, { label: name ?? "" }];
+    case "secretEdit":
+      return [secrets, { label: name ?? "", href: secretHref(name) }, { label: t("Edit", "Ubah") }];
+    case "secretVersions":
+      return [
+        secrets,
+        { label: name ?? "", href: secretHref(name) },
+        { label: t("Versions", "Versi") },
+      ];
+    case "secretHistory":
+      return [
+        secrets,
+        { label: name ?? "", href: secretHref(name) },
+        { label: t("Access history", "Riwayat akses") },
+      ];
   }
 }
+
+/** The link to a secret's own page. The name is one crumb and is never split (DESIGN.md rule 3). */
+export const secretHref = (name?: string): string => `${PATHS.secrets}/${name ?? ""}`;
 
 /** The document title and the h1 are the same text. */
 export function pageTitle(id: PageId, name?: string): string {
