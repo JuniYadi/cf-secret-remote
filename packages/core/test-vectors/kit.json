@@ -1,0 +1,28 @@
+{
+  "name": "ADR 15 access kit: cfskit1_ + base64url(JSON) with fields in this order",
+  "cases": [
+    {
+      "kit": {
+        "host": "https://vault.example.com",
+        "roleId": "7c1b2e0f9a3d4e5f",
+        "secretId": "cfssid_AbCdEf0123456789",
+        "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgSrCsn1d8NXg0D7OnNBFGIoCKCSrqPf0WSu3-PsO3Kw2hRANCAARNhwauuvLMAxXRKG2CJkeXwUFwnsCVq5ORhO8p3ECcnfdaHsOIFmCJaSWnK3zqNPukJo1XF-9ihvW8yUlJ_xYP"
+      },
+      "encoded": "cfskit1_eyJob3N0IjoiaHR0cHM6Ly92YXVsdC5leGFtcGxlLmNvbSIsInJvbGVJZCI6IjdjMWIyZTBmOWEzZDRlNWYiLCJzZWNyZXRJZCI6ImNmc3NpZF9BYkNkRWYwMTIzNDU2Nzg5IiwicHJpdmF0ZUtleSI6Ik1JR0hBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJHMHdhd0lCQVFRZ1NyQ3NuMWQ4TlhnMEQ3T25OQkZHSW9DS0NTcnFQZjBXU3UzLVBzTzNLdzJoUkFOQ0FBUk5od2F1dXZMTUF4WFJLRzJDSmtlWHdVRnduc0NWcTVPUmhPOHAzRUNjbmZkYUhzT0lGbUNKYVNXbkszenFOUHVrSm8xWEYtOWlodlc4eVVsSl94WVAifQ"
+    },
+    {
+      "kit": {
+        "host": "http://127.0.0.1:8787",
+        "roleId": "r-1",
+        "secretId": "s-2",
+        "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgjLeTB5p6pgnBdX5TT5V2UHp_iTO_MvUiDNRrnG4C28ihRANCAAThVQfeFdpTuA1JCmluOlDQ1xM2yipR8uVi2wuQ3bTDosdTwO8LXamiy5R-rQZ2krgoqGraMQzYDMu7E9utwD3E"
+      },
+      "encoded": "cfskit1_eyJob3N0IjoiaHR0cDovLzEyNy4wLjAuMTo4Nzg3Iiwicm9sZUlkIjoici0xIiwic2VjcmV0SWQiOiJzLTIiLCJwcml2YXRlS2V5IjoiTUlHSEFnRUFNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQkcwd2F3SUJBUVFnakxlVEI1cDZwZ25CZFg1VFQ1VjJVSHBfaVRPX012VWlETlJybkc0QzI4aWhSQU5DQUFUaFZRZmVGZHBUdUExSkNtbHVPbERRMXhNMnlpcFI4dVZpMnd1UTNiVERvc2RUd084TFhhbWl5NVItclFaMmtyZ29xR3JhTVF6WURNdTdFOXV0d0QzRSJ9"
+    }
+  ],
+  "rejects": [
+    "nope",
+    "cfskit1_eyJob3N0IjoiaHR0cHM6Ly94Iiwicm9sZUlkIjoiciIsInNlY3JldElkIjoicyJ9",
+    "cfskit1_eyJob3N0IjoiIiwicm9sZUlkIjoiciIsInNlY3JldElkIjoicyIsInByaXZhdGVLZXkiOiJrIn0"
+  ]
+}

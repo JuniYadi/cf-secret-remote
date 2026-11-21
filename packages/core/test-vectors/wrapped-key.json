@@ -1,0 +1,22 @@
+{
+  "name": "ADR 10 wrapped key: ephemeral ECDH P-256, HKDF-SHA256 info cfs-wrap-v1|<epk>|<recipient>, AES-GCM",
+  "note": "Opens with the recipient's PKCS8 private key and SPKI public key (base64url).",
+  "recipient": {
+    "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgjLeTB5p6pgnBdX5TT5V2UHp_iTO_MvUiDNRrnG4C28ihRANCAAThVQfeFdpTuA1JCmluOlDQ1xM2yipR8uVi2wuQ3bTDosdTwO8LXamiy5R-rQZ2krgoqGraMQzYDMu7E9utwD3E",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4VUH3hXaU7gNSQppbjpQ0NcTNsoqUfLlYtsLkN20w6LHU8DvC12posuUfq0GdpK4KKhq2jEM2AzLuxPbrcA9xA"
+  },
+  "cases": [
+    {
+      "aad": "keyring:pay:v1",
+      "dekHex": "00112233445566778899aabbccddeeff102132435465768798a9bacbdcedfe0f",
+      "wrapped": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAECssRvtl_zffB-RJLfsEnl3ok30mFwOIQILFxN8NpVCSjuQkphjDgfyoh0R43IGgGS7zc1sslBjbFjulAJqbPcw.v1.Hj0sKT03YDWvF5kG.r9ucJaU4JGZpICTAu5lNRasvHu-bI4GrgJRfhPIzcF4IMbK2wiKaUjfIbwNmkffO",
+      "wrongAad": "keyring:pay:v1:other"
+    },
+    {
+      "aad": "keyring:ops:v3",
+      "dekHex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "wrapped": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEreLzReRdz-ktIpPWBA74qTz-LhML6-b_LTwIeNsuEe2SNICCUPmICSq6_StiCAwGFFsCiNfRW3lPP9d-eKUixw.v1.n43CmXolLiowoTYC.wpmbqVOpxsVqe0uXa_bFn-d2uS_jmWj3nWmriAakBiwQEhPh4VNKxUu1PnKzsQEq",
+      "wrongAad": "keyring:ops:v3:other"
+    }
+  ]
+}

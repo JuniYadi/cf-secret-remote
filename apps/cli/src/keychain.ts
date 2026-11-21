@@ -154,6 +154,8 @@ export function pickStore(deps: PickDeps = {}): SecretStore {
   const which = deps.which ?? ((bin: string) => Bun.which(bin));
   const run = deps.run ?? runProcess;
   const file = fileStore();
+  // ADR 26: CFS_UNLOCK_STORE=file keeps the end-to-end script away from the real OS keychain.
+  if (process.env.CFS_UNLOCK_STORE === "file") return file;
   if (platform === "darwin" && which("security")) return withFallback(macKeychain(run), file);
   if (platform === "linux" && which("secret-tool")) return withFallback(secretTool(run), file);
   return file;

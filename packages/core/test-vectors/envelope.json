@@ -1,0 +1,27 @@
+{
+  "name": "ADR 26 envelope: AES-256-GCM, v1.<iv>.<ciphertext>, aad bound",
+  "note": "Each envelope opens with its key and aad and fails with wrongAad.",
+  "cases": [
+    {
+      "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "aad": "secret:pay/prod:v1",
+      "plaintext": "sk_live_123",
+      "envelope": "v1.oKGio6Slpqeoqaqr.lXMjQSy9Z-BTV7SYs-dsiF0QzJfDtuUn1pCD",
+      "wrongAad": "secret:pay/prod:v1:other"
+    },
+    {
+      "keyHex": "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100",
+      "aad": "dek:pay/prod:v2",
+      "plaintext": "naive café – 日本語",
+      "envelope": "v1.AAAAAAAAAAAAAAAP.a2BXOKYt5ZP8QZmfwxy-aF3sFhKF0-4Hbdrf6ukLbY_WGzCK29FWxOI",
+      "wrongAad": "dek:pay/prod:v2:other"
+    },
+    {
+      "keyHex": "0f0e0d0c0b0a09080706050403020100f0e0d0c0b0a09080706050403020100f",
+      "aad": "keyring:pay:v1",
+      "plaintext": "",
+      "envelope": "v1.AQIDBAUGBwgJCgsM.rB7VjwaxdL5Jib6Fwbe4LA",
+      "wrongAad": "keyring:pay:v1:other"
+    }
+  ]
+}

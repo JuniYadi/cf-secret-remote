@@ -8,9 +8,11 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:browser": "bun run browser-test/build.ts && playwright test -c browser-test/playwright.config.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "typescript": "^5.6.0",
     "vitest": "^3.0.0"
   }

@@ -156,6 +156,17 @@ describe("keychain fallback to the 0600 file (ADR 25)", () => {
       "secret-tool",
     );
   });
+
+  test("CFS_UNLOCK_STORE=file forces the file even where a keychain exists (ADR 26)", () => {
+    const before = process.env.CFS_UNLOCK_STORE;
+    process.env.CFS_UNLOCK_STORE = "file";
+    try {
+      expect(pickStore({ platform: "darwin", which: () => "/usr/bin/security" }).kind).toBe("file");
+    } finally {
+      if (before === undefined) delete process.env.CFS_UNLOCK_STORE;
+      else process.env.CFS_UNLOCK_STORE = before;
+    }
+  });
 });
 
 describe("unlock TTL (ADR 25, --ttl default 1 h)", () => {

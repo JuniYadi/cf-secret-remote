@@ -31,7 +31,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [23](0023-backup-and-restore.md) | Backup and restore | implemented |
 | [24](0024-web-app.md) | Web app | in progress (1/5) |
 | [25](0025-deploy-and-distribution.md) | Deploy, init, hosts, releases | implemented |
-| [26](0026-testing-strategy.md) | Testing strategy | planned, starts first |
+| [26](0026-testing-strategy.md) | Testing strategy | implemented |
 | [27](0027-hardening-and-limits.md) | Hardening and rate limits | planned |
 
 ## Build order
