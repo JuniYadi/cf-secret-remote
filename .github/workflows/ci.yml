@@ -13,3 +13,23 @@ jobs:
       - run: bun run typecheck
       - run: bun run test
       - run: bun run build:cli
+
+  # ADR 26: the end-to-end script boots wrangler dev with a fresh local D1 and drives the real CLI.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run e2e
+
+  # ADR 26: the shared test vectors in a real Chromium page.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install --with-deps chromium
+        working-directory: packages/core
+      - run: bun run test:browser

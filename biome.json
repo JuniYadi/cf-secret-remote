@@ -9,6 +9,6 @@
     "rules": { "recommended": true }
   },
   "files": {
-    "includes": ["**", "!**/dist", "!**/node_modules"]
+    "includes": ["**", "!**/dist", "!**/node_modules", "!**/.out", "!**/playwright-report"]
   }
 }

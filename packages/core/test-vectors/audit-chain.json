@@ -1,0 +1,47 @@
+{
+  "name": "ADR 6 hash-chained audit: hash = b64u(SHA-256(prev + newline + canonical JSON)), genesis \"genesis\"",
+  "genesis": "genesis",
+  "rows": [
+    {
+      "entry": {
+        "who": "ops@example.com",
+        "action": "login.ok",
+        "result": "ok",
+        "ip": null
+      },
+      "hash": "dXL9rjyoXXFKXPnXTmY4GDj7OmS-8-EyEb2iiJc56XQ"
+    },
+    {
+      "entry": {
+        "who": "app:ci-bot",
+        "action": "secret.read",
+        "path": "pay/prod",
+        "version": 3,
+        "result": "ok"
+      },
+      "hash": "OAjdc4mzZVm1DXAXHT3l0oaqFOBnm1gCDfN2QGSQSFA"
+    },
+    {
+      "entry": {
+        "who": "ops@example.com",
+        "action": "group.member.add",
+        "path": "pay",
+        "version": 2,
+        "result": "ok",
+        "note": "z first"
+      },
+      "hash": "tRKL1uenNL3FY8zRx0KQWej-DPqWgUPNUFgmD2YMoDE"
+    }
+  ],
+  "tampered": {
+    "index": 1,
+    "entry": {
+      "who": "app:other",
+      "action": "secret.read",
+      "path": "pay/prod",
+      "version": 3,
+      "result": "ok"
+    },
+    "firstBad": 1
+  }
+}
