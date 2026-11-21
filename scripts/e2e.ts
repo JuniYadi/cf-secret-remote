@@ -30,10 +30,6 @@ const ADMIN_EMAIL = "admin@e2e.test";
 const BOB_EMAIL = "bob@e2e.test";
 const APP_NAME = "ci-bot";
 const GROUP = "team";
-/** Open problems the e2e works around. Each entry names its issue; remove the workaround when it lands. */
-const KNOWN_GAPS = {
-  nodejsCompat: "issue #40",
-};
 const CODE_RE = /\b([ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}-[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4})\b/;
 
 class StepFailure extends Error {
@@ -204,27 +200,17 @@ function savedToken(configDir: string): string {
 }
 
 /**
- * Writes the wrangler config for this run. Returns a note for the step log.
- *
- * Known gap (see KNOWN_GAPS): apps/api imports node:async_hooks, which workerd loads only with the
- * nodejs_compat flag, and wrangler.jsonc does not set it. The flag is added to this temp config
- * only, so the flows behind it still run. The log says so on every run.
+ * Writes the wrangler config for this run. Returns a note for the step log. It is the real
+ * apps/api/wrangler.jsonc (so its compatibility flags are tested too), minus the web assets and triggers.
  */
 function writeE2eConfig(): string {
   const src = parseJsonc(readFileSync(join(API_DIR, "wrangler.jsonc"), "utf8")) as Record<
     string,
     any
   >;
-  const flags = new Set<string>(src.compatibility_flags ?? []);
-  const note: string[] = [];
-  if (!flags.has("nodejs_compat")) {
-    flags.add("nodejs_compat");
-    note.push(`added nodejs_compat to the e2e config only (${KNOWN_GAPS.nodejsCompat})`);
-  }
   const cfg: Record<string, unknown> = {
     ...src,
     main: join(API_DIR, "src/index.ts"),
-    compatibility_flags: [...flags],
   };
   // Only the API is under test here. The web assets are not needed, so the config drops them.
   for (const k of ["assets", "triggers", "r2_buckets"]) delete cfg[k];
@@ -234,7 +220,7 @@ function writeE2eConfig(): string {
     migrations_dir: join(API_DIR, "migrations"),
   }));
   writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`);
-  return ["apps/api/wrangler.jsonc without assets", ...note].join("; ");
+  return "apps/api/wrangler.jsonc without assets";
 }
 
 /** wrangler.jsonc is JSONC: strip comments outside strings and trailing commas. */
