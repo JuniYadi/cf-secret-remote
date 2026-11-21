@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
-import { hit } from "../throttle.ts";
+import { attemptsLeft, hit, spent } from "../throttle.ts";
 import type { AppEnv, Env } from "../types.ts";
 import { newToken, now, sha256Hex } from "../util.ts";
 
@@ -79,19 +79,49 @@ cliPublic.post("/cli/poll", async (c) => {
 // Authenticated (Access in the browser): the person approves the code shown in their terminal.
 export const cliApprove = new Hono<AppEnv>();
 
+// ADR 27: 5 wrong codes per person per 10 minutes. Every approve call counts, and a 404 says how many are left.
+const CODE_LIMIT = 5;
+const CODE_WINDOW = 600;
+
+/** The code as typed or shown: upper case, hyphen after four characters. Other inputs are only upper-cased. */
+export function normalizeUserCode(raw: string): string {
+  const s = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4)}` : raw.trim().toUpperCase();
+}
+
+// Shows the browser the device name before the person approves. A miss counts toward the same limit.
+cliApprove.get("/cli/login", async (c) => {
+  const who = c.get("who");
+  if (who.kind !== "user") return c.json({ error: "people only" }, 403);
+  const key = `cli-approve:${who.id}`;
+  if (await spent(c.env.DB, key, CODE_LIMIT, CODE_WINDOW))
+    return c.json({ error: "too many attempts" }, 429);
+  const code = normalizeUserCode(c.req.query("code") ?? "");
+  const row = await c.env.DB.prepare(
+    "SELECT device, expires_at AS expiresAt FROM cli_login WHERE user_code = ? AND status = 'pending' AND expires_at > ?",
+  )
+    .bind(code, now())
+    .first<{ device: string; expiresAt: number }>();
+  if (!row) {
+    const left = await attemptsLeft(c.env.DB, key, CODE_LIMIT, CODE_WINDOW);
+    return c.json({ error: "code not found or expired", attemptsLeft: Math.max(0, left) }, 404);
+  }
+  return c.json({ userCode: code, device: row.device, expiresAt: row.expiresAt });
+});
+
 cliApprove.post("/cli/approve", async (c) => {
   const who = c.get("who");
   if (who.kind !== "user") return c.json({ error: "people only" }, 403);
   const b = await c.req.json<{ userCode?: string }>().catch(() => ({}) as { userCode?: string });
-  // ADR 27: 5 wrong codes per person per 10 minutes
-  if (!(await hit(c.env.DB, `cli-approve:${who.id}`, 5, 600)))
-    return c.json({ error: "too many attempts" }, 429);
+  const left = await attemptsLeft(c.env.DB, `cli-approve:${who.id}`, CODE_LIMIT, CODE_WINDOW);
+  if (left < 0) return c.json({ error: "too many attempts" }, 429);
   const res = await c.env.DB.prepare(
     "UPDATE cli_login SET status = 'approved', identity_id = ? WHERE user_code = ? AND status = 'pending' AND expires_at > ?",
   )
-    .bind(who.id, (b.userCode ?? "").trim().toUpperCase(), now())
+    .bind(who.id, normalizeUserCode(b.userCode ?? ""), now())
     .run();
-  if (!res.meta.changes) return c.json({ error: "code not found or expired" }, 404);
+  if (!res.meta.changes)
+    return c.json({ error: "code not found or expired", attemptsLeft: left }, 404);
   await audit(c.env.DB, {
     who: who.name,
     action: "cli.approve",

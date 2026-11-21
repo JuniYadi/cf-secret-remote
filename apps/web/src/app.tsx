@@ -7,12 +7,19 @@ import { watchActivity } from "./lib/keystore.ts";
 import { loadSession } from "./lib/session.ts";
 import { guardTarget, type MatchedPage, matchPage, type PageId, SHELL_PAGES } from "./routes.ts";
 import { AccessDeniedPage } from "./screens/AccessDenied.tsx";
+import { ActivityPage } from "./screens/Activity.tsx";
+import { AgentRulesPage } from "./screens/AgentRules.tsx";
+import { AlertsPage } from "./screens/Alerts.tsx";
+import { CliAuthorizePage } from "./screens/CliAuthorize.tsx";
+import { CliDonePage } from "./screens/CliDone.tsx";
+import { DevicesPage } from "./screens/Devices.tsx";
 import {
   ComingSoonPage,
   LoadErrorPage,
   LoadingPage,
   NotFoundPage,
 } from "./screens/Placeholders.tsx";
+import { RequestsPage } from "./screens/Requests.tsx";
 import { SessionEndedPage } from "./screens/SessionEnded.tsx";
 import { SetupPage } from "./screens/Setup.tsx";
 import { SetupRecoveryPage } from "./screens/SetupRecovery.tsx";
@@ -87,10 +94,44 @@ function renderPage(
       return <SetupRecoveryPage />;
     case "unlock":
       return <UnlockPage />;
+    case "cliAuthorize":
+      return <CliAuthorizePage />;
+    case "cliDone":
+      return <CliDonePage />;
     case "denied":
       return (
         <ShellFrame>
           <AccessDeniedPage name={page.name ?? ""} />
+        </ShellFrame>
+      );
+    case "activity":
+      return (
+        <ShellFrame>
+          <ActivityPage />
+        </ShellFrame>
+      );
+    case "alerts":
+      return (
+        <ShellFrame>
+          <AlertsPage />
+        </ShellFrame>
+      );
+    case "requests":
+      return (
+        <ShellFrame>
+          <RequestsPage />
+        </ShellFrame>
+      );
+    case "agentRules":
+      return (
+        <ShellFrame>
+          <AgentRulesPage />
+        </ShellFrame>
+      );
+    case "devices":
+      return (
+        <ShellFrame>
+          <DevicesPage />
         </ShellFrame>
       );
     default:

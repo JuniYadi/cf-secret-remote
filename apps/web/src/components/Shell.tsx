@@ -5,7 +5,7 @@ import { useKeyStatus, useLang, useSession } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
 import { lock, touch } from "../lib/keystore.ts";
 import { signOut } from "../lib/session.ts";
-import { NAV_ITEMS } from "../routes.ts";
+import { NAV_ITEMS, PATHS } from "../routes.ts";
 import { BrandRow, Icon, LangToggle } from "./shared.tsx";
 
 /** The signed-in layout: sidebar with Lock vault and Sign out, then the page. */
@@ -41,7 +41,11 @@ export function Shell({ children }: { children: ComponentChildren }) {
         </nav>
         <div class="side-foot">
           <LangToggle />
-          <div class="me">
+          <Link
+            href={PATHS.devices}
+            class="me"
+            aria-label={t("Your signed-in devices", "Perangkat yang masuk")}
+          >
             <span class="ava" aria-hidden="true">
               {initial}
             </span>
@@ -49,7 +53,7 @@ export function Shell({ children }: { children: ComponentChildren }) {
               <div class="me-name">{me.name}</div>
               <div class="me-role">{roleLabel}</div>
             </div>
-          </div>
+          </Link>
           <div class="side-actions">
             <button type="button" class="btn ghost sm" onClick={() => lock()}>
               {t("Lock vault", "Kunci vault")}

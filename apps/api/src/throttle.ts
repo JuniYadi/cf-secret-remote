@@ -1,12 +1,15 @@
 import { now } from "./util.ts";
 
-/** Fixed-window limiter (ADR 27). Returns true if the caller is still within `limit` for this window. */
-export async function hit(
+/**
+ * Fixed-window limiter (ADR 27). Counts one attempt and returns how many are left in the window.
+ * The value is negative once the limit is passed.
+ */
+export async function attemptsLeft(
   db: D1Database,
   key: string,
   limit: number,
   windowSec: number,
-): Promise<boolean> {
+): Promise<number> {
   const w = now() - (now() % windowSec);
   await db
     .prepare(
@@ -18,7 +21,17 @@ export async function hit(
     .prepare("SELECT count FROM login_attempt WHERE key = ? AND window = ?")
     .bind(key, w)
     .first<{ count: number }>();
-  return (row?.count ?? 0) <= limit;
+  return limit - (row?.count ?? 0);
+}
+
+/** Counts one attempt. Returns true if the caller is still within `limit` for this window. */
+export async function hit(
+  db: D1Database,
+  key: string,
+  limit: number,
+  windowSec: number,
+): Promise<boolean> {
+  return (await attemptsLeft(db, key, limit, windowSec)) >= 0;
 }
 
 /** Read-only check: true if `limit` has already been reached in the current window. Does not count. */
