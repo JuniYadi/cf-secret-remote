@@ -208,3 +208,5 @@ Setiap layar aplikasi punya dua tombol di sidebar, di bawah kotak pengguna:
 - `apps/api` sudah jalan (diuji lokal dengan wrangler + D1): verifikasi JWT Access, token `cfs_…` (login AppRole), sesi, vault setup, grup/keyring, secret (ciphertext saja, versi, daftar, hapus), kebijakan + assign, app/bot, audit berantai + `/audit/verify`.
 - Semua rute ada di `/api/v1/*`. Di Cloudflare Access, lindungi hostname untuk UI, tetapi beri kebijakan Bypass untuk `/api/v1/*` (klien memakai token `cfs_…`; tanpa token, Worker sendiri meminta JWT Access).
 - Belum ada: login CLI untuk manusia (device/loopback), access request, alert, rotasi keyring saat anggota dicabut, hash harian ke Slack/email, rentang CIDR (baru IP persis), rate limit login.
+- `apps/cli` jalan (diuji lokal): `login` (device code), `unlock`, `lock`, `whoami`, `list`, `get`, `set`, `run`, `group create`, dan mode `CFS_KIT`. Keputusan di ADR 10 sampai 13.
+- Belum ada di CLI: `group add-member` (tanpa ini app tidak bisa diberi kunci grup), `cfs init`, `cfs proxy`, `audit verify`, `deploy`. Layar web `/cli/authorize` belum ada, jadi persetujuan login sementara lewat `POST /api/v1/cli/approve`.

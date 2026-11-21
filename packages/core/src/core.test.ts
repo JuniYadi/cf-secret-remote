@@ -81,3 +81,24 @@ describe("audit chain", () => {
     expect(await verifyChain(rows)).toBe(1);
   });
 });
+
+import { newGroupKey, openSecret, sealSecret, unwrapGroupKey, wrapGroupKey } from "./index.ts";
+
+describe("secret hierarchy", () => {
+  it("round-trips and is bound to path and version", async () => {
+    const m = await generateKeyPair();
+    const gk = await newGroupKey();
+    const wrapped = await wrapGroupKey(gk, m.publicKey, "payments", 1);
+    const opened = await unwrapGroupKey(wrapped, m.privateKey, m.publicKey, "payments", 1);
+    const s = await sealSecret(opened, "payments/prod", 3, { A: "1", B: "two" });
+    expect(await openSecret(gk, "payments/prod", 3, s.wrappedDek, s.ciphertext)).toEqual({
+      A: "1",
+      B: "two",
+    });
+    await expect(openSecret(gk, "payments/prod", 4, s.wrappedDek, s.ciphertext)).rejects.toThrow();
+    await expect(openSecret(gk, "payments/dev", 3, s.wrappedDek, s.ciphertext)).rejects.toThrow();
+    await expect(
+      unwrapGroupKey(wrapped, m.privateKey, m.publicKey, "payments", 2),
+    ).rejects.toThrow();
+  });
+});

@@ -92,6 +92,7 @@ secrets.put("/secret", async (c) => {
     wrappedDek?: string;
     ciphertext?: string;
     keyringVersion?: number;
+    version?: number;
   }>();
   const { path, names, wrappedDek, ciphertext, keyringVersion } = b;
   if (
@@ -120,6 +121,12 @@ secrets.put("/secret", async (c) => {
 
   const id = existing?.id ?? newId();
   const version = (existing?.current ?? 0) + 1;
+  // ADR 10: the client sealed for this exact version, so it must be the next one.
+  if (b.version !== version)
+    return c.json(
+      { error: "version changed, reload and retry", current: existing?.current ?? 0 },
+      409,
+    );
   const stmts = [
     existing
       ? c.env.DB.prepare("UPDATE secret SET current = ?, deleted_at = NULL WHERE id = ?").bind(
