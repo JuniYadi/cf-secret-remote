@@ -24,6 +24,12 @@ export const PATHS = {
   unlock: "/unlock",
   forgot: "/forgot",
   recover: "/recover",
+  alerts: "/activity/alerts",
+  requests: "/permissions/requests",
+  agentRules: "/apps/rules",
+  devices: "/account/devices",
+  cliAuthorize: "/cli/authorize",
+  cliDone: "/cli/done",
 } as const;
 
 export type PageId =
@@ -42,6 +48,12 @@ export type PageId =
   | "unlock"
   | "forgot"
   | "recover"
+  | "alerts"
+  | "requests"
+  | "agentRules"
+  | "devices"
+  | "cliAuthorize"
+  | "cliDone"
   | "notFound";
 
 /** Pages inside the signed-in shell (sidebar and header). They need an unlocked vault. */
@@ -53,6 +65,10 @@ export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
   "activity",
   "settings",
   "denied",
+  "alerts",
+  "requests",
+  "agentRules",
+  "devices",
 ]);
 
 export interface Crumb {
@@ -81,6 +97,12 @@ const STATIC_PATHS: Readonly<Record<string, PageId>> = {
   [PATHS.unlock]: "unlock",
   [PATHS.forgot]: "forgot",
   [PATHS.recover]: "recover",
+  [PATHS.alerts]: "alerts",
+  [PATHS.requests]: "requests",
+  [PATHS.agentRules]: "agentRules",
+  [PATHS.devices]: "devices",
+  [PATHS.cliAuthorize]: "cliAuthorize",
+  [PATHS.cliDone]: "cliDone",
 };
 
 function decodeSegment(segment: string): string | undefined {
@@ -106,6 +128,9 @@ export function matchPage(pathname: string): MatchedPage {
 /** The crumbs for a page. The last one is the title. Empty for the root redirect. */
 export function pageCrumbs(id: PageId, name?: string): Crumb[] {
   const secrets = { label: t("Secrets", "Secret"), href: PATHS.secrets };
+  const activity = { label: t("Activity", "Aktivitas"), href: PATHS.activity };
+  const permissions = { label: t("Permissions", "Izin"), href: PATHS.permissions };
+  const apps = { label: t("Apps & bots", "Aplikasi & bot"), href: PATHS.apps };
   switch (id) {
     case "root":
       return [];
@@ -137,6 +162,21 @@ export function pageCrumbs(id: PageId, name?: string): Crumb[] {
       return [{ label: t("Forgot password", "Lupa password") }];
     case "recover":
       return [{ label: t("Use your recovery key", "Pakai kunci pemulihan") }];
+    case "alerts":
+      return [activity, { label: t("Alerts", "Peringatan") }];
+    case "requests":
+      return [permissions, { label: t("Access requests", "Permintaan akses") }];
+    case "agentRules":
+      return [apps, { label: t("Agent rules", "Aturan agen") }];
+    case "devices":
+      return [
+        { label: t("Account", "Akun") },
+        { label: t("Signed-in devices", "Perangkat yang masuk") },
+      ];
+    case "cliAuthorize":
+      return [{ label: t("Authorize cfs", "Izinkan cfs") }];
+    case "cliDone":
+      return [{ label: t("You're signed in", "Kamu sudah masuk") }];
     case "notFound":
       return [{ label: t("Page not found", "Halaman tidak ditemukan") }];
   }
@@ -184,6 +224,8 @@ export function guardTarget(input: GuardInput): string | null {
   if (page === "notFound") return null;
   if (phase === "loading" || phase === "error") return null;
   if (phase === "signed-out") return PATHS.sessionEnded;
+  // Authorizing a terminal needs a signed-in person, not an unlocked vault (ADR 11).
+  if (page === "cliAuthorize" || page === "cliDone") return null;
 
   if (!vaultReady) {
     if (page === "setup") return null;

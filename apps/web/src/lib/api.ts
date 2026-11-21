@@ -20,13 +20,27 @@ export type ApiErrorKind =
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number;
+  /** Set only for a wrong CLI code (ADR 27): how many tries are left. No other body field is kept. */
+  readonly attemptsLeft: number | undefined;
 
-  constructor(kind: ApiErrorKind, status: number) {
+  constructor(kind: ApiErrorKind, status: number, attemptsLeft?: number) {
     // The message is the kind only. Response bodies are never copied into errors or logs.
     super(kind);
     this.name = "ApiError";
     this.kind = kind;
     this.status = status;
+    this.attemptsLeft = attemptsLeft;
+  }
+}
+
+/** Reads the one numeric field the CLI code check sends back. Anything else in the body is dropped. */
+async function attemptsFrom(res: Response): Promise<number | undefined> {
+  try {
+    const body = (await res.json()) as { attemptsLeft?: unknown } | null;
+    const n = body?.attemptsLeft;
+    return typeof n === "number" && Number.isInteger(n) && n >= 0 ? n : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -62,7 +76,7 @@ export function devBearerToken(): string | undefined {
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
 export async function request<T>(
-  method: "GET" | "POST" | "PUT",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
   fetchImpl: FetchLike = (input, init) => fetch(input, init),
@@ -84,7 +98,10 @@ export async function request<T>(
   } catch {
     throw new ApiError("network", 0);
   }
-  if (!res.ok) throw new ApiError(kindForStatus(res.status), res.status);
+  if (!res.ok) {
+    const attempts = res.status === 404 ? await attemptsFrom(res) : undefined;
+    throw new ApiError(kindForStatus(res.status), res.status, attempts);
+  }
   return (await res.json()) as T;
 }
 
@@ -100,10 +117,197 @@ export interface Me {
   lockedKey: string | null;
 }
 
+/** Builds `?a=b&c=d`, skipping empty values. The result is "" when nothing is set. */
+export function queryString(params: Record<string, string | number | undefined | null>): string {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+  }
+  return parts.length > 0 ? `?${parts.join("&")}` : "";
+}
+
+// Shapes the Worker returns for the screens in this part (ADR 16, 17, 18, 19, 27). Times are unix seconds.
+
+export type AuditResult = "ok" | "denied" | "error";
+
+export interface AuditRow {
+  seq: number;
+  hash: string;
+  at: number;
+  who: string;
+  action: string;
+  path?: string;
+  version?: number;
+  result: AuditResult;
+  ip?: string;
+  note?: string;
+}
+
+export interface Usage {
+  day: string;
+  writes: number;
+  readsLogged: number;
+  limit: number;
+  warning: boolean;
+}
+
+export interface Verify {
+  ok: boolean;
+  rows: number;
+  firstBad: number | null;
+  firstBadSeq: number | null;
+  head: string;
+  base: { seq: number; hash: string } | null;
+  checkpoints: {
+    stored: number;
+    verified: number;
+    pruned: number;
+    mismatched: string[];
+  };
+}
+
+export const RULE_NAMES = [
+  "blocked",
+  "agent_prod_read",
+  "new_network",
+  "read_burst",
+  "quota_80",
+  "chain_broken",
+  "recovery_requested",
+  "access_request",
+] as const;
+export type RuleName = (typeof RULE_NAMES)[number];
+
+export interface ChannelToggles {
+  webhook: boolean;
+  email: boolean;
+}
+
+export interface AlertSettings {
+  /** The webhook URL with its middle masked, or null when none is set. The full URL never comes back. */
+  webhook: string | null;
+  email: { available: boolean; recipients: string[] };
+  rules: Record<RuleName, ChannelToggles>;
+}
+
+export type RequestStatus = "pending" | "approved" | "denied" | "cancelled" | "expired";
+
+export interface AccessRequest {
+  id: string;
+  requesterId: string;
+  requester: string;
+  path: string;
+  groupPrefix: string;
+  reason: string;
+  duration: number;
+  rekeyAfter: boolean;
+  status: RequestStatus;
+  approver: string | null;
+  createdAt: number;
+  decidedAt: number | null;
+  expiresAt: number | null;
+}
+
+export interface Identity {
+  id: string;
+  kind: "user" | "app";
+  name: string;
+  role: "admin" | "member";
+  publicKey: string | null;
+  status: string;
+}
+
+export interface AppSummary {
+  id: string;
+  name: string;
+  status: string;
+}
+
+export interface AgentRule {
+  alias: string;
+  secretPath: string;
+  name: string;
+  upstream: string;
+  inject: string;
+  maxReadsPerHour: number;
+  requireReason: boolean;
+  requireApproval: boolean;
+}
+
+export interface AgentRuleInput {
+  alias?: string;
+  secretPath: string;
+  name: string;
+  upstream: string;
+  inject: string;
+  maxReadsPerHour: number;
+  requireReason: boolean;
+  requireApproval: boolean;
+}
+
+export interface SignedInDevice {
+  id: string;
+  kind: string;
+  device: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface CliLoginInfo {
+  userCode: string;
+  device: string;
+  expiresAt: number;
+}
+
 export const api = {
   whoami: (fetchImpl?: FetchLike) => request<Me>("GET", "/whoami", undefined, fetchImpl),
   createVault: (publicKey: string, lockedKey: string) =>
     request<{ ok: true }>("POST", "/vault", { publicKey, lockedKey }),
   setRecoveryKey: (lockedKey: string) =>
     request<{ ok: true }>("PUT", "/me/recovery", { lockedKey }),
+
+  // Activity (ADR 6, 19)
+  audit: (query: Record<string, string | number | undefined>) =>
+    request<AuditRow[]>("GET", `/audit${queryString(query)}`),
+  usage: () => request<Usage>("GET", "/usage"),
+  verify: () => request<Verify>("GET", "/audit/verify"),
+
+  // Alerts (ADR 18)
+  alerts: () => request<AlertSettings>("GET", "/alerts"),
+  setWebhook: (webhook: string | null) => request<AlertSettings>("PUT", "/alerts", { webhook }),
+  setRules: (rules: Record<RuleName, ChannelToggles>) =>
+    request<AlertSettings>("PUT", "/alerts", { rules }),
+
+  // Access requests (ADR 16)
+  requests: (status?: RequestStatus) =>
+    request<AccessRequest[]>("GET", `/requests${queryString({ status })}`),
+  createRequest: (input: { path: string; reason: string; duration: number }) =>
+    request<AccessRequest>("POST", "/requests", input),
+  cancelRequest: (id: string) => request<AccessRequest>("POST", `/requests/${id}/cancel`),
+  denyRequest: (id: string) => request<AccessRequest>("POST", `/requests/${id}/deny`),
+  approveRequest: (id: string, wrappedKey: string, version: number) =>
+    request<AccessRequest>("POST", `/requests/${id}/approve`, { wrappedKey, version }),
+  /** The caller's wrapped copy of a group key. Used by an approver before approving. */
+  groupKey: (prefix: string) =>
+    request<{ wrappedKey: string; version: number }>("GET", `/keyrings/${prefix}/key`),
+  identities: () => request<Identity[]>("GET", "/identities"),
+
+  // Agent rules (ADR 17)
+  apps: () => request<AppSummary[]>("GET", "/apps"),
+  agentRules: (appId: string) => request<AgentRule[]>("GET", `/apps/${appId}/rules`),
+  createAgentRule: (appId: string, input: AgentRuleInput & { alias: string }) =>
+    request<AgentRule>("POST", `/apps/${appId}/rules`, input),
+  updateAgentRule: (appId: string, alias: string, input: Omit<AgentRuleInput, "alias">) =>
+    request<AgentRule>("PUT", `/apps/${appId}/rules/${alias}`, input),
+  deleteAgentRule: (appId: string, alias: string) =>
+    request<{ ok: true }>("DELETE", `/apps/${appId}/rules/${alias}`),
+
+  // Devices (ADR 27)
+  sessions: () => request<SignedInDevice[]>("GET", "/sessions"),
+  signOutDevice: (id: string) => request<{ ok: true }>("DELETE", `/sessions/${id}`),
+
+  // CLI login (ADR 11)
+  cliLogin: (code: string) => request<CliLoginInfo>("GET", `/cli/login${queryString({ code })}`),
+  cliApprove: (userCode: string) => request<{ ok: true }>("POST", "/cli/approve", { userCode }),
 };

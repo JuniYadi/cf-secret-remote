@@ -31,6 +31,7 @@ const ICON_PATHS = {
   lock: "M5 11h14v10H5z M8 11V7a4 4 0 0 1 8 0v4",
   warning:
     "M12 9v4 M12 17h.01 M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
+  check: "M20 6L9 17l-5-5",
   clock: "M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z",
 } as const;
 

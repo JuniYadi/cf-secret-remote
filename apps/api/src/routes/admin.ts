@@ -65,12 +65,79 @@ admin.post("/policies/:id/assign", async (c) => {
   return c.json({ ok: true });
 });
 
+// ADR 6 / ADR 24 (Activity). Filters are optional and combine with AND:
+//   who (exact), action (exact), path (exact, or a prefix when it ends with *), result (ok|denied|error),
+//   from and to (unix seconds, from inclusive, to exclusive), before (a seq: only older rows, for paging).
+const AUDIT_RESULTS = ["ok", "denied", "error"];
+const AUDIT_TEXT_MAX = 200;
+
+const wholeNumber = (v: string | undefined): number | null | undefined => {
+  if (v === undefined || v === "") return undefined;
+  return /^\d+$/.test(v) ? Number(v) : null;
+};
+
 admin.get("/audit", async (c) => {
   const q = c.req.query();
-  const rows = await c.env.DB.prepare(
-    "SELECT seq, entry, hash FROM audit ORDER BY seq DESC LIMIT ?",
-  )
-    .bind(Math.min(Number(q.limit) || 100, 500))
+  const where: string[] = [];
+  const binds: (string | number)[] = [];
+  const text = (name: string): string | undefined => {
+    const v = q[name];
+    return v === undefined || v === "" ? undefined : v;
+  };
+
+  const who = text("who");
+  if (who !== undefined) {
+    if (who.length > AUDIT_TEXT_MAX) return c.json({ error: "who is too long" }, 400);
+    where.push("who = ?");
+    binds.push(who);
+  }
+  const action = text("action");
+  if (action !== undefined) {
+    if (action.length > AUDIT_TEXT_MAX) return c.json({ error: "action is too long" }, 400);
+    where.push("json_extract(entry, '$.action') = ?");
+    binds.push(action);
+  }
+  const path = text("path");
+  if (path !== undefined) {
+    if (path.length > AUDIT_TEXT_MAX) return c.json({ error: "path is too long" }, 400);
+    if (path.endsWith("*")) {
+      const prefix = path.slice(0, -1);
+      where.push("substr(json_extract(entry, '$.path'), 1, length(?)) = ?");
+      binds.push(prefix, prefix);
+    } else {
+      where.push("json_extract(entry, '$.path') = ?");
+      binds.push(path);
+    }
+  }
+  const result = text("result");
+  if (result !== undefined) {
+    if (!AUDIT_RESULTS.includes(result))
+      return c.json({ error: "result must be ok, denied or error" }, 400);
+    where.push("json_extract(entry, '$.result') = ?");
+    binds.push(result);
+  }
+  const from = wholeNumber(q.from);
+  const to = wholeNumber(q.to);
+  const before = wholeNumber(q.before);
+  if (from === null || to === null || before === null)
+    return c.json({ error: "from, to and before must be whole numbers" }, 400);
+  if (from !== undefined) {
+    where.push("at >= ?");
+    binds.push(from);
+  }
+  if (to !== undefined) {
+    where.push("at < ?");
+    binds.push(to);
+  }
+  if (before !== undefined) {
+    where.push("seq < ?");
+    binds.push(before);
+  }
+
+  const limit = Math.min(Number(q.limit) || 100, 500);
+  const sql = `SELECT seq, entry, hash FROM audit${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY seq DESC LIMIT ?`;
+  const rows = await c.env.DB.prepare(sql)
+    .bind(...binds, limit)
     .all<{ seq: number; entry: string; hash: string }>();
   return c.json(rows.results.map((r) => ({ seq: r.seq, hash: r.hash, ...JSON.parse(r.entry) })));
 });
