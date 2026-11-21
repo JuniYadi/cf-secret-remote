@@ -2,7 +2,7 @@
   // One Worker serves the API and the web app, on one hostname.
   "name": "cfs",
   "main": "src/index.ts",
-  "compatibility_date": "2026-11-21",
+  "compatibility_date": "2026-08-01",
 
   "assets": {
     "directory": "../web/dist",

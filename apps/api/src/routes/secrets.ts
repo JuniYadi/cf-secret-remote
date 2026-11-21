@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
+import { NAME_RE } from "../limits.ts";
 import { type Cap, can, prefixOf, type Rule, validPath } from "../policy.ts";
 import type { AppEnv, Who } from "../types.ts";
 import { newId, now } from "../util.ts";
@@ -106,6 +107,8 @@ secrets.put("/secret", async (c) => {
   ) {
     return c.json({ error: "bad request" }, 400);
   }
+  if (names.some((n) => typeof n !== "string" || !NAME_RE.test(n)))
+    return c.json({ error: "bad name" }, 400);
   const keyring = await c.env.DB.prepare("SELECT id, version FROM keyring WHERE prefix = ?")
     .bind(prefixOf(path))
     .first<{ id: string; version: number }>();

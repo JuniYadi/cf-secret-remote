@@ -48,3 +48,10 @@ Tests first, then each layer in the order the ADRs depend on each other: `core`,
 8. **23** backup and restore.
 9. **25** deploy, init, keychain, releases.
 10. **24** web app, screen by screen, using the API as built.
+
+## Working agreement
+
+- One GitHub issue per ADR feature, one PR per issue (`Closes #N`). The PR updates the Status column above.
+- Reserved migrations (to avoid number clashes): 0004 ADR 14, 0005 ADR 15, 0006 ADR 22, 0007 ADR 19, 0008 ADR 18, 0009 ADR 16, 0010 ADR 17, 0011 ADR 20. Others use the next free number and rebase.
+- Each feature owns its files: `apps/api/src/routes/<feature>.ts` and `apps/cli/src/commands/<feature>.ts` (already registered). Shared files are touched only when the ADR says so.
+- API tests live in `apps/api/test` (real Workers runtime and D1) and use `test/helpers.ts`.

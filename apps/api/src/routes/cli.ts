@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
+import { hit } from "../throttle.ts";
 import type { AppEnv, Env } from "../types.ts";
 import { newToken, now, sha256Hex } from "../util.ts";
 
@@ -34,6 +35,9 @@ cliPublic.post("/cli/poll", async (c) => {
     .catch(() => ({}) as { deviceCode?: string });
   if (!b.deviceCode) return c.json({ error: "bad request" }, 400);
   const hash = await sha256Hex(b.deviceCode);
+  // ADR 27: about one poll per 2 seconds, with some slack
+  if (!(await hit(c.env.DB, `cli-poll:${hash}`, 40, 60)))
+    return c.json({ error: "slow down" }, 429);
   const row = await c.env.DB.prepare(
     "SELECT l.status, l.identity_id, l.device, l.expires_at, i.name FROM cli_login l LEFT JOIN identity i ON i.id = l.identity_id WHERE l.device_hash = ?",
   )
@@ -79,6 +83,9 @@ cliApprove.post("/cli/approve", async (c) => {
   const who = c.get("who");
   if (who.kind !== "user") return c.json({ error: "people only" }, 403);
   const b = await c.req.json<{ userCode?: string }>().catch(() => ({}) as { userCode?: string });
+  // ADR 27: 5 wrong codes per person per 10 minutes
+  if (!(await hit(c.env.DB, `cli-approve:${who.id}`, 5, 600)))
+    return c.json({ error: "too many attempts" }, 429);
   const res = await c.env.DB.prepare(
     "UPDATE cli_login SET status = 'approved', identity_id = ? WHERE user_code = ? AND status = 'pending' AND expires_at > ?",
   )

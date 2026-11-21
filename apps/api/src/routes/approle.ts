@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
+import { hit, safeEqual } from "../throttle.ts";
 import type { Env } from "../types.ts";
 import { newToken, now, sha256Hex } from "../util.ts";
 
@@ -22,6 +23,9 @@ approle.post("/auth/approle/login", async (c) => {
     return c.json({ error: "invalid credentials" }, 401);
   };
   if (!b.roleId || !b.secretId) return deny("missing");
+  // ADR 15/27: 10 attempts per role per 10 minutes
+  if (!(await hit(c.env.DB, `approle:${b.roleId}`, 10, 600)))
+    return c.json({ error: "too many attempts" }, 429);
 
   const r = await c.env.DB.prepare(
     `SELECT a.identity_id, a.secret_hash, a.token_ttl, a.max_uses, a.uses, a.cidr, a.expires_at, i.name, i.status
@@ -40,7 +44,7 @@ approle.post("/auth/approle/login", async (c) => {
       status: string;
     }>();
 
-  if (!r || r.status !== "active" || r.secret_hash !== (await sha256Hex(b.secretId)))
+  if (!r || r.status !== "active" || !safeEqual(r.secret_hash, await sha256Hex(b.secretId)))
     return deny("bad secret");
   if (r.expires_at && r.expires_at < now()) return deny("expired");
   if (r.max_uses !== null && r.uses >= r.max_uses) return deny("uses exhausted");
