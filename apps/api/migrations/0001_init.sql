@@ -91,6 +91,7 @@ CREATE TABLE audit (
   seq           INTEGER PRIMARY KEY AUTOINCREMENT,
   at            INTEGER NOT NULL,
   entry         TEXT NOT NULL,              -- canonical JSON: who, action, path, version, ip, result
+  prev          TEXT NOT NULL UNIQUE,       -- previous hash; UNIQUE stops two writers forking the chain
   hash          TEXT NOT NULL
 );
 

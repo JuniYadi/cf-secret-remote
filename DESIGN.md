@@ -205,3 +205,6 @@ Setiap layar aplikasi punya dua tombol di sidebar, di bawah kotak pengguna:
 - Perubahan dari desain: kode sidik jari sementara berupa 4 grup heksadesimal (`3FA9-81C2-D07B-6E54`), bukan empat kata, karena daftar kata belum dipilih. Ganti bila daftar kata sudah ada.
 - Skema D1 awal ada di `apps/api/migrations/0001_init.sql` (identity, app_role, keyring, secret, policy, session, audit). Belum ada tabel untuk access request, alert, dan pengaturan; menyusul bersama fiturnya.
 - Urutan berikutnya: `api` (auth Access + sesi, CRUD secret/keyring, audit), lalu `cli`, lalu `web`.
+- `apps/api` sudah jalan (diuji lokal dengan wrangler + D1): verifikasi JWT Access, token `cfs_…` (login AppRole), sesi, vault setup, grup/keyring, secret (ciphertext saja, versi, daftar, hapus), kebijakan + assign, app/bot, audit berantai + `/audit/verify`.
+- Semua rute ada di `/api/v1/*`. Di Cloudflare Access, lindungi hostname untuk UI, tetapi beri kebijakan Bypass untuk `/api/v1/*` (klien memakai token `cfs_…`; tanpa token, Worker sendiri meminta JWT Access).
+- Belum ada: login CLI untuk manusia (device/loopback), access request, alert, rotasi keyring saat anggota dicabut, hash harian ke Slack/email, rentang CIDR (baru IP persis), rate limit login.
