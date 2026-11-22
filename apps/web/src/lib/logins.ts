@@ -1,6 +1,6 @@
 // Login envelopes are cached only in memory. Plaintext is opened by the caller's key resolver.
 import { type Login, openLogin, unwrapGroupKey } from "@cfs/core";
-import { API_BASE, api, type FetchLike, request, send } from "./api.ts";
+import { API_BASE, ApiError, api, type FetchLike, request, send } from "./api.ts";
 import { getPrivateKey, getPublicKey } from "./keystore.ts";
 import { VaultLockedError } from "./secret-store.ts";
 
@@ -103,6 +103,31 @@ export async function loginKeyFor(id: string, version: number): Promise<Uint8Arr
   const key = await api.groupKey(group.prefix, version);
   if (key.version !== version) throw new Error("key version mismatch");
   return unwrapGroupKey(key.wrappedKey, priv, pub, group.prefix, version);
+}
+
+/** Only keyrings whose current key the caller can retrieve are valid write targets. */
+export async function loginTargets(): Promise<
+  { id: string; prefix: string; version: number; personal: boolean }[]
+> {
+  const [personal, groups] = await Promise.all([api.personalKeyring(), api.keyrings()]);
+  const available = await Promise.all(
+    groups.map(async (group) => {
+      try {
+        const key = await api.groupKey(group.prefix);
+        return key.version === group.version ? { ...group, personal: false } : null;
+      } catch (error) {
+        if (error instanceof ApiError && (error.kind === "not-found" || error.kind === "forbidden"))
+          return null;
+        throw error;
+      }
+    }),
+  );
+  return [
+    ...(personal
+      ? [{ id: personal.id, prefix: personal.prefix, version: personal.version, personal: true }]
+      : []),
+    ...available.filter((group) => group !== null),
+  ];
 }
 export interface OpenedLogin {
   record: LoginRecord;

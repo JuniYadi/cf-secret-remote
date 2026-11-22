@@ -68,6 +68,7 @@ export type PageId =
   | "root"
   | "secrets"
   | "logins"
+  | "loginDetail"
   | "groups"
   | "permissions"
   | "apps"
@@ -118,6 +119,7 @@ export type PageId =
 export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
   "secrets",
   "logins",
+  "loginDetail",
   "groups",
   "permissions",
   "apps",
@@ -216,6 +218,7 @@ function decodeSegment(segment: string): string | undefined {
 
 /** Parameterised paths, tried in order after the fixed ones. The first capture is the decoded name or id. */
 const PARAM_PATHS: readonly { re: RegExp; id: PageId }[] = [
+  { re: /^\/logins\/([^/]+)$/, id: "loginDetail" },
   { re: /^\/groups\/([^/]+)\/add$/, id: "groupAdd" },
   { re: /^\/groups\/([^/]+)\/relock$/, id: "groupRelock" },
   { re: /^\/groups\/([^/]+)$/, id: "groupDetail" },
@@ -283,6 +286,8 @@ export function pageCrumbs(id: PageId, name?: string): Crumb[] {
       return [{ label: t("Secrets", "Secret"), href: PATHS.secrets }];
     case "logins":
       return [{ label: t("Logins", "Akun"), href: PATHS.logins }];
+    case "loginDetail":
+      return [{ label: t("Logins", "Akun"), href: PATHS.logins }, { label: t("Login", "Akun") }];
     case "groups":
       return [{ label: t("Groups", "Grup"), href: PATHS.groups }];
     case "permissions":

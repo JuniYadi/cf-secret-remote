@@ -15,6 +15,7 @@ import { CliAuthorizePage } from "./screens/CliAuthorize.tsx";
 import { CliDonePage } from "./screens/CliDone.tsx";
 import { DevicesPage } from "./screens/Devices.tsx";
 import { ForgotPage } from "./screens/Forgot.tsx";
+import { LoginDetailPage } from "./screens/LoginDetail.tsx";
 import { LoginsListPage } from "./screens/LoginsList.tsx";
 import { OffboardPage } from "./screens/Offboard.tsx";
 import { PasswordChangePage } from "./screens/PasswordChange.tsx";
@@ -116,6 +117,12 @@ function renderPage(
       return (
         <ShellFrame>
           <LoginsListPage />
+        </ShellFrame>
+      );
+    case "loginDetail":
+      return (
+        <ShellFrame>
+          <LoginDetailPage id={page.name ?? ""} />
         </ShellFrame>
       );
     case "cliAuthorize":
