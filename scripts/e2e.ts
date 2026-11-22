@@ -526,6 +526,59 @@ async function run(): Promise<void> {
     return "child saw both values, exit code 7 passed through";
   });
 
+  await step("accounts: add, get JSON and inject into a child", async () => {
+    const add = await cli(
+      people.admin,
+      [
+        "account",
+        "add",
+        "shop-admin",
+        "--group",
+        GROUP,
+        "--env",
+        "dev",
+        "--role",
+        "admin",
+        "--username",
+        "alice",
+      ],
+      { stdin: `${secretValue}\n` },
+    );
+    expect(add.code === 0, `account add failed: ${lastLine(add.stderr)}`);
+    const got = await cli(people.admin, [
+      "account",
+      "get",
+      "shop-admin",
+      "--json",
+      "--purpose",
+      "e2e",
+    ]);
+    expect(got.code === 0, `account get failed: ${lastLine(got.stderr)}`);
+    const account = JSON.parse(got.stdout) as { username: string; password: string };
+    expect(
+      account.username === "alice" && account.password === secretValue,
+      "account returned different credentials",
+    );
+    const run = await cli(
+      people.admin,
+      [
+        "run",
+        SECRET,
+        "--account",
+        "shop-admin:dev:admin",
+        "--purpose",
+        "e2e",
+        "--",
+        "sh",
+        "-c",
+        'test "$CFS_SHOP_ADMIN_USER" = alice && test "$CFS_SHOP_ADMIN_PASS" = "$E2E_EXPECT"',
+      ],
+      { env: { E2E_EXPECT: secretValue } },
+    );
+    expect(run.code === 0, `account run failed: ${lastLine(run.stderr)}`);
+    return "account credentials reached the child (values not shown)";
+  });
+
   await step(`members: invite ${BOB_EMAIL}, sign in and set up the vault`, async () => {
     const inv = await api("POST", "/invites", people.admin.seedToken, { email: BOB_EMAIL });
     expect(inv.status === 201, `invite refused (status ${inv.status})`);
