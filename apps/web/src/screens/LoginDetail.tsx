@@ -163,6 +163,7 @@ export function LoginDetailPage({ id }: { id: string }) {
   };
   const reload = () => {
     setVersions(null);
+    setTab("values");
     setAttempt((n) => n + 1);
   };
   const openVersions = () => {

@@ -39,12 +39,10 @@ describe("login client", () => {
       wrappedKey: await wrapGroupKey(personalKey, pair.publicKey, "personal-p", 1),
     });
     vi.spyOn(api, "keyrings").mockResolvedValue([{ id: "g", prefix: "team", version: 2 }]);
-    const getKey = vi
-      .spyOn(api, "groupKey")
-      .mockResolvedValue({
-        version: 1,
-        wrappedKey: await wrapGroupKey(oldKey, pair.publicKey, "team", 1),
-      });
+    const getKey = vi.spyOn(api, "groupKey").mockResolvedValue({
+      version: 1,
+      wrappedKey: await wrapGroupKey(oldKey, pair.publicKey, "team", 1),
+    });
     expect(await loginKeyFor("p", 1)).toEqual(personalKey);
     expect(await loginKeyFor("g", 1)).toEqual(oldKey);
     expect(getKey).toHaveBeenCalledWith("team", 1);
