@@ -4,6 +4,17 @@ A secret vault that runs entirely on Cloudflare's free tier. Secrets are locked 
 
 Status: skeleton only. No logic yet. The design lives in [`DESIGN.md`](DESIGN.md), and the screens are in `design/`.
 
+## Install the CLI
+Linux and macOS:
+```
+curl -fsSL https://raw.githubusercontent.com/JuniYadi/cf-secret-remote/main/install.sh | sh
+```
+Windows (PowerShell):
+```
+irm https://raw.githubusercontent.com/JuniYadi/cf-secret-remote/main/install.ps1 | iex
+```
+Both pick the right binary for your OS and CPU, check it against the release `SHA256SUMS`, and install it as `cfs` (`~/.local/bin` or `%LOCALAPPDATA%\cfs\bin`). Pin a version with `sh -s -- v0.0.1`. Later, `cfs upgrade` updates it.
+
 ## Layout
 ```
 apps/
