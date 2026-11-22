@@ -3,6 +3,7 @@ import { useEffect, useState } from "preact/hooks";
 import { Link } from "wouter-preact";
 import { MASK, useReveal } from "../components/secrets-ui.tsx";
 import { PageTitle } from "../components/shared.tsx";
+import { ApiError } from "../lib/api.ts";
 import { copyWithAutoClear } from "../lib/clipboard.ts";
 import { useLang } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
@@ -125,6 +126,7 @@ export function LoginDetailPage({ id }: { id: string }) {
   const [target, setTarget] = useState("");
   const [tab, setTab] = useState<"values" | "versions">("values");
   const [deleted, setDeleted] = useState(false);
+  const [missing, setMissing] = useState(false);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -133,7 +135,12 @@ export function LoginDetailPage({ id }: { id: string }) {
     setRecord(null);
     setLogin(null);
     setError(false);
-    Promise.all([loginClient.get(id), loginTargets()])
+    setMissing(false);
+    const get = loginClient.get(id).catch((err: unknown) => {
+      if (live && err instanceof ApiError && err.kind === "not-found") setMissing(true);
+      throw err;
+    });
+    Promise.all([get, loginTargets()])
       .then(async ([r, options]) => {
         const key = await loginKeyFor(r.keyringId, r.keyringVersion);
         const opened = await openLogin(key, r.id, r.version, r.wrappedDek, r.ciphertext);
@@ -239,7 +246,29 @@ export function LoginDetailPage({ id }: { id: string }) {
           </button>
         </div>
       ) : !record || !login ? (
-        error ? (
+        missing ? (
+          <div>
+            <p>
+              {t(
+                "This login is unavailable or deleted.",
+                "Akun ini tidak tersedia atau telah dihapus.",
+              )}
+            </p>
+            <button
+              type="button"
+              class="btn"
+              disabled={busy}
+              onClick={() =>
+                void action(async () => {
+                  await loginClient.undelete(id);
+                  reload();
+                })
+              }
+            >
+              {t("Restore deleted login", "Pulihkan akun yang dihapus")}
+            </button>
+          </div>
+        ) : error ? (
           <button type="button" class="btn" onClick={reload}>
             {t("Try again", "Coba lagi")}
           </button>
