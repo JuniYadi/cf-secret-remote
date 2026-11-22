@@ -14,13 +14,21 @@ import {
 import { eligibleOrigin, fillPage } from "./fill.ts";
 import "./style.css";
 
+type Pending = {
+  host: string;
+  deviceCode: string;
+  userCode: string;
+  interval: number;
+  end: number;
+};
+
 function App() {
   const [lang, setLang] = useState<"en" | "id">("en");
   const t = (en: string, id: string) => (lang === "en" ? en : id);
   const [host, setHost] = useState("");
   const [session, setSession] = useState<Session>();
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
+  const [pending, setPending] = useState<Pending>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [matches, setMatches] = useState<{ id: string; login: Login }[]>([]);
@@ -29,6 +37,9 @@ function App() {
       .get("host")
       .then((v) => setHost(typeof v.host === "string" ? v.host : ""));
     void getSession().then(setSession);
+    void chrome.storage.session
+      .get("pending")
+      .then((v) => setPending(v.pending as Pending | undefined));
   }, []);
   useEffect(() => {
     if (!session?.unlockExpires) return;
@@ -58,26 +69,59 @@ function App() {
       const start = (await (
         await request(h, "/cli/start", json({ device: "Chrome", device_type: "extension" }))
       ).json()) as { deviceCode: string; userCode: string; interval: number; expiresIn: number };
-      setCode(start.userCode);
-      const end = Date.now() + start.expiresIn * 1000;
-      while (Date.now() < end) {
-        await new Promise((resolve) => setTimeout(resolve, start.interval * 1000));
-        const res = await request(h, "/cli/poll", json({ deviceCode: start.deviceCode }));
-        if (res.status === 202) continue;
-        const result = (await res.json()) as { token: string; expiresIn: number };
-        const next = { token: result.token, tokenExpires: Date.now() + result.expiresIn * 1000 };
-        await chrome.storage.session.set({ session: next });
-        setSession(next);
-        setCode("");
-        return;
-      }
-      throw new Error("Code expired");
+      const next = {
+        host: h,
+        deviceCode: start.deviceCode,
+        userCode: start.userCode,
+        interval: start.interval,
+        end: Date.now() + start.expiresIn * 1000,
+      };
+      await chrome.storage.session.set({ pending: next });
+      setPending(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
       setBusy(false);
     }
   }
+  useEffect(() => {
+    if (!pending) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        while (!cancelled && Date.now() < pending.end) {
+          await new Promise((resolve) => setTimeout(resolve, pending.interval * 1000));
+          if (cancelled) return;
+          const res = await request(
+            pending.host,
+            "/cli/poll",
+            json({ deviceCode: pending.deviceCode }),
+          );
+          if (res.status === 202) continue;
+          const result = (await res.json()) as { token: string; expiresIn: number };
+          if (cancelled) return;
+          const next = { token: result.token, tokenExpires: Date.now() + result.expiresIn * 1000 };
+          await chrome.storage.session.set({ session: next });
+          await chrome.storage.session.remove("pending");
+          setSession(next);
+          setPending(undefined);
+          return;
+        }
+        if (!cancelled) throw new Error("expired");
+      } catch {
+        if (!cancelled) {
+          await chrome.storage.session.remove("pending");
+          setPending(undefined);
+          setError(
+            t("Sign-in expired or failed. Try again.", "Masuk kedaluwarsa atau gagal. Coba lagi."),
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pending]);
   async function doUnlock(event: Event) {
     event.preventDefault();
     if (!session) return;
@@ -191,13 +235,13 @@ function App() {
           <button type="submit" disabled={busy}>
             {t("Sign in", "Masuk")}
           </button>
-          {code && (
+          {pending && (
             <p>
               {t(
                 "Open the approval page and enter this code:",
                 "Buka halaman persetujuan dan masukkan kode ini:",
               )}{" "}
-              <strong>{code}</strong>{" "}
+              <strong>{pending.userCode}</strong>{" "}
               <a href={`${host}/cli/authorize`} target="_blank" rel="noreferrer">
                 {t("Open", "Buka")}
               </a>

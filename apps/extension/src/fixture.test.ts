@@ -5,8 +5,8 @@ import { fillPage } from "./fill.ts";
 
 beforeEach(() => {
   document.body.innerHTML = readFileSync("test-fixtures/fill.html", "utf8").replace(
-    "src=",
-    "data-src=",
+    /<iframe[^>]*><\/iframe>/,
+    "",
   );
   vi.stubGlobal("location", new URL("https://shop.com/login"));
   vi.stubGlobal("top", window);
