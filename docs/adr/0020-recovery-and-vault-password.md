@@ -12,6 +12,7 @@ ADR 7 gives the outline. This fixes the mechanics and replaces the interim hex f
 - **Recovery key (optional).** At setup the browser creates 32 random bytes, shows them as a 24-word BIP-39 phrase once, and stores `identity.recovery_locked_key` (the private key sealed with a key derived from those bytes by HKDF). Using it restores the private key in the browser, lets the person choose a new vault password, and issues a new recovery key.
 - **Change password.** Re-lock the same private key with the new password (`PUT /me/vault`, needs the old password locally). Group access is unchanged.
 - **Two admins.** An admin cannot be demoted or disabled if it would leave fewer than two admins holding a vault set up. Settings shows each admin's vault and recovery-key status.
+- **Last unlocked.** Settings shows each admin's last recorded browser vault unlock, or "Never" when none is recorded. After a successful unlock the browser sends a best-effort ping; its failure never blocks access, so the displayed time may be missing or stale.
 - **Wrong password.** Counted in the browser/CLI only (the server cannot see it); the UI shows attempts left and offers the recovery path.
 
 ## Consequences

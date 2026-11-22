@@ -235,6 +235,7 @@ describe("the two-admin rule on the Admins screen (ADR 20)", () => {
     role: "member",
     publicKey: null,
     status: "active",
+    last_unlocked_at: null,
     recoverySet: false,
     ...over,
   });

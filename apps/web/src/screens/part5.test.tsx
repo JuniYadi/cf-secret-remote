@@ -5,10 +5,11 @@ import { render } from "preact";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QuotaBanner } from "../components/parts.tsx";
 import { setLang } from "../lib/i18n.ts";
-import { lock, unlock } from "../lib/keystore.ts";
+import { getStatus, lock, unlock } from "../lib/keystore.ts";
 import { markQuotaReached, resetQuotaForTests } from "../lib/quota.ts";
 import { clearPendingRecovery, setPendingRecovery } from "../lib/recovery-flow.ts";
 import { loadSession, resetSessionForTests } from "../lib/session.ts";
+import * as vault from "../lib/vault.ts";
 import { ForgotPage } from "./Forgot.tsx";
 import { OffboardPage } from "./Offboard.tsx";
 import { PasswordChangePage } from "./PasswordChange.tsx";
@@ -19,6 +20,7 @@ import { RestorePage } from "./Restore.tsx";
 import { SettingsPage } from "./Settings.tsx";
 import { SettingsAdminsPage } from "./SettingsAdmins.tsx";
 import { SettingsBackupPage } from "./SettingsBackup.tsx";
+import { UnlockPage } from "./Unlock.tsx";
 import { WasYouPage } from "./WasYou.tsx";
 
 // Each screen rendered with the API mocked by a fetch stand-in (no network). Checks the text a person sees,
@@ -100,6 +102,7 @@ afterEach(() => {
   lock();
   clearPendingRecovery();
   resetQuotaForTests();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -137,6 +140,53 @@ describe("Settings, General", () => {
   });
 });
 
+describe("Unlock", () => {
+  async function submitPassword(password: string) {
+    const input = host.querySelector("#unlock-password") as HTMLInputElement;
+    input.value = password;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    host
+      .querySelector("form")
+      ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await flush();
+  }
+
+  it("pings after unlocking without waiting for the request", async () => {
+    await signIn(ADMIN);
+    lock();
+    vi.spyOn(vault, "unlockVault").mockResolvedValue("PRIV-ALICE");
+    const fetch = vi.fn((_url: string, _init: RequestInit) => new Promise<Response>(() => {}));
+    vi.stubGlobal("fetch", fetch);
+    await mount(<UnlockPage />);
+    await submitPassword("password");
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls[0]?.[0]).toBe("/api/v1/me/unlocked");
+    expect(fetch.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(getStatus().unlocked).toBe(true);
+  });
+
+  it("keeps the vault open when the ping fails and never pings for a wrong password", async () => {
+    await signIn(ADMIN);
+    lock();
+    const decrypt = vi
+      .spyOn(vault, "unlockVault")
+      .mockRejectedValueOnce(new Error("wrong password"))
+      .mockResolvedValueOnce("PRIV-ALICE");
+    const fetch = vi.fn().mockRejectedValue(new Error("offline"));
+    vi.stubGlobal("fetch", fetch);
+    await mount(<UnlockPage />);
+    await submitPassword("wrong");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(getStatus().unlocked).toBe(false);
+    expect(text()).toContain("That password didn't work.");
+    await submitPassword("correct");
+    expect(decrypt).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(getStatus().unlocked).toBe(true);
+  });
+});
+
 describe("Settings, Admins", () => {
   it("warns when only one admin holds a vault, and shows each admin's key and recovery status", async () => {
     await signIn(ADMIN);
@@ -151,6 +201,7 @@ describe("Settings, Admins", () => {
             publicKey: "PUB",
             status: "active",
             recoverySet: 1,
+            last_unlocked_at: 1700000000,
           },
           {
             id: "u-bob",
@@ -160,6 +211,7 @@ describe("Settings, Admins", () => {
             publicKey: null,
             status: "active",
             recoverySet: 0,
+            last_unlocked_at: null,
           },
         ]),
     });
@@ -167,6 +219,30 @@ describe("Settings, Admins", () => {
     expect(text()).toContain("Only one admin can open the vault");
     expect(text()).toContain("Saved");
     expect(text()).toContain("Hasn't set up");
+    expect(text()).toContain("Last unlocked");
+    expect(text()).toContain(
+      new Date(1700000000 * 1000).toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    );
+    expect(text()).toContain("Never");
+    setLang("id", undefined);
+    await flush();
+    expect(text()).toContain("Terakhir dibuka");
+    expect(text()).toContain("Belum pernah");
+    expect(text()).toContain(
+      new Date(1700000000 * 1000).toLocaleString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    );
   });
 
   it("demotes through PATCH /identities/:id, and never sends the server a key", async () => {

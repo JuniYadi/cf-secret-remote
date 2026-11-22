@@ -14,7 +14,7 @@ import "../styles/settings.css";
  * other access again (ADR 20). The server refuses a demotion that breaks that; this screen checks first.
  */
 export function SettingsAdminsPage() {
-  useLang();
+  const lang = useLang();
   const { me } = useSession();
   const directory = useLoad(() => api.identities(), "identities");
   const [showCandidates, setShowCandidates] = useState(false);
@@ -114,6 +114,7 @@ export function SettingsAdminsPage() {
               <th scope="col">{t("Person", "Orang")}</th>
               <th scope="col">{t("Vault key", "Kunci vault")}</th>
               <th scope="col">{t("Recovery key", "Kunci pemulihan")}</th>
+              <th scope="col">{t("Last unlocked", "Terakhir dibuka")}</th>
               <th scope="col">
                 <span class="visually-hidden">{t("Action", "Aksi")}</span>
               </th>
@@ -139,6 +140,20 @@ export function SettingsAdminsPage() {
                     {holdsVault ? t("Ready", "Siap") : t("Hasn't set up", "Belum menyiapkan")}
                   </td>
                   <td>{hasRecoveryKey(a) ? t("Saved", "Tersimpan") : t("None", "Tidak ada")}</td>
+                  <td>
+                    {a.last_unlocked_at == null
+                      ? t("Never", "Belum pernah")
+                      : new Date(a.last_unlocked_at * 1000).toLocaleString(
+                          lang === "id" ? "id-ID" : "en-GB",
+                          {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
+                  </td>
                   <td class="right">
                     <button
                       type="button"

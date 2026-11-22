@@ -20,7 +20,7 @@ import { now, sha256Hex } from "../util.ts";
 // Values stay encrypted. Names, paths, emails and dates are in clear.
 
 /** The number of the latest migration. A file must match it to restore. */
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 /** Tables in dependency order: parents first. Restore deletes in the reverse order. */
 export const BACKUP_TABLES = [
@@ -75,6 +75,7 @@ export const COLUMNS: Record<BackupTable, readonly string[]> = {
     "created_at",
     "owner_id",
     "recovery_locked_key",
+    "last_unlocked_at",
   ],
   app_role: [
     "identity_id",

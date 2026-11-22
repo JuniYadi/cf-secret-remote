@@ -78,7 +78,7 @@ keyrings.get("/keyrings/:prefix/key", async (c) => {
 
 keyrings.get("/identities", requireAdmin, async (c) => {
   const rows = await c.env.DB.prepare(
-    "SELECT id, kind, name, role, public_key AS publicKey, status, (recovery_locked_key IS NOT NULL) AS recoverySet FROM identity ORDER BY name",
+    "SELECT id, kind, name, role, public_key AS publicKey, status, (recovery_locked_key IS NOT NULL) AS recoverySet, last_unlocked_at FROM identity ORDER BY name",
   ).all();
   return c.json(rows.results);
 });
