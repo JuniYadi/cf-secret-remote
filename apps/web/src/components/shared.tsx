@@ -26,6 +26,7 @@ const ICON_PATHS = {
     "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8",
   permissions: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
   apps: "M4 17l6-6-6-6 M12 19h8",
+  devices: "M2 4h20v12H2z M8 20h8 M12 16v4",
   activity: "M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01",
   settings: "M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6",
   lock: "M5 11h14v10H5z M8 11V7a4 4 0 0 1 8 0v4",

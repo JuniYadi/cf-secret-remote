@@ -32,7 +32,7 @@ async function unlock(hostFlag?: string, args: string[] = []) {
   }
   const expiresAt = await saveUnlock(pickStore(), c.host, key, ttl);
   console.log(
-    `Unlocked until ${new Date(expiresAt).toLocaleTimeString()}. Run cfs lock to end it sooner.`,
+    `Unlocked until ${new Date(expiresAt).toLocaleTimeString()}. Run cfs lock to end it sooner.\nNeed longer or shorter? Use cfs unlock --ttl 8h, 7d or 30m.`,
   );
 }
 
@@ -42,7 +42,7 @@ export const session: Commands = {
     run: (_a, h) => login(h),
   },
   unlock: {
-    help: "cfs unlock [--ttl 1h]               unlock your vault on this device",
+    help: "cfs unlock [--ttl 24h]              unlock your vault on this device",
     run: (a, h) => unlock(h, a),
   },
   lock: {

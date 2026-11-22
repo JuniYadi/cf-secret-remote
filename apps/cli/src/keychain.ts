@@ -163,7 +163,7 @@ export function pickStore(deps: PickDeps = {}): SecretStore {
 
 // ---------------------------------------------------------------- unlocked key with a TTL
 
-export const DEFAULT_TTL = "1h";
+export const DEFAULT_TTL = "24h";
 
 /** "90s", "30m", "1h", "2d" or plain seconds. Returns seconds. */
 export function parseTtl(text: string): number {

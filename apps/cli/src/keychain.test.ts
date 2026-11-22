@@ -169,10 +169,10 @@ describe("keychain fallback to the 0600 file (ADR 25)", () => {
   });
 });
 
-describe("unlock TTL (ADR 25, --ttl default 1 h)", () => {
-  test("the default is one hour", () => {
-    expect(DEFAULT_TTL).toBe("1h");
-    expect(parseTtl(DEFAULT_TTL)).toBe(3600);
+describe("unlock TTL (ADR 25, --ttl default 24 h)", () => {
+  test("the default is 24 hours", () => {
+    expect(DEFAULT_TTL).toBe("24h");
+    expect(parseTtl(DEFAULT_TTL)).toBe(86400);
   });
 
   test("durations parse to seconds", () => {
