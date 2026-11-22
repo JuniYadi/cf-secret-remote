@@ -245,7 +245,7 @@ describe("Settings, Backup", () => {
     form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     await flush();
 
-    const get = calls.find((c) => c.method === "GET");
+    const get = calls.find((c) => c.method === "GET" && c.url === "/api/v1/backup");
     expect(get).toBeDefined();
     expect(get?.url).toBe("/api/v1/backup");
     expect(get?.url).not.toContain("correct");
@@ -253,6 +253,37 @@ describe("Settings, Backup", () => {
     // The page itself never shows the passphrase after the download.
     expect(text()).not.toContain("correct horse battery");
     expect(createUrl).toHaveBeenCalled();
+  });
+
+  it("shows the latest backup and the list, with a size for automatic copies only", async () => {
+    await signIn(ADMIN);
+    serve({
+      "GET /api/v1/backup/history": () =>
+        json({
+          r2: true,
+          copies: [
+            { at: 1_800_000_100, type: "auto", size: 4501 },
+            { at: 1_800_000_000, type: "manual", size: null },
+          ],
+        }),
+    });
+    await mount(<SettingsBackupPage />);
+    expect(text()).toContain("Latest backup");
+    expect(text()).toContain("Automatic");
+    const rows = Array.from(host.querySelectorAll("tbody tr")).map((r) => r.textContent ?? "");
+    expect(rows[0]).toContain("4.4 KB");
+    expect(rows[1]).toContain("Manual");
+    expect(rows[1]).toContain("-");
+    expect(text()).not.toContain("Automatic daily backups are off");
+  });
+
+  it("says automatic backups are off without R2, and still lets you download", async () => {
+    await signIn(ADMIN);
+    serve({ "GET /api/v1/backup/history": () => json({ r2: false, copies: [] }) });
+    await mount(<SettingsBackupPage />);
+    expect(text()).toContain("No backup has been made yet.");
+    expect(text()).toContain("Automatic daily backups are off");
+    expect(host.querySelector("#backup-passphrase")).not.toBeNull();
   });
 
   it("says what is and is not encrypted", async () => {
@@ -275,7 +306,7 @@ describe("Settings, Backup", () => {
     );
     await flush();
     expect(text()).toContain("The passphrase needs at least 8 characters.");
-    expect(calls.filter((c) => c.method === "GET")).toHaveLength(0);
+    expect(calls.filter((c) => c.url === "/api/v1/backup")).toHaveLength(0);
   });
 });
 

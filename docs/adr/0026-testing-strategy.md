@@ -1,6 +1,6 @@
 # 26. Testing strategy
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Decision
 - **Core.** Unit tests plus shared test vectors in `packages/core/test-vectors` (fixed keys, IVs, expected envelopes, wrapped-key opens, kit strings, fingerprint words, audit chain). Run in Bun/Node (Vitest) and in a real browser (Playwright) so both runtimes agree.

@@ -1,6 +1,6 @@
 # 19. Audit checkpoints, retention, and free-tier quota
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Context
 ADR 6 requires a daily head hash. D1 free writes are limited. DESIGN.md defines behaviour at quota; the mechanics are missing.

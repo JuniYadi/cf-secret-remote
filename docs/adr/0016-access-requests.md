@@ -1,6 +1,6 @@
 # 16. Access requests with approval
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Context
 Production access should be time-boxed and approved. Under E2E an approver must hand over a key, so the server alone cannot grant it.

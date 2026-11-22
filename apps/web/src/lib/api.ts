@@ -547,6 +547,19 @@ export interface RestoreCounts {
 }
 
 /** POST /restore/check (ADR 23). Reads and verifies a file; changes nothing. */
+/** One backup: an automatic R2 copy (with a size) or a manual download (the log keeps the time only). */
+export interface BackupCopy {
+  at: number;
+  type: "auto" | "manual";
+  size: number | null;
+}
+
+export interface BackupHistory {
+  /** Whether an R2 bucket is connected, so daily copies are being kept. */
+  r2: boolean;
+  copies: BackupCopy[];
+}
+
 export interface RestoreCheck {
   ok: true;
   host: string;
@@ -785,6 +798,7 @@ export const api = {
     const res = await send("GET", `${API_BASE}/backup`, undefined, fetchImpl, headers);
     return res.blob();
   },
+  backupHistory: () => request<BackupHistory>("GET", "/backup/history"),
   restoreCheck: (file: Uint8Array, passphrase?: string, fetchImpl?: FetchLike) =>
     request<RestoreCheck>(
       "POST",

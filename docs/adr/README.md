@@ -33,6 +33,14 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [25](0025-deploy-and-distribution.md) | Deploy, init, hosts, releases | implemented |
 | [26](0026-testing-strategy.md) | Testing strategy | implemented |
 | [27](0027-hardening-and-limits.md) | Hardening and rate limits | planned |
+| [28](0028-positioning-qa-credentials.md) | Positioning: credentials and secrets for QA teams | accepted |
+| [29](0029-login-item.md) | Login item | accepted |
+| [30](0030-cli-and-sdk-for-logins.md) | CLI and SDK for Logins | accepted |
+| [31](0031-web-logins.md) | Web: Logins screen | accepted |
+| [32](0032-chrome-extension.md) | Chrome extension | accepted |
+| [33](0033-import-logins.md) | Import Logins | accepted |
+| [34](0034-security-disclosure-and-supply-chain.md) | Security disclosure, licence, supply chain | accepted; build first |
+| [35](0035-deferred-agent-fill-and-account-lease.md) | Deferred: agent-safe fill, account leases | deferred |
 
 ## Build order
 
@@ -48,6 +56,14 @@ Tests first, then each layer in the order the ADRs depend on each other: `core`,
 8. **23** backup and restore.
 9. **25** deploy, init, keychain, releases.
 10. **24** web app, screen by screen, using the API as built.
+
+### QA credentials track (ADR 28 to 35)
+
+1. **34** `SECURITY.md`, `LICENSE`, Private Vulnerability Reporting, then CI scanning and the threat model.
+2. **28** positioning (docs only), then **29** Login item in `core` and `api` with its shared test vector.
+3. **30** CLI `cfs account` and `cfs run --account`, then `@cfs/sdk`.
+4. **31** web Logins screen, then **32** Chrome extension, then **33** import.
+5. **35** stays deferred.
 
 ## Working agreement
 

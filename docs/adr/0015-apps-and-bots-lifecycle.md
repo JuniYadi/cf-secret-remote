@@ -1,6 +1,6 @@
 # 15. Apps and bots lifecycle
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Context
 ADR 4 defines AppRole login. The lifecycle around it (creating, delivering the kit, rotating, revoking, limiting) is not specified.

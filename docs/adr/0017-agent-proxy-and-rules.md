@@ -1,6 +1,6 @@
 # 17. Agent-safe proxy and agent rules (extends ADR 8)
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Context
 Agents should use keys without seeing them, and a prompt-injected agent must not be able to send a key to another host.
