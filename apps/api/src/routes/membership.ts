@@ -192,21 +192,26 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
     .first<{ name: string }>();
   const next = g.version + 1;
   try {
-    await db.batch([
+    const started = await db.batch([
       db
-        .prepare("UPDATE keyring SET status = 'rotating' WHERE id = ? AND status = 'active'")
-        .bind(g.id),
-      db
-        .prepare("DELETE FROM keyring_member WHERE keyring_id = ? AND identity_id = ?")
-        .bind(g.id, removeId),
+        .prepare(
+          "UPDATE keyring SET status = 'rotating' WHERE id = ? AND status = 'active' AND NOT EXISTS (SELECT 1 FROM login WHERE keyring_id = ?)",
+        )
+        .bind(g.id, g.id),
       ...members.map((m) =>
         db
           .prepare(
-            "INSERT INTO keyring_member_staged (keyring_id, identity_id, version, wrapped_key) VALUES (?, ?, ?, ?)",
+            "INSERT INTO keyring_member_staged (keyring_id, identity_id, version, wrapped_key) SELECT ?, ?, ?, ? WHERE changes() = 1",
           )
           .bind(g.id, m.identityId, next, m.wrappedKey),
       ),
+      db
+        .prepare(
+          "DELETE FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND changes() = 1",
+        )
+        .bind(g.id, removeId),
     ]);
+    if (!started[0]?.meta.changes) return c.json({ error: "group changed, reload and retry" }, 409);
   } catch {
     return c.json({ error: "group changed, reload and retry" }, 409);
   }
