@@ -65,15 +65,15 @@ export function CliAuthorizePage() {
         <PageTitle crumbs={pageCrumbs("cliAuthorize")} />
         <p class="sub">
           {t(
-            `A terminal is asking to sign in as ${me?.name ?? ""}. Only continue if you started this.`,
-            `Sebuah terminal meminta masuk sebagai ${me?.name ?? ""}. Lanjutkan hanya jika kamu yang memulainya.`,
+            `A device is asking to sign in as ${me?.name ?? ""}. Only continue if you started this.`,
+            `Sebuah perangkat meminta masuk sebagai ${me?.name ?? ""}. Lanjutkan hanya jika kamu yang memulainya.`,
           )}
         </p>
 
         {info === null ? (
           <form class="form-stack" onSubmit={check} noValidate>
             <div class="field">
-              <label for="cli-code">{t("Code from your terminal", "Kode dari terminalmu")}</label>
+              <label for="cli-code">{t("Code from your device", "Kode dari perangkatmu")}</label>
               <input
                 id="cli-code"
                 type="text"
@@ -110,8 +110,8 @@ export function CliAuthorizePage() {
             <div class="code-confirm" aria-live="polite">
               <div class="note">
                 {t(
-                  "Check this code matches your terminal",
-                  "Pastikan kode ini sama dengan di terminalmu",
+                  "Check this code matches your device",
+                  "Pastikan kode ini sama dengan di perangkatmu",
                 )}
               </div>
               <div class="code-big mono">{info.userCode}</div>
@@ -125,7 +125,11 @@ export function CliAuthorizePage() {
               </div>
               <div>
                 <dt>{t("Program", "Program")}</dt>
-                <dd>cfs</dd>
+                <dd>
+                  {info.deviceType === "extension"
+                    ? t("Browser extension", "Ekstensi browser")
+                    : t("CLI", "CLI")}
+                </dd>
               </div>
               <div>
                 <dt>{t("Code expires", "Kode berakhir")}</dt>

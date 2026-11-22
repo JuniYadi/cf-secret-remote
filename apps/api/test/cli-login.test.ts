@@ -23,4 +23,17 @@ describe("cli device login", () => {
       410,
     );
   });
+  it("identifies extension requests and issues an eight-hour token", async () => {
+    const adm = await admin();
+    const s = await api("POST", "/cli/start", null, { device: "Chrome", device_type: "extension" });
+    const info = await api("GET", `/cli/login?code=${s.body.userCode}`, adm.token);
+    expect(info.body.deviceType).toBe("extension");
+    expect(
+      (await api("POST", "/cli/approve", adm.token, { userCode: s.body.userCode })).status,
+    ).toBe(200);
+    const p = await api("POST", "/cli/poll", null, { deviceCode: s.body.deviceCode });
+    expect(p.body.token).toMatch(/^cfs_/);
+    expect(p.body.expiresIn).toBe(8 * 3600);
+    expect((await api("POST", "/cli/start", null, { device_type: "other" })).status).toBe(400);
+  });
 });
