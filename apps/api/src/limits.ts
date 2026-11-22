@@ -9,11 +9,13 @@ export const NAME_RE = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 /** Rejects bodies over the cap (ADR 27). The secret write and restore have larger caps. */
 export const bodyLimit: MiddlewareHandler = async (c, next) => {
   if (c.req.method !== "GET" && c.req.method !== "DELETE") {
-    const cap = c.req.path.endsWith("/secret")
+    const cap = c.req.path.includes("/logins")
       ? MAX_SECRET
-      : /\/restore(\/check)?$/.test(c.req.path)
-        ? MAX_RESTORE
-        : MAX_JSON;
+      : c.req.path.endsWith("/secret")
+        ? MAX_SECRET
+        : /\/restore(\/check)?$/.test(c.req.path)
+          ? MAX_RESTORE
+          : MAX_JSON;
     const len = Number(c.req.header("content-length") ?? 0);
     if (len > cap) return c.json({ error: "too large" }, 413);
     if (!c.req.header("content-length")) {
