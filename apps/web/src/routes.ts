@@ -12,6 +12,7 @@ import { t } from "./lib/i18n.ts";
 export const PATHS = {
   secrets: "/secrets",
   logins: "/logins",
+  loginsNew: "/logins/new",
   groups: "/groups",
   permissions: "/permissions",
   apps: "/apps",
@@ -69,6 +70,8 @@ export type PageId =
   | "secrets"
   | "logins"
   | "loginDetail"
+  | "loginNew"
+  | "loginEdit"
   | "groups"
   | "permissions"
   | "apps"
@@ -120,6 +123,8 @@ export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
   "secrets",
   "logins",
   "loginDetail",
+  "loginNew",
+  "loginEdit",
   "groups",
   "permissions",
   "apps",
@@ -171,6 +176,7 @@ const STATIC_PATHS: Readonly<Record<string, PageId>> = {
   "/": "root",
   [PATHS.secrets]: "secrets",
   [PATHS.logins]: "logins",
+  [PATHS.loginsNew]: "loginNew",
   [PATHS.groups]: "groups",
   [PATHS.permissions]: "permissions",
   [PATHS.apps]: "apps",
@@ -218,6 +224,7 @@ function decodeSegment(segment: string): string | undefined {
 
 /** Parameterised paths, tried in order after the fixed ones. The first capture is the decoded name or id. */
 const PARAM_PATHS: readonly { re: RegExp; id: PageId }[] = [
+  { re: /^\/logins\/([^/]+)\/edit$/, id: "loginEdit" },
   { re: /^\/logins\/([^/]+)$/, id: "loginDetail" },
   { re: /^\/groups\/([^/]+)\/add$/, id: "groupAdd" },
   { re: /^\/groups\/([^/]+)\/relock$/, id: "groupRelock" },
@@ -288,6 +295,16 @@ export function pageCrumbs(id: PageId, name?: string): Crumb[] {
       return [{ label: t("Logins", "Akun"), href: PATHS.logins }];
     case "loginDetail":
       return [{ label: t("Logins", "Akun"), href: PATHS.logins }, { label: t("Login", "Akun") }];
+    case "loginNew":
+      return [
+        { label: t("Logins", "Akun"), href: PATHS.logins },
+        { label: t("New login", "Akun baru") },
+      ];
+    case "loginEdit":
+      return [
+        { label: t("Logins", "Akun"), href: PATHS.logins },
+        { label: t("Edit login", "Ubah akun") },
+      ];
     case "groups":
       return [{ label: t("Groups", "Grup"), href: PATHS.groups }];
     case "permissions":
