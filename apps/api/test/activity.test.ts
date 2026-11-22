@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { appendRow } from "../src/audit.ts";
 import { admin, api, makeIdentity } from "./helpers.ts";
@@ -151,5 +151,126 @@ describe("CLI approve: device lookup and attempts", () => {
     const m = await makeIdentity({ kind: "app" });
     expect((await api("GET", "/cli/login?code=ABCD-EFGH", m.token)).status).toBe(403);
     void db;
+  });
+});
+
+// ADR 24 (Activity): the Type column, the stat cards and the CSV export.
+type Stats = { accesses: number; byApps: number; blocked: number; actors: number };
+
+describe("GET /audit kind, /audit/stats and /audit/export.csv", () => {
+  const nowSec = () => Math.floor(Date.now() / 1000);
+
+  it("labels rows as user or app, and filters by kind", async () => {
+    const adm = await admin();
+    const t = tag();
+    const person = await makeIdentity({ name: `p-${t}@test.dev`, kind: "user" });
+    const bot = await makeIdentity({ name: `bot-${t}`, kind: "app" });
+    await appendRow(
+      db,
+      { who: person.name, action: "secret.read", path: `k-${t}/a`, result: "ok" },
+      nowSec(),
+    );
+    await appendRow(
+      db,
+      { who: bot.name, action: "secret.read", path: `k-${t}/a`, result: "ok" },
+      nowSec(),
+    );
+    await appendRow(
+      db,
+      { who: `gone-${t}`, action: "secret.read", path: `k-${t}/a`, result: "ok" },
+      nowSec(),
+    );
+
+    const all = await api<(AuditRow & { kind: string | null })[]>(
+      "GET",
+      `/audit?path=k-${t}/a`,
+      adm.token,
+    );
+    const kindOf = (who: string) => all.body.find((r) => r.who === who)?.kind;
+    expect(kindOf(person.name)).toBe("user");
+    expect(kindOf(bot.name)).toBe("app");
+    expect(kindOf(`gone-${t}`)).toBeNull();
+
+    const apps = await api<AuditRow[]>("GET", `/audit?path=k-${t}/a&kind=app`, adm.token);
+    expect(apps.body.map((r) => r.who)).toEqual([bot.name]);
+    expect((await api("GET", "/audit?kind=robot", adm.token)).status).toBe(400);
+  });
+
+  it("counts the last 24 hours for the stat cards", async () => {
+    const adm = await admin();
+    const t = tag();
+    const before = (await api<Stats>("GET", "/audit/stats", adm.token)).body;
+    const person = await makeIdentity({ name: `s-${t}@test.dev`, kind: "user" });
+    const bot = await makeIdentity({ name: `sbot-${t}`, kind: "app" });
+    await appendRow(
+      db,
+      { who: person.name, action: "secret.read", path: `s-${t}/a`, result: "ok" },
+      nowSec(),
+    );
+    await appendRow(
+      db,
+      { who: bot.name, action: "secret.read", path: `s-${t}/a`, result: "ok" },
+      nowSec(),
+    );
+    await appendRow(
+      db,
+      { who: bot.name, action: "secret.read", path: `s-${t}/b`, result: "denied" },
+      nowSec(),
+    );
+    await appendRow(
+      db,
+      { who: bot.name, action: "secret.read", path: `s-${t}/old`, result: "ok" },
+      nowSec() - 90_000,
+    );
+
+    const after = (await api<Stats>("GET", "/audit/stats", adm.token)).body;
+    expect(after.accesses - before.accesses).toBe(2);
+    expect(after.byApps - before.byApps).toBe(1);
+    expect(after.blocked - before.blocked).toBe(1);
+    expect(after.actors - before.actors).toBe(2);
+    expect(
+      (await api("GET", "/audit/stats", (await makeIdentity({ role: "member" })).token)).status,
+    ).toBe(403);
+  });
+
+  it("exports the filtered rows as CSV, guards formulas, and logs the export", async () => {
+    const adm = await admin();
+    const t = tag();
+    await appendRow(
+      db,
+      {
+        who: `x-${t}`,
+        action: "secret.read",
+        path: `c-${t}/a`,
+        result: "ok",
+        note: '=HYPERLINK("http://x"),b',
+      },
+      nowSec(),
+    );
+    const res = await SELF.fetch(`http://t.test/api/v1/audit/export.csv?path=c-${t}/a`, {
+      headers: { authorization: `Bearer ${adm.token}` },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/csv");
+    expect(res.headers.get("content-disposition")).toContain("attachment");
+    const lines = (await res.text()).trim().split("\r\n");
+    expect(lines[0]).toBe("seq,time,who,type,action,secret,version,result,ip,note");
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain(`x-${t},,secret.read,c-${t}/a`);
+    // The note starts with '=' so it is quoted with a leading apostrophe, and its quotes and comma are escaped.
+    expect(lines[1]).toContain(`"'=HYPERLINK(""http://x""),b"`);
+
+    const logged = await api<AuditRow[]>(
+      "GET",
+      `/audit?action=audit.export&who=${encodeURIComponent(adm.name)}`,
+      adm.token,
+    );
+    expect(logged.body.length).toBeGreaterThan(0);
+
+    const member = await makeIdentity({ role: "member" });
+    const denied = await SELF.fetch("http://t.test/api/v1/audit/export.csv", {
+      headers: { authorization: `Bearer ${member.token}` },
+    });
+    expect(denied.status).toBe(403);
   });
 });

@@ -3,6 +3,7 @@ import {
   ACTION_NAMES,
   auditQuery,
   chainState,
+  exportQuery,
   formatCount,
   meterState,
   NO_FILTERS,
@@ -24,6 +25,7 @@ describe("audit query building", () => {
         action: "secret.read",
         path: " backend/* ",
         result: "denied",
+        kind: "app",
         range: "7d",
       },
       NOW,
@@ -33,8 +35,17 @@ describe("audit query building", () => {
       action: "secret.read",
       path: "backend/*",
       result: "denied",
+      kind: "app",
       from: NOW - 7 * 86400,
       limit: PAGE_SIZE,
+    });
+  });
+
+  it("exports the same filters without paging", () => {
+    expect(exportQuery({ ...NO_FILTERS, kind: "user", who: "bob" }, NOW)).toEqual({
+      who: "bob",
+      kind: "user",
+      from: NOW - 86400,
     });
   });
 

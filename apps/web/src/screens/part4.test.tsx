@@ -229,6 +229,80 @@ describe("Activity", () => {
     expect(last?.search.get("from")).not.toBeNull();
   });
 
+  const quiet = {
+    "GET /usage": {
+      body: { day: "d", writes: 1, readsLogged: 0, limit: 100000, warning: false },
+    },
+    "GET /audit/verify": {
+      body: {
+        ok: true,
+        rows: 0,
+        firstBad: null,
+        firstBadSeq: null,
+        head: "",
+        base: null,
+        checkpoints: { stored: 0, verified: 0, pruned: 0, mismatched: [] },
+      },
+    },
+  };
+
+  it("shows the 24-hour stat cards and a Type pill for each row", async () => {
+    await mount(
+      ADMIN,
+      {
+        ...quiet,
+        "GET /audit/stats": {
+          body: { since: 0, accesses: 1204, byApps: 310, blocked: 7, actors: 9 },
+        },
+        "GET /audit": {
+          body: [
+            { ...audit[0], kind: "user" },
+            { ...audit[1], kind: "app" },
+          ],
+        },
+      },
+      () => <ActivityPage />,
+    );
+    expect(text()).toContain("1,204");
+    expect(text()).toContain("accesses in the last 24 hours");
+    expect(text()).toContain("blocked");
+    const pills = Array.from(host.querySelectorAll("td .pill")).map((p) => p.textContent);
+    expect(pills).toContain("Person");
+    expect(pills).toContain("App");
+  });
+
+  it("filters by type and sends kind", async () => {
+    const stub = await mount(ADMIN, { ...quiet, "GET /audit": { body: [] } }, () => (
+      <ActivityPage />
+    ));
+    await setInput("#f-kind", "app");
+    submit("form.filters");
+    await flush();
+    expect(stub.to("GET /audit").at(-1)?.search.get("kind")).toBe("app");
+  });
+
+  it("exports the applied filters as CSV", async () => {
+    const created = vi.fn(() => "blob:x");
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, { createObjectURL: created, revokeObjectURL: vi.fn() }),
+    );
+    const stub = await mount(
+      ADMIN,
+      { ...quiet, "GET /audit": { body: [] }, "GET /audit/export.csv": { body: {} } },
+      () => <ActivityPage />,
+    );
+    await setInput("#f-who", "bob@myorg.com");
+    submit("form.filters");
+    await flush();
+    buttonByLabel("Export CSV")?.click();
+    await flush();
+    const hit = stub.to("GET /audit/export.csv").at(-1);
+    expect(hit?.search.get("who")).toBe("bob@myorg.com");
+    expect(hit?.search.get("limit")).toBeNull();
+    expect(created).toHaveBeenCalledOnce();
+  });
+
   it("rejects a path that is not a path before sending", async () => {
     const stub = await mount(
       ADMIN,

@@ -707,3 +707,33 @@ a.me:hover {
     padding: 10px 10px;
   }
 }
+
+/* Stat cards: the last 24 hours (ADR 24, Audit board). */
+.stat-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-card b {
+  font: 600 26px / 1.2 var(--font-head);
+}
+
+.stat-card span {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.stat-card.warn b {
+  color: var(--bad, #b42318);
+}

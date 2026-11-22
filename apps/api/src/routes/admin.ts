@@ -4,7 +4,7 @@ import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { prefixOf } from "../policy.ts";
 import type { AppEnv } from "../types.ts";
-import { newId } from "../util.ts";
+import { newId, now } from "../util.ts";
 
 export const admin = new Hono<AppEnv>();
 admin.use("/policies/*", requireAdmin);
@@ -96,8 +96,10 @@ const wholeNumber = (v: string | undefined): number | null | undefined => {
   return /^\d+$/.test(v) ? Number(v) : null;
 };
 
-admin.get("/audit", async (c) => {
-  const q = c.req.query();
+type AuditFilter = { where: string[]; binds: (string | number)[] } | { error: string };
+
+/** The shared WHERE for the listing and the CSV export. `kind` is user or app, matched by name against identity. */
+function auditFilter(q: Record<string, string>): AuditFilter {
   const where: string[] = [];
   const binds: (string | number)[] = [];
   const text = (name: string): string | undefined => {
@@ -107,19 +109,19 @@ admin.get("/audit", async (c) => {
 
   const who = text("who");
   if (who !== undefined) {
-    if (who.length > AUDIT_TEXT_MAX) return c.json({ error: "who is too long" }, 400);
+    if (who.length > AUDIT_TEXT_MAX) return { error: "who is too long" };
     where.push("who = ?");
     binds.push(who);
   }
   const action = text("action");
   if (action !== undefined) {
-    if (action.length > AUDIT_TEXT_MAX) return c.json({ error: "action is too long" }, 400);
+    if (action.length > AUDIT_TEXT_MAX) return { error: "action is too long" };
     where.push("json_extract(entry, '$.action') = ?");
     binds.push(action);
   }
   const path = text("path");
   if (path !== undefined) {
-    if (path.length > AUDIT_TEXT_MAX) return c.json({ error: "path is too long" }, 400);
+    if (path.length > AUDIT_TEXT_MAX) return { error: "path is too long" };
     if (path.endsWith("*")) {
       const prefix = path.slice(0, -1);
       where.push("substr(json_extract(entry, '$.path'), 1, length(?)) = ?");
@@ -131,16 +133,21 @@ admin.get("/audit", async (c) => {
   }
   const result = text("result");
   if (result !== undefined) {
-    if (!AUDIT_RESULTS.includes(result))
-      return c.json({ error: "result must be ok, denied or error" }, 400);
+    if (!AUDIT_RESULTS.includes(result)) return { error: "result must be ok, denied or error" };
     where.push("json_extract(entry, '$.result') = ?");
     binds.push(result);
+  }
+  const kind = text("kind");
+  if (kind !== undefined) {
+    if (kind !== "user" && kind !== "app") return { error: "kind must be user or app" };
+    where.push("who IN (SELECT name FROM identity WHERE kind = ?)");
+    binds.push(kind);
   }
   const from = wholeNumber(q.from);
   const to = wholeNumber(q.to);
   const before = wholeNumber(q.before);
   if (from === null || to === null || before === null)
-    return c.json({ error: "from, to and before must be whole numbers" }, 400);
+    return { error: "from, to and before must be whole numbers" };
   if (from !== undefined) {
     where.push("at >= ?");
     binds.push(from);
@@ -153,13 +160,157 @@ admin.get("/audit", async (c) => {
     where.push("seq < ?");
     binds.push(before);
   }
+  return { where, binds };
+}
 
-  const limit = Math.min(Number(q.limit) || 100, 500);
-  const sql = `SELECT seq, entry, hash FROM audit${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY seq DESC LIMIT ?`;
-  const rows = await c.env.DB.prepare(sql)
-    .bind(...binds, limit)
-    .all<{ seq: number; entry: string; hash: string }>();
-  return c.json(rows.results.map((r) => ({ seq: r.seq, hash: r.hash, ...JSON.parse(r.entry) })));
+type AuditDbRow = { seq: number; entry: string; hash: string };
+
+async function auditRows(
+  db: D1Database,
+  f: { where: string[]; binds: (string | number)[] },
+  limit: number,
+) {
+  const sql = `SELECT seq, entry, hash FROM audit${f.where.length ? ` WHERE ${f.where.join(" AND ")}` : ""} ORDER BY seq DESC LIMIT ?`;
+  const rows = await db
+    .prepare(sql)
+    .bind(...f.binds, limit)
+    .all<AuditDbRow>();
+  return rows.results.map(
+    (r) =>
+      ({ seq: r.seq, hash: r.hash, ...JSON.parse(r.entry) }) as {
+        seq: number;
+        hash: string;
+        who: string;
+        at: number;
+        action: string;
+        path?: string;
+        version?: number;
+        result: string;
+        ip?: string;
+        note?: string;
+      },
+  );
+}
+
+/** Whether each name is a person or an app, by identity name. A name that is both reads as user; an unknown name is null. */
+async function kindsOf(db: D1Database, names: string[]): Promise<Map<string, "user" | "app">> {
+  const kinds = new Map<string, "user" | "app">();
+  const unique = [...new Set(names)];
+  // D1 allows 100 bound parameters per statement.
+  for (let i = 0; i < unique.length; i += 90) {
+    const chunk = unique.slice(i, i + 90);
+    const found = await db
+      .prepare(`SELECT name, kind FROM identity WHERE name IN (${chunk.map(() => "?").join(",")})`)
+      .bind(...chunk)
+      .all<{ name: string; kind: "user" | "app" }>();
+    for (const r of found.results) if (kinds.get(r.name) !== "user") kinds.set(r.name, r.kind);
+  }
+  return kinds;
+}
+
+admin.get("/audit", async (c) => {
+  const f = auditFilter(c.req.query());
+  if ("error" in f) return c.json({ error: f.error }, 400);
+  const limit = Math.min(Number(c.req.query("limit")) || 100, 500);
+  const rows = await auditRows(c.env.DB, f, limit);
+  const kinds = await kindsOf(
+    c.env.DB,
+    rows.map((r) => r.who),
+  );
+  return c.json(rows.map((r) => ({ ...r, kind: kinds.get(r.who) ?? null })));
+});
+
+// ADR 24 (Activity stat cards): the last 24 hours. `accesses` are allowed reads, `byApps` the ones made by apps.
+admin.get("/audit/stats", async (c) => {
+  const since = now() - 86400;
+  const db = c.env.DB;
+  const one = async (sql: string, ...binds: (string | number)[]) =>
+    (
+      await db
+        .prepare(sql)
+        .bind(...binds)
+        .first<{ n: number }>()
+    )?.n ?? 0;
+  const reads =
+    "at >= ? AND json_extract(entry, '$.action') = 'secret.read' AND json_extract(entry, '$.result') = 'ok'";
+  const [accesses, byApps, blocked, actors] = await Promise.all([
+    one(`SELECT count(*) AS n FROM audit WHERE ${reads}`, since),
+    one(
+      `SELECT count(*) AS n FROM audit WHERE ${reads} AND who IN (SELECT name FROM identity WHERE kind = 'app')`,
+      since,
+    ),
+    one(
+      "SELECT count(*) AS n FROM audit WHERE at >= ? AND json_extract(entry, '$.result') = 'denied'",
+      since,
+    ),
+    one("SELECT count(DISTINCT who) AS n FROM audit WHERE at >= ? AND who != 'system'", since),
+  ]);
+  return c.json({ since, accesses, byApps, blocked, actors });
+});
+
+const CSV_MAX_ROWS = 5000;
+
+/** A CSV cell. Text that starts with = + - @ or a control character gets a leading quote so a spreadsheet won't run it. */
+export function csvCell(value: string | number | undefined | null): string {
+  let v = value === undefined || value === null ? "" : String(value);
+  if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+  return /[",\n\r]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v;
+}
+
+// The same filters as /audit, as a download. Capped at CSV_MAX_ROWS newest rows; the export itself is logged.
+admin.get("/audit/export.csv", async (c) => {
+  const f = auditFilter(c.req.query());
+  if ("error" in f) return c.json({ error: f.error }, 400);
+  const rows = await auditRows(c.env.DB, f, CSV_MAX_ROWS);
+  const kinds = await kindsOf(
+    c.env.DB,
+    rows.map((r) => r.who),
+  );
+  const head = [
+    "seq",
+    "time",
+    "who",
+    "type",
+    "action",
+    "secret",
+    "version",
+    "result",
+    "ip",
+    "note",
+  ];
+  const lines = [head.join(",")];
+  for (const r of rows) {
+    lines.push(
+      [
+        r.seq,
+        new Date(r.at * 1000).toISOString(),
+        r.who,
+        kinds.get(r.who) ?? "",
+        r.action,
+        r.path,
+        r.version,
+        r.result,
+        r.ip,
+        r.note,
+      ]
+        .map(csvCell)
+        .join(","),
+    );
+  }
+  await audit(c.env.DB, {
+    who: c.get("who").name,
+    action: "audit.export",
+    result: "ok",
+    note: `${rows.length} rows`,
+    ip: c.req.header("CF-Connecting-IP"),
+  });
+  return new Response(`${lines.join("\r\n")}\r\n`, {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": 'attachment; filename="cfs-activity.csv"',
+      "Cache-Control": "no-store",
+    },
+  });
 });
 
 // Re-checks the chain from audit_base (or genesis if nothing was pruned), then each stored checkpoint (ADR 19).
