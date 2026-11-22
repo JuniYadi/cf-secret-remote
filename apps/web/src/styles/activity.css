@@ -27,7 +27,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  align-items: stretch;
+  align-items: flex-start;
 }
 
 .activity-top > .activity-card {
@@ -183,7 +183,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  align-items: flex-end;
+  /* A field with a hint under it is taller than the rest. Top-align, and line the button up with the inputs. */
+  align-items: flex-start;
 }
 
 .filters .field {
@@ -221,6 +222,7 @@
 
 .filters-actions {
   flex: 0 0 auto;
+  margin-top: 26px;
 }
 
 .field-error + .note,

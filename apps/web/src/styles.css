@@ -802,7 +802,7 @@ input[type="checkbox"] {
 }
 
 /* Access denied */
-.denied {
+.denied-page {
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -907,8 +907,12 @@ input[type="checkbox"] {
   margin: 0;
 }
 
-.side-card {
+/* The flex-basis belongs to the two-column setup layout only. Elsewhere a side card sits in a column, where a basis would set its height. */
+.setup-grid .side-card {
   flex: 1 1 360px;
+}
+
+.side-card {
   display: flex;
   flex-direction: column;
   gap: 20px;

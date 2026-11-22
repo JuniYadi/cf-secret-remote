@@ -11,7 +11,7 @@ import { PATHS, pageCrumbs } from "../routes.ts";
 export function AccessDeniedPage({ name }: { name: string }) {
   useLang();
   return (
-    <div class="denied">
+    <div class="denied-page">
       <div class="crumbs-spacer">
         <PageTitle crumbs={pageCrumbs("denied", name)} />
       </div>
