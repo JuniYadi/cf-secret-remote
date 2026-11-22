@@ -12,6 +12,7 @@
     "test": "bun run --filter '*' test && bun test scripts",
     "test:browser": "bun run --filter @cfs/core test:browser",
     "e2e": "bun run scripts/e2e.ts",
+    "adr:check": "bun run scripts/adr-check.ts",
     "lint": "biome check apps packages scripts",
     "format": "biome format --write apps packages scripts",
     "bundle:worker": "bun run scripts/bundle-worker.ts"

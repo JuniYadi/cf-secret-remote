@@ -33,3 +33,17 @@ jobs:
       - run: bunx playwright install --with-deps chromium
         working-directory: packages/core
       - run: bun run test:browser
+
+  # Informational: reports ADR status drift and PR coverage. Never fails (continue-on-error + exit 0).
+  adr-check:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: oven-sh/setup-bun@v2
+      - run: bun run adr:check
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
