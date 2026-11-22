@@ -10,7 +10,7 @@ export const keyrings = new Hono<AppEnv>();
 keyrings.get("/keyrings", async (c) => {
   const who = c.get("who");
   const rows = await c.env.DB.prepare(
-    `SELECT k.prefix, k.version FROM keyring k
+    `SELECT k.id, k.prefix, k.version FROM keyring k
      WHERE k.personal_owner IS NULL AND (?1 = 'admin' OR EXISTS (SELECT 1 FROM keyring_member m WHERE m.keyring_id = k.id AND m.identity_id = ?2))
      ORDER BY k.prefix`,
   )
@@ -51,14 +51,19 @@ keyrings.post("/keyrings", requireAdmin, async (c) => {
 
 // The caller's wrapped copy of a group key. Whoever lacks one cannot decrypt, whatever the policies say.
 // ADR 16: a time-boxed key (from an approved request) is refused once its expires_at has passed.
+// ?version=N returns an older key the caller still holds, to read versions written before a rotation.
 keyrings.get("/keyrings/:prefix/key", async (c) => {
   const who = c.get("who");
   const prefix = c.req.param("prefix");
+  const want = c.req.query("version");
+  if (want !== undefined && !/^[1-9][0-9]{0,8}$/.test(want))
+    return c.json({ error: "bad version" }, 400);
   const row = await c.env.DB.prepare(
     `SELECT m.wrapped_key, m.version, m.expires_at AS expiresAt FROM keyring_member m JOIN keyring k ON k.id = m.keyring_id
-     WHERE k.prefix = ? AND k.personal_owner IS NULL AND m.identity_id = ? ORDER BY m.version DESC LIMIT 1`,
+     WHERE k.prefix = ? AND k.personal_owner IS NULL AND m.identity_id = ? AND (?3 IS NULL OR m.version = ?3)
+     ORDER BY m.version DESC LIMIT 1`,
   )
-    .bind(prefix, who.id)
+    .bind(prefix, who.id, want === undefined ? null : Number(want))
     .first<{ wrapped_key: string; version: number; expiresAt: number | null }>();
   if (!row) return c.json({ error: "no key for you in this group" }, 404);
   if (row.expiresAt !== null && row.expiresAt <= now()) {
