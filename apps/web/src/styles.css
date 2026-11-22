@@ -434,12 +434,15 @@ input[type="checkbox"] {
 
 .me-text {
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 .me-name {
   font-size: 14px;
   font-weight: 600;
+  /* A long email gets an ellipsis, not a break in the middle of the address. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .me-role {
@@ -454,6 +457,8 @@ input[type="checkbox"] {
 
 .side-actions .btn {
   flex: 1;
+  padding: 0 8px;
+  white-space: nowrap;
 }
 
 .main {
