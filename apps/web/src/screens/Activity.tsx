@@ -8,7 +8,6 @@ import {
   chainState,
   DATE_RANGE_SECONDS,
   type DateRange,
-  formatClock,
   formatCount,
   formatTime,
   meterState,
@@ -422,7 +421,7 @@ function LogTable() {
               <tr key={row.seq} class={row.result === "denied" ? "denied" : undefined}>
                 <td class="time">
                   <time dateTime={new Date(row.at * 1000).toISOString()}>
-                    {formatTime(row.at, lang)} {formatClock(row.at, lang)}
+                    {formatTime(row.at, lang)}
                   </time>
                 </td>
                 <td>{row.who}</td>

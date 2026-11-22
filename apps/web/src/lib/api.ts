@@ -611,8 +611,14 @@ export const api = {
 
   // Secrets (ADR 10, 22)
   secrets: () => request<SecretSummary[]>("GET", "/secrets"),
-  secret: (path: string, version?: number) =>
-    request<SecretRecord>("GET", `/secret${queryString({ path, version })}`),
+  // The Worker does not echo the path back, and the sealed envelope is bound to it (ADR 22), so it is set here.
+  secret: async (path: string, version?: number): Promise<SecretRecord> => ({
+    ...(await request<Omit<SecretRecord, "path">>(
+      "GET",
+      `/secret${queryString({ path, version })}`,
+    )),
+    path,
+  }),
   writeSecret: (body: SecretWrite) =>
     request<{ path: string; version: number }>("PUT", "/secret", body),
   secretVersions: (path: string) =>

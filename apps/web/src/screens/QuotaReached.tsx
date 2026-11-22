@@ -34,18 +34,20 @@ export function QuotaReachedPage() {
         </p>
       </div>
 
-      <div class="quota-banner" role="status">
-        <Icon name="warning" size={18} />
-        <div>
-          <b>{t("Free plan limit reached for today", "Batas paket gratis hari ini tercapai")}</b>{" "}
-          <span>
-            {t(
-              "Saving is paused until 00:00 UTC. Opening secrets still works.",
-              "Penyimpanan dijeda sampai pukul 00:00 UTC. Membuka secret tetap berjalan.",
-            )}
-          </span>
+      {active ? (
+        <div class="quota-banner" role="status">
+          <Icon name="warning" size={18} />
+          <div>
+            <b>{t("Free plan limit reached for today", "Batas paket gratis hari ini tercapai")}</b>{" "}
+            <span>
+              {t(
+                "Saving is paused until 00:00 UTC. Opening secrets still works.",
+                "Penyimpanan dijeda sampai pukul 00:00 UTC. Membuka secret tetap berjalan.",
+              )}
+            </span>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <section class="card settings-card" aria-labelledby="usage-title">
         <h2 id="usage-title" class="card-title">
