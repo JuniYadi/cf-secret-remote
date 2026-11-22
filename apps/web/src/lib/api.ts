@@ -196,6 +196,17 @@ export interface AuditRow {
   result: AuditResult;
   ip?: string;
   note?: string;
+  /** Whether `who` is a person or an app. null when the identity no longer exists. */
+  kind?: "user" | "app" | null;
+}
+
+/** The last 24 hours, for the Activity stat cards. `accesses` are allowed secret reads. */
+export interface AuditStats {
+  since: number;
+  accesses: number;
+  byApps: number;
+  blocked: number;
+  actors: number;
 }
 
 export interface Usage {
@@ -586,6 +597,12 @@ export const api = {
   // Activity (ADR 6, 19)
   audit: (query: Record<string, string | number | undefined>) =>
     request<AuditRow[]>("GET", `/audit${queryString(query)}`),
+  auditStats: () => request<AuditStats>("GET", "/audit/stats"),
+  /** The filtered log as CSV text. The Worker caps it at the newest 5000 rows and records the export. */
+  auditCsv: async (query: Record<string, string | number | undefined>): Promise<Blob> => {
+    const res = await send("GET", `${API_BASE}/audit/export.csv${queryString(query)}`);
+    return res.blob();
+  },
   usage: () => request<Usage>("GET", "/usage"),
   verify: () => request<Verify>("GET", "/audit/verify"),
 

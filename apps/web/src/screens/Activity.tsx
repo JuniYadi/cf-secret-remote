@@ -8,6 +8,7 @@ import {
   chainState,
   DATE_RANGE_SECONDS,
   type DateRange,
+  exportQuery,
   formatCount,
   formatTime,
   meterState,
@@ -16,7 +17,7 @@ import {
   usageLine,
   validPathFilter,
 } from "../lib/activity.ts";
-import { type AuditRow, api, type Usage, type Verify } from "../lib/api.ts";
+import { type AuditRow, type AuditStats, api, type Usage, type Verify } from "../lib/api.ts";
 import { useLang, useSession } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
 import { messageFor } from "../lib/messages.ts";
@@ -80,12 +81,48 @@ function ActivityBody() {
           { href: PATHS.alerts, label: t("Alerts", "Peringatan") },
         ]}
       />
+      <StatCards />
       <div class="activity-top">
         <UsageMeter />
         <ChainPanel />
       </div>
       <LogTable />
     </>
+  );
+}
+
+/** The last 24 hours at a glance. Hidden when the numbers can't be loaded, since the log below still works. */
+function StatCards() {
+  const lang = useLang();
+  const [stats, setStats] = useState<AuditStats | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api
+      .auditStats()
+      .then((v) => live && setStats(v))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (stats === null) return null;
+  const cards: { n: number; label: string; warn?: boolean }[] = [
+    { n: stats.accesses, label: t("accesses in the last 24 hours", "akses dalam 24 jam terakhir") },
+    { n: stats.byApps, label: t("by apps and bots", "oleh aplikasi dan bot") },
+    { n: stats.blocked, label: t("blocked", "diblokir"), warn: stats.blocked > 0 },
+    { n: stats.actors, label: t("different people and apps", "orang dan aplikasi berbeda") },
+  ];
+  return (
+    <ul class="stat-cards" aria-label={t("Last 24 hours", "24 jam terakhir")}>
+      {cards.map((c) => (
+        <li key={c.label} class={`card stat-card${c.warn ? " warn" : ""}`}>
+          <b>{formatCount(c.n, lang)}</b>
+          <span>{c.label}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -272,6 +309,25 @@ function LogTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pathError, setPathError] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  async function exportCsv() {
+    setExporting(true);
+    setError(null);
+    try {
+      const blob = await api.auditCsv(exportQuery(applied, nowSeconds()));
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "cfs-activity.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(messageFor(err));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function load(filters: AuditFilters, before?: number) {
     setLoading(true);
@@ -319,6 +375,20 @@ function LogTable() {
             onInput={(e) => setDraft({ ...draft, who: e.currentTarget.value })}
             autocomplete="off"
           />
+        </div>
+        <div class="field">
+          <label for="f-kind">{t("Type", "Tipe")}</label>
+          <select
+            id="f-kind"
+            value={draft.kind}
+            onChange={(e) =>
+              setDraft({ ...draft, kind: e.currentTarget.value as AuditFilters["kind"] })
+            }
+          >
+            <option value="">{t("All", "Semua")}</option>
+            <option value="user">{t("Person", "Orang")}</option>
+            <option value="app">{t("App", "Aplikasi")}</option>
+          </select>
         </div>
         <div class="field">
           <label for="f-action">{t("What", "Apa")}</label>
@@ -394,6 +464,14 @@ function LogTable() {
           <button type="submit" class="btn sm" disabled={loading}>
             {t("Apply filters", "Terapkan saringan")}
           </button>
+          <button
+            type="button"
+            class="btn ghost sm"
+            disabled={loading || exporting}
+            onClick={() => void exportCsv()}
+          >
+            {exporting ? t("Exporting...", "Mengekspor...") : t("Export CSV", "Ekspor CSV")}
+          </button>
         </div>
       </form>
 
@@ -410,6 +488,7 @@ function LogTable() {
             <tr>
               <th scope="col">{t("Time", "Waktu")}</th>
               <th scope="col">{t("Who", "Siapa")}</th>
+              <th scope="col">{t("Type", "Tipe")}</th>
               <th scope="col">{t("What", "Apa")}</th>
               <th scope="col">{t("Secret", "Secret")}</th>
               <th scope="col">{t("Details", "Keterangan")}</th>
@@ -425,6 +504,15 @@ function LogTable() {
                   </time>
                 </td>
                 <td>{row.who}</td>
+                <td>
+                  {row.kind ? (
+                    <span class="pill">
+                      {row.kind === "app" ? t("App", "Aplikasi") : t("Person", "Orang")}
+                    </span>
+                  ) : (
+                    "-"
+                  )}
+                </td>
                 <td class="mono small">{row.action}</td>
                 <td class="mono small">{row.path ?? "-"}</td>
                 <td class="details">{row.note ?? ""}</td>

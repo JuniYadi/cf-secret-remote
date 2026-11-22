@@ -24,10 +24,19 @@ export interface AuditFilters {
   /** An exact path, or a prefix when it ends with *, such as backend/*. Empty means any. */
   path: string;
   result: "" | AuditResult;
+  /** A person or an app. Empty means both. */
+  kind: "" | "user" | "app";
   range: DateRange;
 }
 
-export const NO_FILTERS: AuditFilters = { who: "", action: "", path: "", result: "", range: "24h" };
+export const NO_FILTERS: AuditFilters = {
+  who: "",
+  action: "",
+  path: "",
+  result: "",
+  kind: "",
+  range: "24h",
+};
 
 /** Action names the Worker writes (apps/api/src). The filter lists them so the person need not type them. */
 export const ACTION_NAMES: readonly string[] = [
@@ -54,6 +63,7 @@ export const ACTION_NAMES: readonly string[] = [
   "policy.create",
   "policy.assign",
   "backup.export",
+  "audit.export",
   "audit.gap",
 ];
 
@@ -62,6 +72,7 @@ export interface AuditQuery {
   action?: string;
   path?: string;
   result?: AuditResult;
+  kind?: "user" | "app";
   from?: number;
   before?: number;
   limit: number;
@@ -85,6 +96,7 @@ export function auditQuery(filters: AuditFilters, nowSec: number, before?: numbe
   if (action !== undefined) query.action = action;
   if (path !== undefined) query.path = path;
   if (filters.result !== "") query.result = filters.result;
+  if (filters.kind !== "") query.kind = filters.kind;
   if (filters.range !== "all") query.from = nowSec - DATE_RANGE_SECONDS[filters.range];
   if (before !== undefined) query.before = before;
   return query;
@@ -153,4 +165,10 @@ export function formatClock(sec: number, lang: "en" | "id"): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** The query for the CSV export: the applied filters, without paging. */
+export function exportQuery(filters: AuditFilters, nowSec: number): Omit<AuditQuery, "limit"> {
+  const { limit: _limit, before: _before, ...rest } = auditQuery(filters, nowSec);
+  return rest;
 }
