@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { createPersonalKeyring, generateKeyPair, type Login, sealLogin } from "@cfs/core";
 import type { Client } from "../client.ts";
-import { accounts, findAccount, reveal } from "./account.ts";
+import { accounts, findAccount, keptPassword, reveal } from "./account.ts";
 
 test("decrypts the list, rejects ambiguous matches, and audits reveals", async () => {
   const pair = await generateKeyPair();
@@ -60,4 +60,9 @@ test("decrypts the list, rejects ambiguous matches, and audits reveals", async (
     path: "/logins/one/reveal",
     body: { purpose: "job-1", field: "totp" },
   });
+});
+
+test("edit keeps the current password when none is typed", () => {
+  expect(keptPassword("", "old")).toBe("old");
+  expect(keptPassword("new", "old")).toBe("new");
 });

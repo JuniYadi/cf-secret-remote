@@ -118,6 +118,8 @@ async function target(c: Client, prefix?: string) {
   }
   return { ring, ...(await ringKey(c, ring, rs.publicKey)) };
 }
+/** An empty answer on edit keeps the current password. */
+export const keptPassword = (typed: string, current: string) => typed || current;
 function switchFlag(a: string[], name: string) {
   const i = a.indexOf(name);
   if (i < 0) return false;
@@ -194,12 +196,13 @@ export const account: Commands = {
       }
       if (action === "edit") {
         if (group) throw new CliError("Use the existing keyring when editing an account.");
-        const password = process.stdin.isTTY
-          ? await askHidden("Password: ")
+        // An empty answer keeps the current password, so editing other fields never wipes it.
+        const typed = process.stdin.isTTY
+          ? await askHidden("Password (empty keeps the current one): ")
           : (await Bun.stdin.text()).replace(/\r?\n$/, "");
         const login = {
           ...item.login,
-          password,
+          password: keptPassword(typed, item.login.password),
           ...(url !== undefined ? { url } : {}),
           ...(username !== undefined ? { username } : {}),
           ...(seed !== undefined ? { totp: seed } : {}),
