@@ -1,7 +1,7 @@
 // Login envelopes are cached only in memory. Plaintext is opened by the caller's key resolver.
 import { type Login, openLogin, unwrapGroupKey } from "@cfs/core";
 import { API_BASE, ApiError, api, type FetchLike, request, send } from "./api.ts";
-import { getPrivateKey, getPublicKey } from "./keystore.ts";
+import { getPrivateKey, getPublicKey, subscribeKeys } from "./keystore.ts";
 import { VaultLockedError } from "./secret-store.ts";
 
 export interface LoginRecord {
@@ -88,8 +88,24 @@ export function createLoginClient(fetchImpl?: FetchLike) {
 }
 export const loginClient = createLoginClient();
 
+// Unwrapped keys for this unlock only, so a list of N logins costs a few requests, not 3N.
+const keyCache = new Map<string, Promise<Uint8Array>>();
+subscribeKeys(() => keyCache.clear());
+
 /** Resolve a login's keyring ID to the key for the version that sealed it. */
-export async function loginKeyFor(id: string, version: number): Promise<Uint8Array> {
+export function loginKeyFor(id: string, version: number): Promise<Uint8Array> {
+  if (getPrivateKey() === null || getPublicKey() === null)
+    return Promise.reject(new VaultLockedError());
+  const k = `${id}:${version}`;
+  const hit = keyCache.get(k);
+  if (hit) return hit;
+  const p = resolveLoginKey(id, version);
+  keyCache.set(k, p);
+  p.catch(() => keyCache.delete(k));
+  return p;
+}
+
+async function resolveLoginKey(id: string, version: number): Promise<Uint8Array> {
   const priv = getPrivateKey();
   const pub = getPublicKey();
   if (priv === null || pub === null) throw new VaultLockedError();

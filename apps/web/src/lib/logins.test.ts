@@ -48,6 +48,13 @@ describe("login client", () => {
     expect(getKey).toHaveBeenCalledWith("team", 1);
     await expect(loginKeyFor("missing", 1)).rejects.toThrow();
     await expect(loginKeyFor("p", 2)).rejects.toThrow();
+    // Cached for this unlock: a second lookup makes no request.
+    expect(await loginKeyFor("g", 1)).toEqual(oldKey);
+    expect(getKey).toHaveBeenCalledTimes(1);
+    // A new unlock starts with an empty cache.
+    unlock(pair);
+    expect(await loginKeyFor("g", 1)).toEqual(oldKey);
+    expect(getKey).toHaveBeenCalledTimes(2);
   });
   it("uses the ETag and reuses the encrypted list on 304", async () => {
     const fetcher = vi
