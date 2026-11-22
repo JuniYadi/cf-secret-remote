@@ -57,6 +57,7 @@ export function SecretsListPage() {
         </p>
       </div>
       <div class="row-actions">
+        <Pill tone="ok">{t("Unlocked", "Terbuka")}</Pill>
         <Link class="btn ghost" href={PATHS.secretsImport}>
           {t("Import .env", "Impor .env")}
         </Link>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiError, kindForStatus, request } from "./api.ts";
+import { ApiError, api, kindForStatus, request } from "./api.ts";
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -73,5 +73,24 @@ describe("API client", () => {
     await request("GET", "/whoami", undefined, fetchImpl);
     const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(init.headers).not.toHaveProperty("Authorization");
+  });
+
+  it("sets the path on a fetched secret, because the Worker does not return it", async () => {
+    const body = {
+      version: 1,
+      keyringVersion: 1,
+      names: ["A"],
+      wrappedDek: "d",
+      ciphertext: "v1.x",
+      createdAt: 1,
+    };
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(json(200, body));
+    try {
+      const rec = await api.secret("demo/prod");
+      expect(rec.path).toBe("demo/prod");
+      expect(rec.version).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

@@ -378,7 +378,12 @@ input[type="checkbox"] {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  min-height: 100vh;
+  /* Desktop: the sidebar follows the screen, so the footer (account, lock, sign out) stays in view on long pages. */
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .nav {
@@ -429,12 +434,15 @@ input[type="checkbox"] {
 
 .me-text {
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 .me-name {
   font-size: 14px;
   font-weight: 600;
+  /* A long email gets an ellipsis, not a break in the middle of the address. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .me-role {
@@ -449,6 +457,8 @@ input[type="checkbox"] {
 
 .side-actions .btn {
   flex: 1;
+  padding: 0 8px;
+  white-space: nowrap;
 }
 
 .main {
@@ -792,7 +802,7 @@ input[type="checkbox"] {
 }
 
 /* Access denied */
-.denied {
+.denied-page {
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -897,8 +907,12 @@ input[type="checkbox"] {
   margin: 0;
 }
 
-.side-card {
+/* The flex-basis belongs to the two-column setup layout only. Elsewhere a side card sits in a column, where a basis would set its height. */
+.setup-grid .side-card {
   flex: 1 1 360px;
+}
+
+.side-card {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -1026,7 +1040,31 @@ details.tech summary {
   color: #e5e9ee;
   padding: 12px;
   font: 12px / 1.7 var(--font-mono);
-  word-break: break-all;
+  /* Keep line breaks in multi-line samples; split a long URL only when it cannot fit. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Link tabs outside the secret pages (Activity, Permissions, Apps and bots). The secret pages style theirs in secrets.css. */
+.tabs > a {
+  display: inline-flex;
+  align-items: flex-end;
+  min-height: 44px;
+  padding: 0 2px 11px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.tabs > a:hover {
+  color: var(--ink);
+}
+
+.tabs > a.on {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--teal);
 }
 
 /* Recovery words */
@@ -1084,7 +1122,9 @@ details.tech summary {
   .side {
     flex: none;
     width: 100%;
-    min-height: 0;
+    position: static;
+    height: auto;
+    overflow-y: visible;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }

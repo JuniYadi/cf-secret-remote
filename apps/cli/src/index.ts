@@ -21,7 +21,7 @@ async function main() {
   const cmd = args.shift();
   if (!cmd || cmd === "--help" || cmd === "-h" || cmd === "help") return console.log(usage());
   if (cmd === "--version" || cmd === "-v")
-    return console.log(`cfs 0.0.0 (protocol ${PROTOCOL_VERSION})`);
+    return console.log(`cfs 0.0.1 (protocol ${PROTOCOL_VERSION})`);
   const c = commands[cmd];
   if (!c) {
     console.error(usage());
