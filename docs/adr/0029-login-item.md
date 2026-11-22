@@ -1,6 +1,6 @@
 # 29. Login item
 
-Status: accepted (not implemented yet)
+Status: implemented in core and api; CLI in 30, web in 31
 
 ## Decision
 - **One new item type: Login.** Fields: `name`, `url`, `environment`, `role`, `username`, `password`, `totp` (seed or `otpauth://` URI), `notes`. A site can have many Logins (one per role and environment); they may share a site and environment.
