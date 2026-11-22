@@ -10,6 +10,7 @@ import {
   digest,
   EXCLUDED_TABLES,
   keepNewest,
+  listAutoBackups,
   readFile,
   readTables,
   SCHEMA_VERSION,
@@ -662,5 +663,50 @@ describe("ADR 23: optional R2 copy", () => {
     await r2.bucket.put("backups/cfs-backup-2026-01-01.cfsbackup", new Uint8Array([1]));
     expect(await keepNewest(r2.bucket, 30)).toBe(0);
     expect(r2.objects.size).toBe(1);
+  });
+});
+
+describe("ADR 24: backup history", () => {
+  it("lists manual downloads from the audit log, newest first, and says R2 is off", async () => {
+    const adm = await admin();
+    await api("GET", "/backup", adm.token);
+    const r = await api<{
+      r2: boolean;
+      copies: { at: number; type: string; size: number | null }[];
+    }>("GET", "/backup/history", adm.token);
+    expect(r.status).toBe(200);
+    expect(r.body.r2).toBe(false);
+    expect(r.body.copies[0]).toMatchObject({ type: "manual", size: null });
+    const times = r.body.copies.map((x) => x.at);
+    expect(times).toEqual([...times].sort((a, b) => b - a));
+  });
+
+  it("refuses a member", async () => {
+    const m = await makeIdentity({ role: "member" });
+    expect((await api("GET", "/backup/history", m.token)).status).toBe(403);
+  });
+
+  it("lists R2 copies with their size", async () => {
+    const bucket = {
+      list: async () => ({
+        objects: [
+          {
+            key: "backups/cfs-backup-2026-01-01.cfsbackup",
+            size: 10,
+            uploaded: new Date(1_000_000),
+          },
+          {
+            key: "backups/cfs-backup-2026-01-02.cfsbackup",
+            size: 20,
+            uploaded: new Date(2_000_000),
+          },
+        ],
+        truncated: false,
+      }),
+    } as unknown as R2Bucket;
+    expect(await listAutoBackups(bucket)).toEqual([
+      { at: 2000, type: "auto", size: 20 },
+      { at: 1000, type: "auto", size: 10 },
+    ]);
   });
 });

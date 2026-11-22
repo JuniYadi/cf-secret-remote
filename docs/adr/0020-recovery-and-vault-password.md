@@ -1,6 +1,6 @@
 # 20. Recovery, vault password, and admins
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Context
 ADR 7 gives the outline. This fixes the mechanics and replaces the interim hex fingerprint.

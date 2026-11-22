@@ -1,6 +1,6 @@
 # 23. Backup and restore
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Decision
 - **Export.** `GET /backup` (admin) streams a `.cfsbackup` file: gzip JSON of `identity`, `app_role` (hashes only), `keyring`, `keyring_member`, `secret`, `secret_version`, `policy`, `identity_policy`, `agent_rule`, `setting` (webhook masked out), `audit`, `checkpoint`, with a `schema` version and a SHA-256 of the body. Sessions and CLI login codes are excluded. Values stay encrypted, but paths, names, emails and dates are clear, so the file can be sealed with a passphrase (AES-GCM, PBKDF2) chosen at export. The UI says so plainly.

@@ -1,6 +1,6 @@
 # 21. Offboarding
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Decision
 `Offboard <person>` runs as a plan the admin reviews, then steps:

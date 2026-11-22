@@ -1,6 +1,6 @@
 # 14. Group membership and key rotation
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Context
 ADR 3 says removing a member rotates the group key. Adding a member and rotating need exact rules, and rotation can exceed one D1 batch.

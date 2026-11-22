@@ -1,6 +1,6 @@
 # 18. Alerts and notifications
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Context
 Alerts are a differentiator (DESIGN.md). Channels and thresholds need defining within free-tier limits.

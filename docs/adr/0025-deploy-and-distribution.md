@@ -1,6 +1,6 @@
 # 25. Deploy, init, hosts, and releases
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Decision
 - **`cfs deploy [--domain d]`** uses the user's own Cloudflare account (API token or `wrangler` login): creates the D1 database, applies migrations, deploys the Worker with the built web assets, sets vars, and with `--domain` adds the custom domain and an Access application (UI paths protected, `/api/v1/*` bypassed, ADR 4). It prints the first-run steps (set `BOOTSTRAP_ADMIN_EMAIL`, sign in, set the vault password) and writes the host to `.cfs.json`. It is re-runnable (upgrade): migrations are forward-only and tracked.

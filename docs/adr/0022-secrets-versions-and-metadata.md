@@ -1,6 +1,6 @@
 # 22. Secret versions, history, import, and metadata
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented
 
 ## Decision
 - **Fingerprints for diffs.** The client stores, per version, `fps = { NAME: hex(HMAC-SHA256(groupKey, "fp|<path>|<NAME>|<value>")[0..8]) }` in clear. The UI can then show added, changed, removed names between versions without revealing values; guessing a value needs the group key.

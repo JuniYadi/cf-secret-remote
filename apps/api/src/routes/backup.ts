@@ -167,6 +167,7 @@ export class BackupError extends Error {
 
 export const backup = new Hono<AppEnv>();
 backup.use("/backup", requireAdmin);
+backup.use("/backup/history", requireAdmin);
 backup.use("/restore", requireAdmin);
 backup.use("/restore/*", requireAdmin);
 
@@ -434,6 +435,40 @@ function parseRestoreBody(raw: unknown): { bytes: Uint8Array; confirmHost?: stri
 /** The passphrase travels only in this header (never in the URL, a log or the audit). */
 const passphraseOf = (c: { req: { header: (n: string) => string | undefined } }) =>
   c.req.header("X-Backup-Passphrase") || undefined;
+
+export interface BackupCopy {
+  at: number;
+  type: "auto" | "manual";
+  /** Bytes. Known for R2 copies only. */
+  size: number | null;
+}
+
+/** The R2 copies the daily job keeps, newest first. Empty when nothing is stored. */
+export async function listAutoBackups(bucket: R2Bucket): Promise<BackupCopy[]> {
+  const out: BackupCopy[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await bucket.list({ prefix: R2_PREFIX, cursor });
+    for (const o of page.objects)
+      out.push({ at: Math.floor(o.uploaded.getTime() / 1000), type: "auto", size: o.size });
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return out.sort((a, b) => b.at - a.at);
+}
+
+// ADR 24 (Settings, Backup): what the Backup tab lists. Manual downloads come from the audit log (which records
+// the time only, not the size); automatic copies come from R2 when it is connected.
+backup.get("/backup/history", async (c) => {
+  const manual = await c.env.DB.prepare(
+    "SELECT at FROM audit WHERE json_extract(entry, '$.action') = 'backup.export' ORDER BY seq DESC LIMIT 20",
+  ).all<{ at: number }>();
+  const auto = c.env.BACKUP ? await listAutoBackups(c.env.BACKUP) : [];
+  const copies: BackupCopy[] = [
+    ...auto,
+    ...manual.results.map((r) => ({ at: r.at, type: "manual" as const, size: null })),
+  ].sort((a, b) => b.at - a.at);
+  return c.json({ r2: Boolean(c.env.BACKUP), copies: copies.slice(0, 30) });
+});
 
 // Export. The passphrase goes in a header, never the URL.
 backup.get("/backup", async (c) => {

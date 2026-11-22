@@ -1,6 +1,6 @@
 # 24. Web app: stack, keys, and screens
 
-Status: accepted (not implemented yet)
+Status: accepted, implemented (not yet viewed in a browser, see #57)
 
 ## Context
 `apps/web` has no framework. The UI is designed (50 boards). Keys must live only in browser memory.

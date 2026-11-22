@@ -1,9 +1,10 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { Link } from "wouter-preact";
 import { ErrorNote, SettingsTabs } from "../components/parts.tsx";
 import { Icon, PageTitle } from "../components/shared.tsx";
-import { api } from "../lib/api.ts";
-import { backupFileName, passphraseProblem } from "../lib/backup.ts";
+import { formatTime } from "../lib/activity.ts";
+import { api, type BackupHistory } from "../lib/api.ts";
+import { backupFileName, formatBytes, passphraseProblem } from "../lib/backup.ts";
 import { useLang, useSession } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
 import { PATHS, pageCrumbs } from "../routes.ts";
@@ -20,6 +21,19 @@ export function SettingsBackupPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [tooShort, setTooShort] = useState(false);
+  const [history, setHistory] = useState<BackupHistory | null>(null);
+  const isAdmin = me?.role === "admin";
+
+  function loadHistory() {
+    // The list is a convenience: if it can't load, the download below still works.
+    api
+      .backupHistory()
+      .then(setHistory)
+      .catch(() => setHistory(null));
+  }
+  useEffect(() => {
+    if (isAdmin) loadHistory();
+  }, [isAdmin]);
 
   if (me?.role !== "admin") {
     return (
@@ -44,6 +58,7 @@ export function SettingsBackupPage() {
       const blob = await api.downloadBackup(passphrase === "" ? undefined : passphrase);
       saveBlob(blob, backupFileName(new Date()));
       setPassphrase("");
+      loadHistory();
     } catch (err) {
       setError(err);
     } finally {
@@ -63,6 +78,8 @@ export function SettingsBackupPage() {
         </p>
       </div>
       <SettingsTabs current="backup" />
+
+      <BackupList history={history} />
 
       <section class="card settings-card" aria-labelledby="schedule-title">
         <h2 id="schedule-title" class="card-title">
@@ -190,4 +207,70 @@ export function saveBlob(blob: Blob, name: string): void {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/** The newest backup, then the list. Manual downloads show no size, because the log records only when they happened. */
+function BackupList({ history }: { history: BackupHistory | null }) {
+  const lang = useLang();
+  if (history === null) return null;
+  const latest = history.copies[0];
+  return (
+    <section class="card settings-card" aria-labelledby="latest-title">
+      <h2 id="latest-title" class="card-title">
+        {t("Latest backup", "Cadangan terbaru")}
+      </h2>
+      {latest === undefined ? (
+        <p class="note">
+          {t(
+            "No backup has been made yet. Download one below.",
+            "Belum ada cadangan. Unduh satu di bawah.",
+          )}
+        </p>
+      ) : (
+        <p class="sub">
+          {t("Made ", "Dibuat ")}
+          <time dateTime={new Date(latest.at * 1000).toISOString()}>
+            {formatTime(latest.at, lang)}
+          </time>
+          {" · "}
+          {latest.type === "auto" ? t("Automatic", "Otomatis") : t("Manual", "Manual")}
+        </p>
+      )}
+      {!history.r2 && (
+        <p class="note">
+          {t(
+            "Automatic daily backups are off. They need a Cloudflare R2 bucket named BACKUP.",
+            "Cadangan harian otomatis mati. Butuh bucket Cloudflare R2 bernama BACKUP.",
+          )}
+        </p>
+      )}
+      {history.copies.length > 0 && (
+        <div class="tw">
+          <table class="log-table">
+            <caption class="visually-hidden">{t("Backups", "Cadangan")}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{t("Made", "Dibuat")}</th>
+                <th scope="col">{t("Size", "Ukuran")}</th>
+                <th scope="col">{t("Type", "Tipe")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.copies.map((c) => (
+                <tr key={`${c.type}-${c.at}`}>
+                  <td>
+                    <time dateTime={new Date(c.at * 1000).toISOString()}>
+                      {formatTime(c.at, lang)}
+                    </time>
+                  </td>
+                  <td>{c.size === null ? "-" : formatBytes(c.size)}</td>
+                  <td>{c.type === "auto" ? t("Automatic", "Otomatis") : t("Manual", "Manual")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
 }
