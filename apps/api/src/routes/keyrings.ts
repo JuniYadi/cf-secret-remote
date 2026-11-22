@@ -10,7 +10,7 @@ export const keyrings = new Hono<AppEnv>();
 keyrings.get("/keyrings", async (c) => {
   const who = c.get("who");
   const rows = await c.env.DB.prepare(
-    `SELECT k.prefix, k.version FROM keyring k
+    `SELECT k.id, k.prefix, k.version FROM keyring k
      WHERE k.personal_owner IS NULL AND (?1 = 'admin' OR EXISTS (SELECT 1 FROM keyring_member m WHERE m.keyring_id = k.id AND m.identity_id = ?2))
      ORDER BY k.prefix`,
   )
