@@ -6,3 +6,6 @@ dist/
 .DS_Store
 .claude/
 packages/core/browser-test/.out/
+
+# Local deploy config. Copy of wrangler.example.jsonc (made by bun install); put real ids and vars here.
+apps/api/wrangler.jsonc

@@ -5,6 +5,7 @@
   "type": "module",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
+    "postinstall": "bun run scripts/ensure-wrangler.ts",
     "dev:api": "bun run --filter @cfs/api dev",
     "build:web": "bun run --filter @cfs/web build",
     "build:cli": "bun run --filter @cfs/cli build",

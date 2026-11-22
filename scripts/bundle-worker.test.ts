@@ -138,9 +138,9 @@ describe("bundle manifest (ADR 25)", () => {
   });
 });
 
-describe("wrangler.jsonc settings", () => {
-  test("the real apps/api/wrangler.jsonc yields the crons, compatibility date and asset rules", () => {
-    const text = readFileSync(join(here, "../apps/api/wrangler.jsonc"), "utf8");
+describe("wrangler.example.jsonc settings", () => {
+  test("the real apps/api/wrangler.example.jsonc yields the crons, compatibility date and asset rules", () => {
+    const text = readFileSync(join(here, "../apps/api/wrangler.example.jsonc"), "utf8");
     const s = wranglerSettings(text);
     expect(s.compatibility_date).toBe("2026-08-01");
     expect(s.crons).toEqual(["5 0 * * *"]);
@@ -162,8 +162,8 @@ describe("wrangler.jsonc settings", () => {
 });
 
 describe("compatibility flags (nodejs_als)", () => {
-  test("the real wrangler.jsonc asks for nodejs_als, because alerts.ts uses AsyncLocalStorage", async () => {
-    const settings = wranglerSettings(readFileSync("apps/api/wrangler.jsonc", "utf8"));
+  test("the real wrangler.example.jsonc asks for nodejs_als, because alerts.ts uses AsyncLocalStorage", async () => {
+    const settings = wranglerSettings(readFileSync("apps/api/wrangler.example.jsonc", "utf8"));
     expect(settings.compatibility_flags).toContain("nodejs_als");
   });
 

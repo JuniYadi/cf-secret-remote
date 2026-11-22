@@ -17,4 +17,6 @@ Bun workspaces monorepo. Follow the decisions in `docs/adr/`. Read `DESIGN.md` b
 - UI text is English by default with an Indonesian translation. Keep both when editing a screen.
 
 ## Commands
+`apps/api/wrangler.jsonc` is local and gitignored (real ids and vars). `bun install` creates it from the committed `wrangler.example.jsonc`; change the template for shared settings. Tests, e2e and the release bundle read the template, never the local file.
+
 `bun install`, `bun run typecheck`, `bun run test`, `bun run lint`, `bun run dev:api`.
