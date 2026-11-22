@@ -61,8 +61,28 @@ jobs:
           path: dist/worker-bundle.tgz
           if-no-files-found: error
 
+  extension:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run --filter @cfs/extension build
+      - name: Package extension
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find apps/extension/dist -exec touch -t 198001010000 {} +
+          (cd apps/extension/dist && find . -type f | LC_ALL=C sort | zip -X "${GITHUB_WORKSPACE}/dist/cfs-extension.zip" -@)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cfs-extension.zip
+          path: dist/cfs-extension.zip
+          if-no-files-found: error
+
   publish:
-    needs: [cli, worker]
+    needs: [cli, worker, extension]
     runs-on: ubuntu-latest
     permissions:
       contents: write

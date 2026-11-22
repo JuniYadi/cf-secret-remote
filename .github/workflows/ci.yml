@@ -14,6 +14,15 @@ jobs:
       - run: bun run test
       - run: bun run build:cli
 
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run --filter @cfs/extension test
+      - run: bun run --filter @cfs/extension build
+
   # ADR 26: the end-to-end script boots wrangler dev with a fresh local D1 and drives the real CLI.
   e2e:
     runs-on: ubuntu-latest
