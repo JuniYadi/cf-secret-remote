@@ -5,15 +5,15 @@ import { fillPage } from "./fill.ts";
 
 beforeEach(() => {
   document.body.innerHTML = readFileSync("test-fixtures/fill.html", "utf8").replace(
-    /<iframe[^>]*><\/iframe>/,
+    /<iframe[^>]*><\/iframe>/g,
     "",
   );
   vi.stubGlobal("location", new URL("https://shop.com/login"));
   vi.stubGlobal("top", window);
   vi.stubGlobal("getComputedStyle", (element: HTMLElement) => ({
     display: element.style.display || "block",
-    visibility: "visible",
-    opacity: "1",
+    visibility: element.style.visibility || "visible",
+    opacity: element.style.opacity || "1",
   }));
   vi.spyOn(HTMLInputElement.prototype, "getClientRects").mockImplementation(function (
     this: HTMLInputElement,
@@ -36,7 +36,7 @@ describe("fill fixture", () => {
     expect((document.querySelector("#user") as HTMLInputElement).value).toBe("person");
     expect(password.value).toBe("secret");
     expect(password.getAttribute("value")).toBeNull();
-    expect((document.querySelector("#invisible") as HTMLInputElement).value).toBe("");
+    expect((document.querySelector("#display") as HTMLInputElement).value).toBe("");
     expect((document.querySelector("#zero") as HTMLInputElement).value).toBe("");
     expect(input).toHaveBeenCalledOnce();
     expect(change).toHaveBeenCalledOnce();

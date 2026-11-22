@@ -7,3 +7,5 @@ Enter the Worker origin, grant access, and approve the displayed device code in 
 The extension requests `storage` for encrypted cached Logins and session credentials, `activeTab` to access the current page after the action, and `scripting` to inject the fill function on demand. Optional host access is requested for the Worker entered at setup. There is no always-on content script. Fill is limited to the top frame and an exact HTTPS origin, with HTTP allowed for localhost and 127.0.0.1.
 
 The unlocked key expires after one hour. Expiration is enforced when the popup is open or next opened; Chrome may leave the expired key in session storage until the popup is opened again. Closing the browser clears session storage. Use Lock to clear it sooner.
+
+An expired key may remain in `chrome.storage.session` (memory only, cleared on browser close) until the next extension action, but it is never used after `lockAt`. While the popup is open, a timer clears it at the deadline.

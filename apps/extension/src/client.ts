@@ -13,7 +13,7 @@ export interface Session {
   tokenExpires: number;
   privateKey?: string;
   publicKey?: string;
-  unlockExpires?: number;
+  lockAt?: number;
 }
 export interface Cache {
   host: string;
@@ -71,7 +71,7 @@ export async function unlock(host: string, session: Session, password: string): 
     ...session,
     privateKey,
     publicKey: me.publicKey,
-    unlockExpires: Date.now() + 3600000,
+    lockAt: Date.now() + 3600000,
   };
   await sync(host, session.token);
   await chrome.storage.session.set({ session: next });
@@ -84,10 +84,10 @@ export async function getSession(): Promise<Session | undefined> {
     await chrome.storage.session.remove("session");
     return;
   }
-  if (session.unlockExpires && session.unlockExpires <= Date.now()) {
+  if (session.privateKey && (!session.lockAt || session.lockAt <= Date.now())) {
     delete session.privateKey;
     delete session.publicKey;
-    delete session.unlockExpires;
+    delete session.lockAt;
     await chrome.storage.session.set({ session });
   }
   return session;
@@ -97,13 +97,9 @@ export async function openLogins(
   host: string,
   session: Session,
 ): Promise<{ id: string; login: import("@cfs/core").Login }[]> {
-  if (
-    !session.privateKey ||
-    !session.publicKey ||
-    !session.unlockExpires ||
-    session.unlockExpires <= Date.now()
-  )
+  if (!session.privateKey || !session.publicKey || !session.lockAt || session.lockAt <= Date.now())
     throw new Error("Locked");
+  if (!(await getSession())?.privateKey) throw new Error("Locked");
   const { openLogin, unwrapGroupKey } = await import("@cfs/core");
   const headers = auth(session.token);
   const [groups, personal, cache] = await Promise.all([
@@ -121,6 +117,8 @@ export async function openLogins(
   const keys = new Map<string, Uint8Array>();
   const out: { id: string; login: import("@cfs/core").Login }[] = [];
   for (const row of cache.logins ?? []) {
+    if (!(await getSession())?.privateKey || !session.lockAt || session.lockAt <= Date.now())
+      throw new Error("Locked");
     const group =
       groups.find((g) => g.id === row.keyringId) ??
       (personal?.id === row.keyringId ? personal : undefined);
@@ -136,6 +134,8 @@ export async function openLogins(
               `/keyrings/${encodeURIComponent(group.prefix)}/key?version=${row.keyringVersion}`,
               { headers },
             ).then((r) => r.json())) as { wrappedKey: string });
+      if (!(await getSession())?.privateKey || !session.lockAt || session.lockAt <= Date.now())
+        throw new Error("Locked");
       key = await unwrapGroupKey(
         wrapped.wrappedKey,
         session.privateKey,
@@ -145,10 +145,14 @@ export async function openLogins(
       );
       keys.set(cacheKey, key);
     }
+    if (!(await getSession())?.privateKey || !session.lockAt || session.lockAt <= Date.now())
+      throw new Error("Locked");
     out.push({
       id: row.id,
       login: await openLogin(key, row.id, row.version, row.wrappedDek, row.ciphertext),
     });
   }
+  if (!(await getSession())?.privateKey || !session.lockAt || session.lockAt <= Date.now())
+    throw new Error("Locked");
   return out;
 }

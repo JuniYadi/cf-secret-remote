@@ -42,12 +42,12 @@ function App() {
       .then((v) => setPending(v.pending as Pending | undefined));
   }, []);
   useEffect(() => {
-    if (!session?.unlockExpires) return;
+    if (!session?.lockAt) return;
     const timer = setTimeout(
       () => {
         void getSession().then(setSession);
       },
-      Math.max(0, session.unlockExpires - Date.now()),
+      Math.max(0, session.lockAt - Date.now()),
     );
     return () => clearTimeout(timer);
   }, [session]);
@@ -181,6 +181,11 @@ function App() {
       if (!tab?.id || !tab.url || !eligibleOrigin(tab.url, item.login.url))
         throw new Error("Origin mismatch");
       await request(host, `/logins/${encodeURIComponent(item.id)}/fill`, json({}, current.token));
+      const unlocked = await getSession();
+      if (!unlocked?.privateKey) {
+        setSession(unlocked);
+        throw new Error("Locked");
+      }
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id, frameIds: [0] },
         func: fillPage,
