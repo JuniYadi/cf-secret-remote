@@ -1,6 +1,6 @@
 # 31. Web: Logins screen
 
-Status: accepted (not implemented yet)
+Status: implemented; import entry points in 33
 
 ## Decision
 - New sidebar entry **Logins** (Indonesian: "Akun") beside Secrets: list with search, filters for keyring, environment, and role, and a detail view with Show/Copy per field, a live TOTP code with countdown, Versions tab, and Move to group.
