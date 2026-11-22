@@ -109,6 +109,20 @@ describe("Login API", () => {
 
     expect((await api("GET", `/logins/${id}`, user.token)).status).toBe(404);
     expect((await api("POST", `/logins/${id}/undelete`, user.token)).status).toBe(200);
+    const restoredAudit = await env.DB.prepare(
+      "SELECT entry FROM audit WHERE json_extract(entry, '$.path') = ? ORDER BY seq DESC LIMIT 1",
+    )
+      .bind(id)
+      .first<{ entry: string }>();
+    const restoredEvent = JSON.parse(restoredAudit?.entry ?? "{}");
+    expect(restoredEvent).toMatchObject({
+      action: "login.undelete",
+      path: id,
+      version: 4,
+      who: user.name,
+    });
+    expect(restoredAudit?.entry).not.toContain(value.name);
+    expect(restoredAudit?.entry).not.toContain(value.url);
     await api("DELETE", `/logins/${id}`, user.token);
     await env.DB.prepare("UPDATE login SET deleted_at = ? WHERE id = ?")
       .bind(Math.floor(Date.now() / 1000) - 31 * 86400, id)

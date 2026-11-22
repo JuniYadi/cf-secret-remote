@@ -236,6 +236,13 @@ logins.post("/logins/:id/undelete", async (c) => {
   if (now() - (l.deletedAt as number) > RESTORE_WINDOW)
     return c.json({ error: "too old to restore" }, 410);
   await c.env.DB.prepare("UPDATE login SET deleted_at = NULL WHERE id = ?").bind(l.id).run();
+  await audit(c.env.DB, {
+    who: c.get("who").name,
+    action: "login.undelete",
+    path: l.id,
+    version: l.current,
+    result: "ok",
+  });
   return c.json({ ok: true });
 });
 
