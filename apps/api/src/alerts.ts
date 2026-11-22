@@ -426,3 +426,47 @@ async function detect(
 
   return hits;
 }
+
+export type TestOutcome = "sent" | "failed" | "off";
+
+/**
+ * ADR 24 (Alerts, "Send test"): one message to each channel that is set up, no retry, so the result is honest.
+ * The error is dropped because it may echo the webhook URL. "off" means the channel is not set up here.
+ */
+export async function sendTestAlert(
+  env: Env,
+  by: string,
+): Promise<{ webhook: TestOutcome; email: TestOutcome }> {
+  const cfg = await loadConfig(env.DB);
+  const text = `[cfs] Test alert: sent by ${by} (${new Date().toISOString()})`;
+  const run = async (send: () => Promise<void>): Promise<TestOutcome> => {
+    try {
+      await send();
+      return "sent";
+    } catch {
+      return "failed";
+    }
+  };
+  const webhook: TestOutcome = cfg.webhookUrl
+    ? await run(() => (overrides.webhook ?? postWebhook)(cfg.webhookUrl as string, text))
+    : "off";
+  const sender = emailSenderFor(env);
+  const to = sender ? await adminEmails(env.DB) : [];
+  const email: TestOutcome =
+    sender && to.length > 0 ? await run(() => sender(to, "cfs test alert", text)) : "off";
+  return { webhook, email };
+}
+
+/** The newest alerts that went out: one row per (rule, subject), from the dedupe table. Admin only. */
+export async function recentAlerts(
+  db: D1Database,
+  limit = 20,
+): Promise<{ rule: string; subject: string; at: number }[]> {
+  const rows = await db
+    .prepare(
+      "SELECT rule, subject, last_sent_at AS at FROM alert_state ORDER BY last_sent_at DESC LIMIT ?",
+    )
+    .bind(limit)
+    .all<{ rule: string; subject: string; at: number }>();
+  return rows.results;
+}

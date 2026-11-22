@@ -6,7 +6,9 @@ import {
   maskWebhook,
   parseToggles,
   RULES,
+  recentAlerts,
   saveConfig,
+  sendTestAlert,
   type Toggles,
   validWebhookUrl,
 } from "../alerts.ts";
@@ -71,4 +73,19 @@ alerts.put("/alerts", async (c) => {
     result: "ok",
   });
   return c.json(await settingsView(c.env));
+});
+
+// ADR 24: the Alerts screen's "Recent alerts" list and its "Send test" button.
+alerts.get("/alerts/recent", async (c) => c.json(await recentAlerts(c.env.DB)));
+
+alerts.post("/alerts/test", async (c) => {
+  const who = c.get("who");
+  const result = await sendTestAlert(c.env, who.name);
+  await audit(c.env.DB, {
+    who: who.name,
+    action: "alerts.test",
+    note: `webhook ${result.webhook}, email ${result.email}`,
+    result: "ok",
+  });
+  return c.json(result);
 });

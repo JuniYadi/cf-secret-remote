@@ -10,6 +10,9 @@ import "../styles/activity.css";
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
+/** Marks the "sign out everywhere" button as the armed one. Never a real session id. */
+const ALL = "*";
+
 /**
  * Signed-in devices (ADR 27, DESIGN "Signed-in devices"). Each row is a CLI session. Signing out ends that
  * session on the server. The browser's own Access session is not listed here; it ends with Sign out in the sidebar.
@@ -34,6 +37,32 @@ export function DevicesPage() {
   useEffect(() => {
     void reload();
   }, []);
+
+  async function signOutAll() {
+    // Same two presses as a single device.
+    if (armed !== ALL) {
+      setArmed(ALL);
+      setNotice(null);
+      return;
+    }
+    setBusy(ALL);
+    setError(null);
+    try {
+      const out = await api.signOutAllDevices();
+      setArmed(null);
+      setNotice(
+        t(
+          `Signed out of ${out.ended} ${out.ended === 1 ? "device" : "devices"}.`,
+          `Keluar dari ${out.ended} perangkat.`,
+        ),
+      );
+      await reload();
+    } catch (err) {
+      setError(messageFor(err));
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function signOut(device: SignedInDevice) {
     // The first press arms the row, the second one ends the session. Nothing is lost by a stray click.
@@ -86,12 +115,32 @@ export function DevicesPage() {
           <p class="note">{t("No devices are signed in.", "Tidak ada perangkat yang masuk.")}</p>
         )}
         {devices !== null && devices.length > 0 && (
+          <div class="row-between">
+            <span class="note">
+              {t(`${devices.length} signed in`, `${devices.length} perangkat masuk`)}
+            </span>
+            <button
+              type="button"
+              class="btn danger-outline sm"
+              disabled={busy !== null}
+              onClick={() => void signOutAll()}
+            >
+              {busy === ALL
+                ? t("Signing out...", "Keluar...")
+                : armed === ALL
+                  ? t("Confirm: sign out everywhere", "Konfirmasi: keluar di mana saja")
+                  : t("Sign out everywhere", "Keluar di mana saja")}
+            </button>
+          </div>
+        )}
+        {devices !== null && devices.length > 0 && (
           <div class="tw">
             <table class="log-table">
               <thead>
                 <tr>
                   <th scope="col">{t("Device", "Perangkat")}</th>
                   <th scope="col">{t("Signed in", "Masuk")}</th>
+                  <th scope="col">{t("Last used", "Terakhir dipakai")}</th>
                   <th scope="col">{t("Ends", "Berakhir")}</th>
                   <th scope="col">
                     <span class="visually-hidden">{t("Actions", "Aksi")}</span>
@@ -109,6 +158,15 @@ export function DevicesPage() {
                       <time dateTime={new Date(device.createdAt * 1000).toISOString()}>
                         {formatTime(device.createdAt, lang)}
                       </time>
+                    </td>
+                    <td>
+                      {device.lastUsedAt === null ? (
+                        "-"
+                      ) : (
+                        <time dateTime={new Date(device.lastUsedAt * 1000).toISOString()}>
+                          {formatTime(device.lastUsedAt, lang)}
+                        </time>
+                      )}
                     </td>
                     <td>
                       {t(

@@ -579,12 +579,88 @@ describe("Agent rules", () => {
   });
 });
 
+describe("Alerts: send test and recent alerts", () => {
+  const settings = {
+    webhook: "https://hooks.slack.com/services/T0••••/B0••••/••••",
+    email: { available: false, recipients: [] },
+    rules: Object.fromEntries(
+      [
+        "blocked",
+        "agent_prod_read",
+        "new_network",
+        "read_burst",
+        "quota_80",
+        "chain_broken",
+        "recovery_requested",
+        "access_request",
+      ].map((r) => [r, { webhook: false, email: false }]),
+    ),
+  };
+
+  it("sends a test and says what happened on each channel", async () => {
+    const stub = await mount(
+      ADMIN,
+      {
+        "GET /alerts": { body: settings },
+        "GET /alerts/recent": { body: [] },
+        "POST /alerts/test": { body: { webhook: "sent", email: "off" } },
+      },
+      () => <AlertsPage />,
+    );
+    buttonByLabel("Send test")?.click();
+    await flush();
+    expect(stub.to("POST /alerts/test")).toHaveLength(1);
+    expect(text()).toContain("Webhook: sent. Email: not set up.");
+  });
+
+  it("says failed when the webhook did not take the message", async () => {
+    await mount(
+      ADMIN,
+      {
+        "GET /alerts": { body: settings },
+        "GET /alerts/recent": { body: [] },
+        "POST /alerts/test": { body: { webhook: "failed", email: "off" } },
+      },
+      () => <AlertsPage />,
+    );
+    buttonByLabel("Send test")?.click();
+    await flush();
+    expect(text()).toContain("Webhook: failed.");
+  });
+
+  it("lists recent alerts with a readable rule name, and says when there are none", async () => {
+    await mount(
+      ADMIN,
+      {
+        "GET /alerts": { body: settings },
+        "GET /alerts/recent": {
+          body: [{ rule: "blocked", subject: "bob@myorg.com", at: nowSec() - 300 }],
+        },
+      },
+      () => <AlertsPage />,
+    );
+    expect(text()).toContain("Recent alerts");
+    expect(text()).toContain("bob@myorg.com");
+    expect(host.querySelector(".recent-list")?.textContent).toContain("A blocked attempt");
+  });
+
+  it("shows an empty state", async () => {
+    await mount(
+      ADMIN,
+      { "GET /alerts": { body: settings }, "GET /alerts/recent": { body: [] } },
+      () => <AlertsPage />,
+    );
+    expect(text()).toContain("No alerts have gone out yet.");
+  });
+});
+
 describe("Signed-in devices", () => {
   const device = {
     id: "dev1abc",
     kind: "cli",
     device: "dev-laptop",
     createdAt: nowSec() - 3600,
+    lastUsedAt: (nowSec() - 600) as number | null,
     expiresAt: nowSec() + 25200,
   };
 
@@ -605,6 +681,49 @@ describe("Signed-in devices", () => {
     buttonByLabel("Confirm sign out of dev-laptop")?.click();
     await flush();
     expect(stub.to("DELETE /sessions/dev1abc")).toHaveLength(1);
+  });
+});
+
+describe("Signed-in devices: last used and sign out everywhere", () => {
+  const base = { kind: "cli", createdAt: nowSec() - 3600, expiresAt: nowSec() + 25200 };
+
+  it("shows when each device was last used, or a dash before first use", async () => {
+    await mount(
+      ADMIN,
+      {
+        "GET /sessions": {
+          body: [
+            { ...base, id: "a1", device: "laptop", lastUsedAt: nowSec() - 120 },
+            { ...base, id: "b2", device: "server", lastUsedAt: null },
+          ],
+        },
+      },
+      () => <DevicesPage />,
+    );
+    expect(text()).toContain("Last used");
+    const cells = Array.from(host.querySelectorAll("tbody tr")).map(
+      (tr) => tr.querySelectorAll("td")[2]?.textContent?.trim() ?? "",
+    );
+    expect(cells[0]).not.toBe("-");
+    expect(cells[1]).toBe("-");
+  });
+
+  it("ends every session only after a second press", async () => {
+    const stub = await mount(
+      ADMIN,
+      {
+        "GET /sessions": { body: [{ ...base, id: "a1", device: "laptop", lastUsedAt: null }] },
+        "DELETE /sessions": { body: { ok: true, ended: 2 } },
+      },
+      () => <DevicesPage />,
+    );
+    buttonByLabel("Sign out everywhere")?.click();
+    await flush();
+    expect(stub.to("DELETE /sessions")).toHaveLength(0);
+    buttonByLabel("Confirm: sign out everywhere")?.click();
+    await flush();
+    expect(stub.to("DELETE /sessions")).toHaveLength(1);
+    expect(text()).toContain("Signed out of 2 devices.");
   });
 });
 

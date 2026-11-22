@@ -2,11 +2,14 @@ import { useEffect, useState } from "preact/hooks";
 import { Switch } from "../components/Switch.tsx";
 import { PageTitle } from "../components/shared.tsx";
 import { Tabs } from "../components/Tabs.tsx";
+import { formatTime } from "../lib/activity.ts";
 import { validWebhook, withChannel } from "../lib/alerts.ts";
 import {
   type AlertSettings,
+  type AlertTestResult,
   api,
   type ChannelToggles,
+  type RecentAlert,
   RULE_NAMES,
   type RuleName,
 } from "../lib/api.ts";
@@ -150,6 +153,9 @@ function AlertsBody() {
         <WebhookCard settings={settings} onSaved={setSettings} />
         <RulesCard settings={settings} onSaved={setSettings} />
       </div>
+      <div class="alerts-col">
+        <RecentAlerts />
+      </div>
     </div>
   );
 }
@@ -265,6 +271,7 @@ function WebhookCard({
           {error}
         </p>
       )}
+      <SendTest />
       <div class="channel-row">
         <span class="channel-name">{t("Email", "Email")}</span>
         {settings.email.available ? (
@@ -354,6 +361,112 @@ function RulesCard({
           "Setiap peringatan dikirim sekali per 15 menit untuk subjek yang sama, dan tidak pernah berisi nilai secret.",
         )}
       </p>
+    </section>
+  );
+}
+
+const OUTCOME: Record<AlertTestResult["webhook"], () => string> = {
+  sent: () => t("sent", "terkirim"),
+  failed: () => t("failed", "gagal"),
+  off: () => t("not set up", "belum diatur"),
+};
+
+/** Sends one test message to each channel that is set up and says what happened to each. */
+function SendTest() {
+  useLang();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<AlertTestResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function send() {
+    setBusy(true);
+    setError(null);
+    try {
+      setResult(await api.alertsTest());
+    } catch (err) {
+      setError(messageFor(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div class="stack">
+      <div class="row-between">
+        <span class="note">
+          {t(
+            "Check that a message arrives before you rely on it.",
+            "Pastikan pesan sampai sebelum kamu mengandalkannya.",
+          )}
+        </span>
+        <button type="button" class="btn ghost sm" disabled={busy} onClick={() => void send()}>
+          {busy ? t("Sending...", "Mengirim...") : t("Send test", "Kirim tes")}
+        </button>
+      </div>
+      {result !== null && (
+        <p
+          class={`note${result.webhook === "failed" || result.email === "failed" ? " field-error" : ""}`}
+          role="status"
+        >
+          {`Webhook: ${OUTCOME[result.webhook]()}. Email: ${OUTCOME[result.email]()}.`}
+        </p>
+      )}
+      {error !== null && (
+        <p class="field-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** The newest alerts that went out: one line per rule and subject, with the time of the latest. */
+function RecentAlerts() {
+  const lang = useLang();
+  const [rows, setRows] = useState<RecentAlert[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    api
+      .alertsRecent()
+      .then((v) => live && setRows(v))
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const titleOf = (rule: string) =>
+    (RULE_NAMES as readonly string[]).includes(rule) ? RULE_COPY[rule as RuleName].title() : rule;
+
+  return (
+    <section class="card activity-card" aria-labelledby="recent-title">
+      <h2 id="recent-title">{t("Recent alerts", "Peringatan terbaru")}</h2>
+      {failed && (
+        <p class="note">
+          {t("Recent alerts aren't available right now.", "Peringatan terbaru belum bisa dimuat.")}
+        </p>
+      )}
+      {!failed && rows === null && <p class="note">{t("Loading...", "Memuat...")}</p>}
+      {rows !== null && rows.length === 0 && (
+        <p class="note">
+          {t("No alerts have gone out yet.", "Belum ada peringatan yang terkirim.")}
+        </p>
+      )}
+      {rows !== null && rows.length > 0 && (
+        <ul class="recent-list">
+          {rows.map((row) => (
+            <li key={`${row.rule}:${row.subject}`}>
+              <b>{titleOf(row.rule)}</b>
+              <span class="mono small">{row.subject}</span>
+              <time dateTime={new Date(row.at * 1000).toISOString()}>
+                {formatTime(row.at, lang)}
+              </time>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
