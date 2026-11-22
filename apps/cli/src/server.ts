@@ -22,6 +22,13 @@ export async function checkServer(host: string, fetchImpl: Fetch = fetch): Promi
   } catch {
     throw new CliError(`Cannot reach ${host}. Check the host and your network.`);
   }
+  // Cloudflare Access answers an unauthenticated request with a redirect to its login page, so the
+  // fetch ends on an HTML page. Say what is wrong instead of "not a cfs server".
+  if (r.redirected && /cloudflareaccess\.com/.test(r.url)) {
+    throw new CliError(
+      `Cloudflare Access is blocking ${host}/api/health. In Zero Trust, add Bypass policies for ${new URL(host).host}/api/v1/* and ${new URL(host).host}/api/health (ADR 4, ADR 25), or re-run cfs deploy --domain.`,
+    );
+  }
   const body = (await r.json().catch(() => ({}))) as { protocol?: unknown; version?: string };
   if (!r.ok) throw new CliError(`${host} did not answer /api/health (status ${r.status}).`);
   const theirs = protocolMajor(body.protocol);

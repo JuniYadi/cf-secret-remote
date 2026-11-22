@@ -45,6 +45,20 @@ describe("protocol major check (ADR 25)", () => {
     );
   });
 
+  test("Cloudflare Access in front of /api/health is named as the cause", async () => {
+    const blocked: Fetch = async () => {
+      const r = new Response("<html>login</html>", { headers: { "content-type": "text/html" } });
+      Object.defineProperty(r, "redirected", { value: true });
+      Object.defineProperty(r, "url", {
+        value: "https://team.cloudflareaccess.com/cdn-cgi/access/login/x",
+      });
+      return r;
+    };
+    await expect(checkServer("https://vault.example.com", blocked)).rejects.toThrow(
+      /Cloudflare Access is blocking.*\/api\/v1\/\*/,
+    );
+  });
+
   test("an unreachable server gives a clear error", async () => {
     const down: Fetch = async () => {
       throw new TypeError("fetch failed");
