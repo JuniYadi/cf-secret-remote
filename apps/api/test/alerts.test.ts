@@ -606,3 +606,57 @@ describe("ADR 18: email (optional)", () => {
     expect(((await res.json()) as any).email.available).toBe(true);
   });
 });
+
+describe("ADR 24: send test and recent alerts", () => {
+  it("sends one test message to the webhook, reports the outcome, and logs it without the URL", async () => {
+    const r = await api<{ webhook: string; email: string }>("POST", "/alerts/test", adm.token);
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ webhook: "sent", email: "off" });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain("Test alert");
+    expect(urls).toEqual([HOOK]);
+    const rows = await api<{ action: string; note?: string }[]>(
+      "GET",
+      "/audit?action=alerts.test",
+      adm.token,
+    );
+    expect(rows.body[0]?.note).toBe("webhook sent, email off");
+    expect(JSON.stringify(rows.body)).not.toContain("SUPERSECRETTOKEN123");
+  });
+
+  it("says failed when the webhook errors, and does not echo the error", async () => {
+    setAlertSenders({
+      webhook: async () => {
+        throw new Error(`boom ${HOOK}`);
+      },
+    });
+    const r = await api("POST", "/alerts/test", adm.token);
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ webhook: "failed", email: "off" });
+    expect(JSON.stringify(r.body)).not.toContain("SUPERSECRETTOKEN123");
+  });
+
+  it("says off for both channels when nothing is set up, and refuses a member", async () => {
+    await configure({ webhook: null });
+    expect((await api("POST", "/alerts/test", adm.token)).body).toEqual({
+      webhook: "off",
+      email: "off",
+    });
+    const m = await makeIdentity({ role: "member" });
+    expect((await api("POST", "/alerts/test", m.token)).status).toBe(403);
+    expect((await api("GET", "/alerts/recent", m.token)).status).toBe(403);
+  });
+
+  it("lists recent alerts newest first", async () => {
+    await ev({ who: "alice@test.dev", action: "secret.read", path: "pay/dev", result: "denied" });
+    await settle();
+    const r = await api<{ rule: string; subject: string; at: number }[]>(
+      "GET",
+      "/alerts/recent",
+      adm.token,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body[0]?.rule).toBe("blocked");
+    expect(typeof r.body[0]?.at).toBe("number");
+  });
+});

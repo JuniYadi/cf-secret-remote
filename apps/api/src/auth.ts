@@ -4,6 +4,9 @@ import { audit } from "./audit.ts";
 import type { AppEnv, Who } from "./types.ts";
 import { newId, now, sha256Hex } from "./util.ts";
 
+/** Seconds between two last-used stamps on one session. */
+export const LAST_USED_EVERY = 600;
+
 const ip = (c: { req: { header: (n: string) => string | undefined } }) =>
   c.req.header("CF-Connecting-IP");
 
@@ -14,13 +17,28 @@ export const authenticate: MiddlewareHandler<AppEnv> = async (c, next) => {
   let who: Who | null = null;
 
   if (bearer) {
-    who = await db
+    const tokenHash = await sha256Hex(bearer);
+    const found = await db
       .prepare(
-        `SELECT i.id, i.kind, i.name, i.role FROM session s JOIN identity i ON i.id = s.identity_id
+        `SELECT i.id, i.kind, i.name, i.role, s.last_used_at AS lastUsedAt
+         FROM session s JOIN identity i ON i.id = s.identity_id
          WHERE s.token_hash = ? AND s.expires_at > ? AND i.status = 'active'`,
       )
-      .bind(await sha256Hex(bearer), now())
-      .first<Who>();
+      .bind(tokenHash, now())
+      .first<Who & { lastUsedAt: number | null }>();
+    if (found) {
+      const { lastUsedAt, ...rest } = found;
+      who = rest;
+      // Stamped at most once per LAST_USED_EVERY seconds, so a busy CLI does not write on every call.
+      const t = now();
+      if (lastUsedAt === null || t - lastUsedAt >= LAST_USED_EVERY) {
+        await db
+          .prepare("UPDATE session SET last_used_at = ? WHERE token_hash = ?")
+          .bind(t, tokenHash)
+          .run()
+          .catch(() => {}); // a missed stamp must never fail the request (e.g. over the write quota)
+      }
+    }
   } else {
     const found = accessJwtFrom(c.req);
     // A cookie can be sent by another site's page, so cookie logins may only change data from our own origin.

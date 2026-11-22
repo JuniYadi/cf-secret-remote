@@ -256,6 +256,18 @@ export interface AlertSettings {
   rules: Record<RuleName, ChannelToggles>;
 }
 
+/** Per channel: "off" means it isn't set up on this server. */
+export interface AlertTestResult {
+  webhook: "sent" | "failed" | "off";
+  email: "sent" | "failed" | "off";
+}
+
+export interface RecentAlert {
+  rule: string;
+  subject: string;
+  at: number;
+}
+
 export type RequestStatus = "pending" | "approved" | "denied" | "cancelled" | "expired";
 
 export interface AccessRequest {
@@ -318,6 +330,8 @@ export interface SignedInDevice {
   kind: string;
   device: string;
   createdAt: number;
+  /** Last time the session made a call, rounded to 10 minutes. null before it was first used. */
+  lastUsedAt: number | null;
   expiresAt: number;
 }
 
@@ -611,6 +625,8 @@ export const api = {
   setWebhook: (webhook: string | null) => request<AlertSettings>("PUT", "/alerts", { webhook }),
   setRules: (rules: Record<RuleName, ChannelToggles>) =>
     request<AlertSettings>("PUT", "/alerts", { rules }),
+  alertsTest: () => request<AlertTestResult>("POST", "/alerts/test"),
+  alertsRecent: () => request<RecentAlert[]>("GET", "/alerts/recent"),
 
   // Access requests (ADR 16)
   requests: (status?: RequestStatus) =>
@@ -657,6 +673,8 @@ export const api = {
   // Devices (ADR 27)
   sessions: () => request<SignedInDevice[]>("GET", "/sessions"),
   signOutDevice: (id: string) => request<{ ok: true }>("DELETE", `/sessions/${id}`),
+  /** Ends every command-line session of the caller, including the CLI that sends this when it is one. */
+  signOutAllDevices: () => request<{ ok: true; ended: number }>("DELETE", "/sessions"),
 
   // CLI login (ADR 11)
   cliLogin: (code: string) => request<CliLoginInfo>("GET", `/cli/login${queryString({ code })}`),
