@@ -116,7 +116,7 @@ it("moves the encrypted login to a group the caller can access", async () => {
   select.value = "g";
   select.dispatchEvent(new Event("change", { bubbles: true }));
   await tick();
-  [...host.querySelectorAll("button")].find((x) => x.textContent === "Move")?.click();
+  Array.from(host.querySelectorAll("button")).find((x) => x.textContent === "Move")?.click();
   await tick();
   await tick();
   const call = move.mock.calls[0];
