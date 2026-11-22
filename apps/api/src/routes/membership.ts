@@ -1,3 +1,4 @@
+import { LOGIN_CIPHERTEXT_LIMIT } from "@cfs/core";
 import { type Context, Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
@@ -5,6 +6,7 @@ import { NAME_RE } from "../limits.ts";
 import { prefixOf, validPath } from "../policy.ts";
 import type { AppEnv } from "../types.ts";
 import { now } from "../util.ts";
+import { ciphertextSize, validInput } from "./logins.ts";
 
 // ADR 14. Membership and staged key rotation. The server only stores wrapped keys and ciphertext.
 // Writes to a rotating group are refused with 409 in secrets.ts.
@@ -156,9 +158,6 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   const g = await memberGate(c, prefix, "group.rotate.start");
   if (g instanceof Response) return g;
   if (g.status !== "active") return c.json({ error: "group is already rotating" }, 409);
-  // Rotation currently re-encrypts secrets only. Refuse to strand Login ciphertext under the old key.
-  if (await db.prepare("SELECT 1 FROM login WHERE keyring_id = ? LIMIT 1").bind(g.id).first())
-    return c.json({ error: "move or purge group logins before rotation" }, 409);
 
   // The rotating admin needs the old key until commit, so it must stay a member.
   if (removeId === who.id)
@@ -194,10 +193,8 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   try {
     const started = await db.batch([
       db
-        .prepare(
-          "UPDATE keyring SET status = 'rotating' WHERE id = ? AND status = 'active' AND NOT EXISTS (SELECT 1 FROM login WHERE keyring_id = ?)",
-        )
-        .bind(g.id, g.id),
+        .prepare("UPDATE keyring SET status = 'rotating' WHERE id = ? AND status = 'active'")
+        .bind(g.id),
       ...members.map((m) =>
         db
           .prepare(
@@ -231,6 +228,21 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   return c.json({ version: next, secrets: live?.n ?? 0 });
 });
 
+// Current ciphertext, including deleted items, for a rotating admin who holds the group key.
+membership.get("/keyrings/:prefix/rotate/logins", requireAdmin, async (c) => {
+  const g = await memberGate(c, c.req.param("prefix"), "group.rotate.logins");
+  if (g instanceof Response) return g;
+  if (g.status !== "rotating") return c.json({ error: "group is not rotating" }, 409);
+  const rows = await c.env.DB.prepare(
+    `SELECT l.id, v.version, v.wrapped_dek AS wrappedDek, v.ciphertext, v.fps
+     FROM login l JOIN login_version v ON v.login_id = l.id AND v.version = l.current
+     WHERE l.keyring_id = ? ORDER BY l.id`,
+  )
+    .bind(g.id)
+    .all<{ fps: string }>();
+  return c.json(rows.results.map((r) => ({ ...r, fps: JSON.parse(r.fps) })));
+});
+
 // Rotation step 2. Stages re-encrypted current versions at the new keyring version, at most 50 per call.
 membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
   const db = c.env.DB;
@@ -238,6 +250,13 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
   const prefix = c.req.param("prefix");
   const b = await c.req.json<{
     keyringVersion?: number;
+    logins?: {
+      id: string;
+      version: number;
+      wrappedDek: string;
+      ciphertext: string;
+      fps: unknown;
+    }[];
     secrets?: {
       path?: string;
       names?: string[];
@@ -246,8 +265,18 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
       version?: number;
     }[];
   }>();
-  if (!Array.isArray(b.secrets) || b.secrets.length === 0 || b.secrets.length > CHUNK_SIZE)
-    return c.json({ error: `send 1 to ${CHUNK_SIZE} secrets per chunk` }, 400);
+  if (
+    (b.secrets !== undefined && !Array.isArray(b.secrets)) ||
+    (b.logins !== undefined && !Array.isArray(b.logins))
+  )
+    return c.json({ error: "bad request" }, 400);
+  const loginItems = b.logins ?? [];
+  b.secrets ??= [];
+  if (
+    b.secrets.length + loginItems.length === 0 ||
+    b.secrets.length + loginItems.length > CHUNK_SIZE
+  )
+    return c.json({ error: `send 1 to ${CHUNK_SIZE} items per chunk` }, 400);
   if (!Number.isInteger(b.keyringVersion)) return c.json({ error: "bad request" }, 400);
   const seen = new Set<string>();
   for (const s of b.secrets) {
@@ -281,6 +310,27 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
   if (b.keyringVersion !== next)
     return c.json({ error: "keyringVersion must be the new version" }, 400);
 
+  const loginIds = new Set<string>();
+  for (const l of loginItems) {
+    if (
+      !l ||
+      !/^[A-Za-z0-9_-]{1,128}$/.test(l.id) ||
+      loginIds.has(l.id) ||
+      !validInput({ ...l, keyringId: g.id, keyringVersion: next })
+    )
+      return c.json({ error: "bad request" }, 400);
+    const size = ciphertextSize(l.ciphertext);
+    if (size === null) return c.json({ error: "bad ciphertext" }, 400);
+    if (size > LOGIN_CIPHERTEXT_LIMIT) return c.json({ error: "too large" }, 413);
+    loginIds.add(l.id);
+    const row = await db
+      .prepare("SELECT current FROM login WHERE id = ? AND keyring_id = ?")
+      .bind(l.id, g.id)
+      .first<{ current: number }>();
+    if (!row || l.version !== row.current + 1)
+      return c.json({ error: "login or version changed" }, 409);
+  }
+
   const rows: { secretId: string; version: number }[] = [];
   for (const s of secrets) {
     const row = await db
@@ -297,8 +347,8 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
   }
 
   try {
-    await db.batch(
-      secrets.flatMap((s, i) => {
+    await db.batch([
+      ...secrets.flatMap((s, i) => {
         const r = rows[i] as { secretId: string; version: number };
         return [
           // A retried chunk replaces its own staged rows.
@@ -323,7 +373,29 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
             ),
         ];
       }),
-    );
+      ...loginItems.flatMap((l) => [
+        db
+          .prepare(
+            "DELETE FROM login_version WHERE login_id = ? AND version = ? AND keyring_version = ?",
+          )
+          .bind(l.id, l.version, next),
+        db
+          .prepare(
+            "INSERT INTO login_version (login_id, version, keyring_id, keyring_version, wrapped_dek, ciphertext, fps, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          )
+          .bind(
+            l.id,
+            l.version,
+            g.id,
+            next,
+            l.wrappedDek,
+            l.ciphertext,
+            JSON.stringify(l.fps),
+            who.id,
+            now(),
+          ),
+      ]),
+    ]);
   } catch {
     return c.json({ error: "group changed, reload and retry" }, 409);
   }
@@ -336,7 +408,7 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
       result: "ok",
       ip: c.req.header("CF-Connecting-IP"),
     });
-  return c.json({ staged: secrets.length });
+  return c.json({ staged: secrets.length + loginItems.length });
 });
 
 // Rotation step 3. Refused unless every live secret has a version at the new keyring version.
@@ -367,15 +439,33 @@ membership.post("/keyrings/:prefix/rotate/commit", requireAdmin, async (c) => {
       409,
     );
 
+  const missingLogins = await db
+    .prepare(
+      `SELECT l.id FROM login l WHERE l.keyring_id = ? AND NOT EXISTS
+     (SELECT 1 FROM login_version v WHERE v.login_id = l.id AND v.version = l.current + 1 AND v.keyring_version = ? AND v.keyring_id = ?)`,
+    )
+    .bind(g.id, next, g.id)
+    .all<{ id: string }>();
+  if (missingLogins.results.length)
+    return c.json(
+      {
+        error: "some logins have no new version yet",
+        missing: missingLogins.results.map((r) => r.id),
+      },
+      409,
+    );
+
   try {
     await db.batch([
       db
         .prepare(
           `UPDATE keyring SET version = ?, status = 'active' WHERE id = ? AND status = 'rotating'
            AND NOT EXISTS (SELECT 1 FROM secret s WHERE s.keyring_id = ? AND s.deleted_at IS NULL
-             AND NOT EXISTS (SELECT 1 FROM secret_version v WHERE v.secret_id = s.id AND v.keyring_version = ?))`,
+             AND NOT EXISTS (SELECT 1 FROM secret_version v WHERE v.secret_id = s.id AND v.keyring_version = ?))
+           AND NOT EXISTS (SELECT 1 FROM login l WHERE l.keyring_id = ? AND NOT EXISTS
+             (SELECT 1 FROM login_version v WHERE v.login_id = l.id AND v.version = l.current + 1 AND v.keyring_version = ? AND v.keyring_id = ?))`,
         )
-        .bind(next, g.id, g.id, next),
+        .bind(next, g.id, g.id, next, g.id, next, g.id),
       // The statements below only apply if the keyring flip above happened.
       db
         .prepare(
@@ -384,6 +474,11 @@ membership.post("/keyrings/:prefix/rotate/commit", requireAdmin, async (c) => {
            AND EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ?)`,
         )
         .bind(g.id, next, g.id, next),
+      db
+        .prepare(`UPDATE login SET current = current + 1 WHERE keyring_id = ?
+        AND EXISTS (SELECT 1 FROM login_version v WHERE v.login_id = login.id AND v.version = login.current + 1 AND v.keyring_version = ? AND v.keyring_id = ?)
+        AND EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ?)`)
+        .bind(g.id, next, g.id, g.id, next),
       db
         .prepare(
           `INSERT INTO keyring_member (keyring_id, identity_id, version, wrapped_key)
@@ -430,6 +525,11 @@ membership.post("/keyrings/:prefix/rotate/abort", requireAdmin, async (c) => {
           "DELETE FROM secret_version WHERE keyring_version = ? AND secret_id IN (SELECT id FROM secret WHERE keyring_id = ?)",
         )
         .bind(next, g.id),
+      db
+        .prepare(
+          "DELETE FROM login_version WHERE keyring_version = ? AND keyring_id = ? AND login_id IN (SELECT id FROM login WHERE keyring_id = ?)",
+        )
+        .bind(next, g.id, g.id),
       db.prepare("DELETE FROM keyring_member_staged WHERE keyring_id = ?").bind(g.id),
       db
         .prepare("UPDATE keyring SET status = 'active' WHERE id = ? AND status = 'rotating'")

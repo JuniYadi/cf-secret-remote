@@ -731,6 +731,26 @@ export const api = {
       `/keyrings/${encodeURIComponent(prefix)}/rotate/start`,
       { removeIdentityId, members },
     ),
+  rotateLogins: (prefix: string) =>
+    request<{ id: string; version: number; wrappedDek: string; ciphertext: string }[]>(
+      "GET",
+      `/keyrings/${encodeURIComponent(prefix)}/rotate/logins`,
+    ),
+  rotateLoginChunk: (
+    prefix: string,
+    keyringVersion: number,
+    logins: {
+      id: string;
+      version: number;
+      wrappedDek: string;
+      ciphertext: string;
+      fps: Record<string, string>;
+    }[],
+  ) =>
+    request<{ staged: number }>("POST", `/keyrings/${encodeURIComponent(prefix)}/rotate/chunk`, {
+      keyringVersion,
+      logins,
+    }),
   rotateChunk: (prefix: string, keyringVersion: number, secrets: RotateSecret[]) =>
     request<{ staged: number }>("POST", `/keyrings/${encodeURIComponent(prefix)}/rotate/chunk`, {
       keyringVersion,

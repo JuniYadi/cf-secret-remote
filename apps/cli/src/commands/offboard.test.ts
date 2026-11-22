@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { generateKeyPair, newGroupKey, wrapGroupKey } from "@cfs/core";
+import {
+  generateKeyPair,
+  newGroupKey,
+  openLogin,
+  sealLogin,
+  unwrapGroupKey,
+  wrapGroupKey,
+} from "@cfs/core";
 import { CliError, type Client } from "../client.ts";
 import { offboard, type Plan, planLines, REMINDER, reportLines, runOffboard } from "./offboard.ts";
 
@@ -30,6 +37,7 @@ function world() {
     } as Record<string, { version: number; status: string; members: string[] }>,
     people: { adm: "active", tgt: "active", keep: "active" } as Record<string, string>,
     app: { id: "app1", name: "deploy-bot", owner: "tgt", status: "active" },
+    login: null as null | { id: string; version: number; wrappedDek: string; ciphertext: string },
     failApp: false,
     failFinish: false,
     calls: [] as Call[],
@@ -153,6 +161,10 @@ function serve(w: World) {
       g.status = "active";
       return ok({ version: g.version, status: "active" });
     }
+    if (method === "GET" && /\/rotate\/logins$/.test(path))
+      return ok(path.includes("/pay/") && w.login ? [w.login] : []);
+    if (method === "POST" && /\/rotate\/chunk$/.test(path))
+      return ok({ staged: body.logins.length });
     if (method === "GET" && path === "/secrets") return ok([]);
     if (method === "GET" && /^\/offboard\/[^/]+\/plan$/.test(path)) return ok(planOf(w));
     if (method === "POST" && /^\/apps\/[^/]+\/disable$/.test(path)) {
@@ -248,6 +260,42 @@ describe("ADR 21: offboard flow", () => {
     // The report lists names and versions, never values.
     expect(report).toContain("pay/prod\tAPI_KEY, DB_PASS\tversions 3");
     expect(report.join("\n")).not.toMatch(/ciphertext|wrappedDek|secret value/i);
+  });
+
+  test("offboarding re-encrypts group logins", async () => {
+    const { w, client } = await setup();
+    const value = {
+      v: 1 as const,
+      name: "private",
+      url: "https://example.test",
+      environment: "dev",
+      role: "user",
+      username: "u",
+      password: "p",
+      totp: "",
+      notes: "",
+    };
+    w.login = {
+      id: "login1",
+      version: 1,
+      ...(await sealLogin(w.gk.pay as Uint8Array, "login1", 1, value)),
+    };
+    await runOffboard(client, "gone@x.test", { yes: true }, io().io);
+    const start = w.calls.find((c) => c.path === "/keyrings/pay/rotate/start");
+    const wrapped = start?.body.members.find(
+      (m: { identityId: string }) => m.identityId === "adm",
+    ).wrappedKey;
+    const key = await unwrapGroupKey(
+      wrapped,
+      w.keys.adm.privateKey,
+      w.keys.adm.publicKey,
+      "pay",
+      2,
+    );
+    const row = w.calls.find((c) => c.path === "/keyrings/pay/rotate/chunk")?.body.logins[0];
+    expect(await openLogin(key, row.id, row.version, row.wrappedDek, row.ciphertext)).toEqual(
+      value,
+    );
   });
 
   test("without --yes the person is asked first, and answering no changes nothing", async () => {

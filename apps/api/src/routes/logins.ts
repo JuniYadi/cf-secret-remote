@@ -18,7 +18,7 @@ type Input = {
   ciphertext?: unknown;
   fps?: unknown;
 };
-function validInput(b: Input): boolean {
+export function validInput(b: Input): boolean {
   if (
     !idOk(b.keyringId) ||
     !Number.isSafeInteger(b.keyringVersion) ||
@@ -44,7 +44,7 @@ function validInput(b: Input): boolean {
     return false;
   return true;
 }
-function ciphertextSize(value: string): number | null {
+export function ciphertextSize(value: string): number | null {
   const parts = value.split(".");
   if (
     parts.length !== 3 ||

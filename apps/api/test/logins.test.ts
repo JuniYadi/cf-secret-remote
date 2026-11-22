@@ -1,5 +1,5 @@
 import { env, SELF } from "cloudflare:test";
-import { loginFingerprints, newGroupKey, sealLogin } from "@cfs/core";
+import { loginFingerprints, newGroupKey, openLogin, sealLogin } from "@cfs/core";
 import { describe, expect, it } from "vitest";
 import { api, makeIdentity } from "./helpers.ts";
 
@@ -43,14 +43,6 @@ describe("Login API", () => {
       fps: await loginFingerprints(groupKey, id, value),
     });
     expect((await api("POST", "/logins", user.token, await payload(1))).status).toBe(201);
-    expect(
-      (
-        await api("POST", `/keyrings/${keyringId}/rotate/start`, user.token, {
-          removeIdentityId: stranger.id,
-          members: [{ identityId: user.id, wrappedKey: "new-key" }],
-        })
-      ).status,
-    ).toBe(409);
 
     expect((await api("GET", `/logins/${id}`, stranger.token)).status).toBe(404);
     expect((await api("PUT", `/logins/${id}`, stranger.token, await payload(2))).status).toBe(404);
@@ -122,6 +114,99 @@ describe("Login API", () => {
       .bind(Math.floor(Date.now() / 1000) - 31 * 86400, id)
       .run();
     expect((await api("POST", `/logins/${id}/undelete`, user.token)).status).toBe(410);
+  });
+  it("rotates live and deleted logins, refuses incomplete commit and cleans abort", async () => {
+    const admin = await makeIdentity({ role: "admin" });
+    const removed = await makeIdentity();
+    const group = crypto.randomUUID();
+    const oldKey = await newGroupKey();
+    const newKey = await newGroupKey();
+    await env.DB.prepare("INSERT INTO keyring (id, prefix, created_at) VALUES (?, ?, 1)")
+      .bind(group, group)
+      .run();
+    for (const user of [admin, removed])
+      await env.DB.prepare(
+        "INSERT INTO keyring_member (keyring_id, identity_id, version, wrapped_key) VALUES (?, ?, 1, 'key')",
+      )
+        .bind(group, user.id)
+        .run();
+    const ids = [crypto.randomUUID(), crypto.randomUUID()];
+    for (const id of ids)
+      expect(
+        (
+          await api("POST", "/logins", admin.token, {
+            id,
+            keyringId: group,
+            keyringVersion: 1,
+            version: 1,
+            ...(await sealLogin(oldKey, id, 1, value)),
+            fps: await loginFingerprints(oldKey, id, value),
+          })
+        ).status,
+      ).toBe(201);
+    await api("DELETE", `/logins/${ids[1]}`, admin.token);
+    const start = () =>
+      api("POST", `/keyrings/${group}/rotate/start`, admin.token, {
+        removeIdentityId: removed.id,
+        members: [{ identityId: admin.id, wrappedKey: "new" }],
+      });
+    const stage = async () => {
+      const logins = await Promise.all(
+        ids.map(async (id) => ({
+          id,
+          version: 2,
+          ...(await sealLogin(newKey, id, 2, value)),
+          fps: await loginFingerprints(newKey, id, value),
+        })),
+      );
+      return api("POST", `/keyrings/${group}/rotate/chunk`, admin.token, {
+        keyringVersion: 2,
+        logins,
+      });
+    };
+    expect((await start()).status).toBe(200);
+    expect((await api("GET", `/keyrings/${group}/rotate/logins`, admin.token)).body).toHaveLength(
+      2,
+    );
+    expect((await api("POST", `/keyrings/${group}/rotate/commit`, admin.token, {})).status).toBe(
+      409,
+    );
+    expect((await stage()).status).toBe(200);
+    expect((await api("POST", `/keyrings/${group}/rotate/abort`, admin.token, {})).status).toBe(
+      200,
+    );
+    expect(
+      (
+        await env.DB.prepare(
+          "SELECT COUNT(*) AS n FROM login_version WHERE keyring_id = ? AND keyring_version = 2",
+        )
+          .bind(group)
+          .first<{ n: number }>()
+      )?.n,
+    ).toBe(0);
+    expect((await start()).status).toBe(200);
+    expect((await stage()).status).toBe(200);
+    expect((await api("POST", `/keyrings/${group}/rotate/commit`, admin.token, {})).status).toBe(
+      200,
+    );
+    expect((await api("GET", `/logins/${ids[0]}`, removed.token)).status).toBe(404);
+    expect((await api("GET", "/logins", removed.token)).body).toEqual([]);
+    const row = (await api("GET", `/logins/${ids[0]}`, admin.token)).body;
+    expect(row.keyringVersion).toBe(2);
+    expect(
+      await openLogin(newKey, ids[0] as string, row.version, row.wrappedDek, row.ciphertext),
+    ).toEqual(value);
+    expect((await api("POST", `/logins/${ids[1]}/undelete`, admin.token)).status).toBe(200);
+    const restored = (await api("GET", `/logins/${ids[1]}`, admin.token)).body;
+    expect(
+      await openLogin(
+        newKey,
+        ids[1] as string,
+        restored.version,
+        restored.wrappedDek,
+        restored.ciphertext,
+      ),
+    ).toEqual(value);
   });
   it("rejects oversized ciphertext", async () => {
     const user = await makeIdentity();

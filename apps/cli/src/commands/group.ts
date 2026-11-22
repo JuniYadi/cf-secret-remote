@@ -1,4 +1,12 @@
-import { newGroupKey, sealSecret, unwrapGroupKey, wrapGroupKey } from "@cfs/core";
+import {
+  loginFingerprints,
+  newGroupKey,
+  openLogin,
+  sealLogin,
+  sealSecret,
+  unwrapGroupKey,
+  wrapGroupKey,
+} from "@cfs/core";
 import { flagAll } from "../args.ts";
 import { CliError, type Client, connect, readSecret } from "../client.ts";
 import type { Commands } from "./types.ts";
@@ -174,6 +182,35 @@ export async function removeMember(
       const r = await c.call("POST", `/keyrings/${prefix}/rotate/chunk`, {
         keyringVersion: newVersion,
         secrets: part,
+      });
+      if (r.status !== 200) throw new CliError(`Chunk refused: ${errorOf(r.body, r.status)}`);
+    }
+    const logins = await c.call<
+      { id: string; version: number; wrappedDek: string; ciphertext: string }[]
+    >("GET", `/keyrings/${prefix}/rotate/logins`);
+    if (logins.status !== 200)
+      throw new CliError(`Could not list logins: ${errorOf(logins.body, logins.status)}`);
+    for (const part of chunks(logins.body)) {
+      const items = await Promise.all(
+        part.map(async (row) => {
+          const value = await openLogin(
+            mine.key,
+            row.id,
+            row.version,
+            row.wrappedDek,
+            row.ciphertext,
+          );
+          return {
+            id: row.id,
+            version: row.version + 1,
+            ...(await sealLogin(newKey, row.id, row.version + 1, value)),
+            fps: await loginFingerprints(newKey, row.id, value),
+          };
+        }),
+      );
+      const r = await c.call("POST", `/keyrings/${prefix}/rotate/chunk`, {
+        keyringVersion: newVersion,
+        logins: items,
       });
       if (r.status !== 200) throw new CliError(`Chunk refused: ${errorOf(r.body, r.status)}`);
     }
