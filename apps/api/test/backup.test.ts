@@ -394,7 +394,9 @@ describe("ADR 23: restore check", () => {
     for (const path of ["/restore/check", "/restore"]) {
       const r = await post(path, adm.token, restoreBody(file));
       expect(r.status).toBe(409);
-      expect(r.body.error).toContain(`file is schema 14; this instance runs schema ${SCHEMA_VERSION}`);
+      expect(r.body.error).toContain(
+        `file is schema 14; this instance runs schema ${SCHEMA_VERSION}`,
+      );
     }
     expect(await snapshot()).toEqual(before);
   });
