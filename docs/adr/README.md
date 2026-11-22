@@ -39,7 +39,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [31](0031-web-logins.md) | Web: Logins screen | accepted |
 | [32](0032-chrome-extension.md) | Chrome extension | accepted |
 | [33](0033-import-logins.md) | Import Logins | accepted |
-| [34](0034-security-disclosure-and-supply-chain.md) | Security disclosure, licence, supply chain | accepted; build first |
+| [34](0034-security-disclosure-and-supply-chain.md) | Security disclosure, licence, supply chain | implemented; PVR setting pending owner |
 | [35](0035-deferred-agent-fill-and-account-lease.md) | Deferred: agent-safe fill, account leases | deferred |
 
 ## Build order

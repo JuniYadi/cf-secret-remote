@@ -10,4 +10,4 @@ Status: accepted (not implemented yet)
 - **Logging.** Never request bodies, never values or tokens. Errors log the message only.
 - **CORS.** None: the web app is same-origin. The API sends no CORS headers.
 - **Dependency policy.** Few runtime dependencies (Hono only on the server); lockfile committed; CI runs `bun audit`.
-- **Threat model.** A document `docs/threat-model.md` records what is and is not protected (a Cloudflare admin can delete rows and swap the served JS; the checkpoints and signed releases detect or limit this).
+- **Threat model.** The [threat model](../threat-model.md) records what is and is not protected (a Cloudflare admin can delete rows and swap the served JS; the checkpoints and signed releases detect or limit this).

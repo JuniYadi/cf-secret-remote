@@ -1,6 +1,6 @@
 # 34. Security disclosure, licence, and supply chain
 
-Status: accepted (not implemented yet)
+Status: implemented; Private Vulnerability Reporting setting pending owner
 
 ## Context
 The repo is open and stores credentials, so a flaw in our code is a risk for every deployment. Researchers need a safe way to report, and users need a way to check that what they run matches the source.
