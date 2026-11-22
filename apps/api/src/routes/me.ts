@@ -1,7 +1,9 @@
 import { isPrivateKeyLock, isRecoveryLockedKey } from "@cfs/core";
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
+import { LAST_USED_EVERY } from "../auth.ts";
 import type { AppEnv } from "../types.ts";
+import { now } from "../util.ts";
 
 export const me = new Hono<AppEnv>();
 
@@ -16,6 +18,21 @@ me.get("/whoami", async (c) => {
     publicKey: row?.public_key ?? null,
     lockedKey: row?.locked_key ?? null,
   });
+});
+
+// Best effort: a missed stamp must not prevent the user from unlocking their vault.
+me.post("/me/unlocked", async (c) => {
+  const t = now();
+  try {
+    await c.env.DB.prepare(
+      "UPDATE identity SET last_unlocked_at = ? WHERE id = ? AND (last_unlocked_at IS NULL OR last_unlocked_at <= ?)",
+    )
+      .bind(t, c.get("who").id, t - LAST_USED_EVERY)
+      .run();
+  } catch {
+    // Writes can fail when D1 is over quota.
+  }
+  return c.json({ ok: true });
 });
 
 // First-time vault setup: the browser generates the key pair, locks the private key with the vault password, sends both.

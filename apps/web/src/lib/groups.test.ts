@@ -160,6 +160,7 @@ describe("chunking and the group view", () => {
       role: "admin",
       publicKey: "PUB",
       status: "active",
+      last_unlocked_at: null,
       ...over,
     });
     expect(
@@ -197,6 +198,7 @@ describe("removing a member", () => {
       role: "member",
       publicKey: keyFor.includes(id) ? "PUB" : null,
       status: "active",
+      last_unlocked_at: null,
     }));
 
   it("keeps everyone else, each with a public key", () => {

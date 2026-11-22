@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { Link, useLocation } from "wouter-preact";
 import { PageTitle, Standalone } from "../components/shared.tsx";
+import { api } from "../lib/api.ts";
 import { useLang, useSession } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
 import { unlock } from "../lib/keystore.ts";
@@ -59,6 +60,8 @@ export function UnlockPage() {
       setFailed(false);
       setPassword("");
       unlock({ publicKey: me?.publicKey ?? "", privateKey });
+      // Recording is best-effort: neither latency nor an API failure should block the vault.
+      void api.recordUnlock().catch(() => {});
       navigate(PATHS.secrets);
     } catch {
       const at = Date.now();

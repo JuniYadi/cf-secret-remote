@@ -293,6 +293,8 @@ export interface Identity {
   role: "admin" | "member";
   publicKey: string | null;
   status: string;
+  /** Last browser vault unlock, in Unix seconds, or null if none is recorded. */
+  last_unlocked_at: number | null;
   /** True (or 1 from SQLite) when the person has saved a recovery key (ADR 20). */
   recoverySet?: boolean | number;
 }
@@ -616,6 +618,7 @@ function passphraseHeader(passphrase: string | undefined): Record<string, string
 
 export const api = {
   whoami: (fetchImpl?: FetchLike) => request<Me>("GET", "/whoami", undefined, fetchImpl),
+  recordUnlock: () => request<{ ok: true }>("POST", "/me/unlocked"),
   createVault: (publicKey: string, lockedKey: string) =>
     request<{ ok: true }>("POST", "/vault", { publicKey, lockedKey }),
   setRecoveryKey: (lockedKey: string) =>

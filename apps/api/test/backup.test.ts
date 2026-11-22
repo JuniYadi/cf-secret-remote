@@ -144,6 +144,10 @@ async function seedSealedSecret(adminId: string): Promise<void> {
 async function seedWorld() {
   const adm = await admin();
   const member = await makeIdentity({ name: `m-${uniq()}@test.dev` });
+  await db
+    .prepare("UPDATE identity SET last_unlocked_at = ? WHERE id = ?")
+    .bind(1700000000, member.id)
+    .run();
   // Old rows, pruned by the daily job: leaves an audit_base, a checkpoint and a usage row behind.
   const t = now();
   await appendRow(
@@ -379,18 +383,21 @@ describe("ADR 23: restore check", () => {
     expect(r.body.error).toMatch(/hash mismatch/);
   });
 
-  it("refuses a file of the wrong schema, even when its hash is recomputed", async () => {
+  it("refuses schema 13 on both restore check and restore, even with a valid hash", async () => {
     const { adm } = await seedWorld();
     const f = await plainFile((await download(adm.token)).bytes);
-    f.schema = SCHEMA_VERSION - 1;
+    expect(f.schema).toBe(14);
+    f.schema = 13;
+    for (const identity of f.tables.identity!) delete identity.last_unlocked_at;
     f.sha256 = await digest(f.schema, f.createdAt, f.tables as unknown as Tables);
-    const r = await post(
-      "/restore/check",
-      adm.token,
-      restoreBody(await gzipBytes(JSON.stringify(f))),
-    );
-    expect(r.status).toBe(409);
-    expect(r.body.error).toContain(`file is schema ${f.schema}`);
+    const file = await gzipBytes(JSON.stringify(f));
+    const before = await snapshot();
+    for (const path of ["/restore/check", "/restore"]) {
+      const r = await post(path, adm.token, restoreBody(file));
+      expect(r.status).toBe(409);
+      expect(r.body.error).toContain("file is schema 13; this instance runs schema 14");
+    }
+    expect(await snapshot()).toEqual(before);
   });
 
   it("refuses an audit chain that is broken inside the file, even with a recomputed hash", async () => {
@@ -425,8 +432,9 @@ describe("ADR 23: restore check", () => {
 
 describe("ADR 23: restore", () => {
   it("round trip: backup, wipe, restore gives the same rows, and only the restore row is new", async () => {
-    const { adm } = await seedWorld();
+    const { adm, member } = await seedWorld();
     const before = await snapshot();
+    expect(before.identity.find((row) => row.id === member.id)?.last_unlocked_at).toBe(1700000000);
     const file = (await download(adm.token)).bytes;
 
     // Wipe every backed-up table except the admin's own identity and session, which the restore needs to authenticate.
