@@ -34,7 +34,7 @@ export async function signIn(
         token: p.body.token,
         expiresAt: Math.floor(Date.now() / 1000) + (p.body.expiresIn ?? 3600),
       });
-      console.log("Signed in. Next: cfs unlock");
+      console.log("Signed in. Next: cfs unlock (lasts 24h; use --ttl to change)");
       return;
     }
     if (p.status === 410) break;

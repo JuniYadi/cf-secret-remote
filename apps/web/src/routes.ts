@@ -421,7 +421,7 @@ export interface NavItem {
   path: string;
   label: () => string;
   /** The sidebar icon, as a key for the icon component. */
-  icon: "secrets" | "groups" | "permissions" | "apps" | "activity" | "settings";
+  icon: "secrets" | "groups" | "permissions" | "apps" | "activity" | "devices" | "settings";
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -430,6 +430,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: PATHS.permissions, label: () => t("Permissions", "Izin"), icon: "permissions" },
   { path: PATHS.apps, label: () => t("Apps & bots", "Aplikasi & bot"), icon: "apps" },
   { path: PATHS.activity, label: () => t("Activity", "Aktivitas"), icon: "activity" },
+  { path: PATHS.devices, label: () => t("Devices", "Perangkat"), icon: "devices" },
   { path: PATHS.settings, label: () => t("Settings", "Pengaturan"), icon: "settings" },
 ];
 
