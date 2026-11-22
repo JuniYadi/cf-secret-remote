@@ -1,5 +1,15 @@
 <!doctype html>
 <html lang="en"><body>
-<form><input id="hidden" type="hidden"><input id="invisible" style="display:none" type="password"><input id="zero" type="password"><input id="user" autocomplete="username"><input id="password" type="password"></form>
-<iframe title="Other origin" src="https://other.example/login"></iframe>
+<form id="login">
+  <input id="hidden-field" type="hidden">
+  <input id="display" style="display:none" type="password">
+  <input id="visibility" style="visibility:hidden" type="password">
+  <input id="opacity" style="opacity:0" type="password">
+  <input id="zero" style="width:0;height:0;padding:0;border:0" type="password">
+  <input id="user" autocomplete="username">
+  <input id="password" type="password">
+  <button type="submit">Submit</button>
+</form>
+<iframe title="Same origin" src="/frame.html"></iframe>
+<iframe title="Other origin" src="http://127.0.0.1/frame.html"></iframe>
 </body></html>

@@ -7,7 +7,7 @@ describe("fill origins", () => {
     expect(eligibleOrigin("https://staging.shop.com", "https://shop.com")).toBe(false);
     expect(eligibleOrigin("http://localhost:3000", "http://localhost:5173")).toBe(false);
     expect(eligibleOrigin("http://localhost:3000", "http://localhost:3000")).toBe(true);
-    expect(eligibleOrigin("http://127.0.0.1:3000", "http://127.0.0.1:3000")).toBe(true);
-    expect(eligibleOrigin("http://shop.com", "http://shop.com")).toBe(false);
+    expect(eligibleOrigin("http://127.0.0.1:8080", "http://127.0.0.1:8080")).toBe(true);
+    expect(eligibleOrigin("http://example.com", "http://example.com")).toBe(false);
   });
 });
