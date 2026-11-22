@@ -378,7 +378,12 @@ input[type="checkbox"] {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  min-height: 100vh;
+  /* Desktop: the sidebar follows the screen, so the footer (account, lock, sign out) stays in view on long pages. */
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .nav {
@@ -1084,7 +1089,9 @@ details.tech summary {
   .side {
     flex: none;
     width: 100%;
-    min-height: 0;
+    position: static;
+    height: auto;
+    overflow-y: visible;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
