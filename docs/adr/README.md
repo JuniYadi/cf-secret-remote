@@ -37,7 +37,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [29](0029-login-item.md) | Login item | implemented in core and api; CLI in 30, web in 31 |
 | [30](0030-cli-and-sdk-for-logins.md) | CLI and SDK for Logins | accepted |
 | [31](0031-web-logins.md) | Web: Logins screen | accepted |
-| [32](0032-chrome-extension.md) | Chrome extension | accepted |
+| [32](0032-chrome-extension.md) | Chrome extension | implemented; Chrome Web Store listing pending owner |
 | [33](0033-import-logins.md) | Import Logins | accepted |
 | [34](0034-security-disclosure-and-supply-chain.md) | Security disclosure, licence, supply chain | accepted; build first |
 | [35](0035-deferred-agent-fill-and-account-lease.md) | Deferred: agent-safe fill, account leases | deferred |
