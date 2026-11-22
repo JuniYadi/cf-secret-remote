@@ -77,6 +77,8 @@ export const secrets: Commands = {
       let values: Record<string, string>;
       if (before[0]) {
         values = (await readSecret(c, before[0])).values;
+      } else if (accountNames.length && !projectFile().project && !projectFile().envs && !env) {
+        values = {};
       } else {
         // ADR 25: explicit envs in .cfs.json, later secrets override earlier ones.
         const plan = runPaths(projectFile(), env);
