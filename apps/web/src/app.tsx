@@ -15,6 +15,7 @@ import { CliAuthorizePage } from "./screens/CliAuthorize.tsx";
 import { CliDonePage } from "./screens/CliDone.tsx";
 import { DevicesPage } from "./screens/Devices.tsx";
 import { ForgotPage } from "./screens/Forgot.tsx";
+import { LoginsListPage } from "./screens/LoginsList.tsx";
 import { OffboardPage } from "./screens/Offboard.tsx";
 import { PasswordChangePage } from "./screens/PasswordChange.tsx";
 import {
@@ -111,6 +112,12 @@ function renderPage(
       return <SetupRecoveryPage />;
     case "unlock":
       return <UnlockPage />;
+    case "logins":
+      return (
+        <ShellFrame>
+          <LoginsListPage />
+        </ShellFrame>
+      );
     case "cliAuthorize":
       return <CliAuthorizePage />;
     case "cliDone":

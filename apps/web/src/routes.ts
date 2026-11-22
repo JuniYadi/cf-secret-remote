@@ -11,6 +11,7 @@ import { t } from "./lib/i18n.ts";
 
 export const PATHS = {
   secrets: "/secrets",
+  logins: "/logins",
   groups: "/groups",
   permissions: "/permissions",
   apps: "/apps",
@@ -66,6 +67,7 @@ export const appKitPath = (id: string) => `${appPath(id)}/kit`;
 export type PageId =
   | "root"
   | "secrets"
+  | "logins"
   | "groups"
   | "permissions"
   | "apps"
@@ -115,6 +117,7 @@ export type PageId =
 /** Pages inside the signed-in shell (sidebar and header). They need an unlocked vault. */
 export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
   "secrets",
+  "logins",
   "groups",
   "permissions",
   "apps",
@@ -165,6 +168,7 @@ export interface MatchedPage {
 const STATIC_PATHS: Readonly<Record<string, PageId>> = {
   "/": "root",
   [PATHS.secrets]: "secrets",
+  [PATHS.logins]: "logins",
   [PATHS.groups]: "groups",
   [PATHS.permissions]: "permissions",
   [PATHS.apps]: "apps",
@@ -277,6 +281,8 @@ export function pageCrumbs(id: PageId, name?: string): Crumb[] {
       return [];
     case "secrets":
       return [{ label: t("Secrets", "Secret"), href: PATHS.secrets }];
+    case "logins":
+      return [{ label: t("Logins", "Akun"), href: PATHS.logins }];
     case "groups":
       return [{ label: t("Groups", "Grup"), href: PATHS.groups }];
     case "permissions":
@@ -426,6 +432,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { path: PATHS.secrets, label: () => t("Secrets", "Secret"), icon: "secrets" },
+  { path: PATHS.logins, label: () => t("Logins", "Akun"), icon: "secrets" },
   { path: PATHS.groups, label: () => t("Groups", "Grup"), icon: "groups" },
   { path: PATHS.permissions, label: () => t("Permissions", "Izin"), icon: "permissions" },
   { path: PATHS.apps, label: () => t("Apps & bots", "Aplikasi & bot"), icon: "apps" },
