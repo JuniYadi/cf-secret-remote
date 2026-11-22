@@ -29,7 +29,7 @@ import { type BundleManifest, PROTOCOL_VERSION, parseManifest } from "@cfs/core"
 
 export const MANIFEST = "manifest.json";
 
-/** Strips // comments and trailing commas from wrangler.jsonc so JSON.parse accepts it. */
+/** Strips // comments and trailing commas from wrangler.example.jsonc so JSON.parse accepts it. */
 export function parseJsonc(text: string): unknown {
   const noComments = text.replace(/(^|\s)\/\/[^\n]*/g, "$1");
   const noTrailingCommas = noComments.replace(/,(\s*[}\]])/g, "$1");
@@ -44,7 +44,7 @@ export interface WranglerSettings {
   vars: Record<string, string>;
 }
 
-/** Reads the parts of apps/api/wrangler.jsonc that go into the manifest. */
+/** Reads the parts of apps/api/wrangler.example.jsonc that go into the manifest. */
 export function wranglerSettings(jsonc: string): WranglerSettings {
   const w = parseJsonc(jsonc) as Record<string, unknown>;
   const assets = (w.assets ?? {}) as Record<string, unknown>;
@@ -186,7 +186,7 @@ async function main(): Promise<void> {
   mkdirSync(join(bundleDir, "migrations"), { recursive: true });
   for (const m of migrations) copyFileSync(join(migDir, m), join(bundleDir, "migrations", m));
 
-  const settings = wranglerSettings(readFileSync(join(api, "wrangler.jsonc"), "utf8"));
+  const settings = wranglerSettings(readFileSync(join(api, "wrangler.example.jsonc"), "utf8"));
   const manifest = writeManifest(bundleDir, { version, settings, migrations });
 
   const tgz = join(dist, "worker-bundle.tgz");

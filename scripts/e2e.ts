@@ -201,10 +201,10 @@ function savedToken(configDir: string): string {
 
 /**
  * Writes the wrangler config for this run. Returns a note for the step log. It is the real
- * apps/api/wrangler.jsonc (so its compatibility flags are tested too), minus the web assets and triggers.
+ * apps/api/wrangler.example.jsonc (so its compatibility flags are tested too), minus the web assets and triggers.
  */
 function writeE2eConfig(): string {
-  const src = parseJsonc(readFileSync(join(API_DIR, "wrangler.jsonc"), "utf8")) as Record<
+  const src = parseJsonc(readFileSync(join(API_DIR, "wrangler.example.jsonc"), "utf8")) as Record<
     string,
     any
   >;
@@ -220,10 +220,10 @@ function writeE2eConfig(): string {
     migrations_dir: join(API_DIR, "migrations"),
   }));
   writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`);
-  return "apps/api/wrangler.jsonc without assets";
+  return "apps/api/wrangler.example.jsonc without assets";
 }
 
-/** wrangler.jsonc is JSONC: strip comments outside strings and trailing commas. */
+/** wrangler.example.jsonc is JSONC: strip comments outside strings and trailing commas. */
 function parseJsonc(text: string): unknown {
   let out = "";
   let inString = false;
