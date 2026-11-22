@@ -1,7 +1,18 @@
-import { flag, parseEnv } from "../args.ts";
+import { totp } from "@cfs/core";
+import { flag, flagAll, parseEnv } from "../args.ts";
 import { CliError, connect, readSecret, writeSecret } from "../client.ts";
 import { mergeSecrets, projectFile, runPaths } from "../config.ts";
+import { accounts, findAccount, reveal } from "./account.ts";
 import type { Commands } from "./types.ts";
+
+export function accountPrefixes(specs: string[]): string[] {
+  const names = specs.map((spec) =>
+    (spec.split(":")[0] ?? "").toUpperCase().replace(/[^A-Z0-9_]/g, "_"),
+  );
+  if (names.some((name) => !name) || new Set(names).size !== names.length)
+    throw new CliError("Account names must be nonempty and must not collide when normalised.");
+  return names;
+}
 
 export const secrets: Commands = {
   list: {
@@ -51,7 +62,7 @@ export const secrets: Commands = {
     },
   },
   run: {
-    help: "cfs run [<secret>] [--env <name>] -- <command>",
+    help: "cfs run [<secret>] [--env <name>] [--account <name>[:env[:role]]] [--purpose <text>] -- <command>",
     run: async (a, h) => {
       const dd = a.indexOf("--");
       if (dd < 0 || dd === a.length - 1)
@@ -59,6 +70,9 @@ export const secrets: Commands = {
       const before = a.slice(0, dd);
       const command = a.slice(dd + 1);
       const env = flag(before, "--env");
+      const accountNames = flagAll(before, "--account");
+      const purpose = flag(before, "--purpose");
+      const normalised = accountPrefixes(accountNames);
       const c = await connect(h);
       let values: Record<string, string>;
       if (before[0]) {
@@ -71,6 +85,20 @@ export const secrets: Commands = {
           async (p) => (await readSecret(c, p)).values,
           plan.env,
         );
+      }
+      if (accountNames.length) {
+        const items = await accounts(c);
+        for (const [i, spec] of accountNames.entries()) {
+          const parts = spec.split(":");
+          if (parts.length > 3 || !parts[0])
+            throw new CliError(`Invalid account selector: ${spec}`);
+          const item = findAccount(items, parts[0], parts[1] || undefined, parts[2] || undefined);
+          await reveal(c, item, purpose);
+          const prefix = `CFS_${normalised[i]}`;
+          values[`${prefix}_USER`] = item.login.username;
+          values[`${prefix}_PASS`] = item.login.password;
+          values[`${prefix}_TOTP`] = item.login.totp ? await totp(item.login.totp) : "";
+        }
       }
       const child = Bun.spawn(command, {
         env: { ...process.env, ...values },
