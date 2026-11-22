@@ -1,6 +1,10 @@
-import { newGroupKey, sealLogin } from "@cfs/core";
-import { describe, expect, it, vi } from "vitest";
-import { createLoginClient, decryptLoginList, filterLogins, type LoginRecord } from "./logins.ts";
+import { generateKeyPair, newGroupKey, sealLogin, wrapGroupKey } from "@cfs/core";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { api } from "./api.ts";
+import { lock, unlock } from "./keystore.ts";
+import { createLoginClient, decryptLoginList, filterLogins, loginKeyFor, type LoginRecord } from "./logins.ts";
+
+afterEach(() => { lock(); vi.restoreAllMocks(); });
 
 const login = {
   v: 1 as const,
@@ -14,6 +18,20 @@ const login = {
   notes: "private",
 };
 describe("login client", () => {
+  it("resolves personal and historical group keys by ID and version", async () => {
+    const pair = await generateKeyPair();
+    unlock(pair);
+    const personalKey = await newGroupKey();
+    const oldKey = await newGroupKey();
+    vi.spyOn(api, "personalKeyring").mockResolvedValue({ id: "p", prefix: "personal-p", version: 1, wrappedKey: await wrapGroupKey(personalKey, pair.publicKey, "personal-p", 1) });
+    vi.spyOn(api, "keyrings").mockResolvedValue([{ id: "g", prefix: "team", version: 2 }]);
+    const getKey = vi.spyOn(api, "groupKey").mockResolvedValue({ version: 1, wrappedKey: await wrapGroupKey(oldKey, pair.publicKey, "team", 1) });
+    expect(await loginKeyFor("p", 1)).toEqual(personalKey);
+    expect(await loginKeyFor("g", 1)).toEqual(oldKey);
+    expect(getKey).toHaveBeenCalledWith("team", 1);
+    await expect(loginKeyFor("missing", 1)).rejects.toThrow();
+    await expect(loginKeyFor("p", 2)).rejects.toThrow();
+  });
   it("uses the ETag and reuses the encrypted list on 304", async () => {
     const fetcher = vi
       .fn()

@@ -1,6 +1,8 @@
 // Login envelopes are cached only in memory. Plaintext is opened by the caller's key resolver.
-import { type Login, openLogin } from "@cfs/core";
-import { API_BASE, type FetchLike, request, send } from "./api.ts";
+import { type Login, openLogin, unwrapGroupKey } from "@cfs/core";
+import { API_BASE, api, type FetchLike, request, send } from "./api.ts";
+import { getPrivateKey, getPublicKey } from "./keystore.ts";
+import { VaultLockedError } from "./secret-store.ts";
 
 export interface LoginRecord {
   id: string;
@@ -85,6 +87,23 @@ export function createLoginClient(fetchImpl?: FetchLike) {
   };
 }
 export const loginClient = createLoginClient();
+
+/** Resolve a login's keyring ID to the key for the version that sealed it. */
+export async function loginKeyFor(id: string, version: number): Promise<Uint8Array> {
+  const priv = getPrivateKey();
+  const pub = getPublicKey();
+  if (priv === null || pub === null) throw new VaultLockedError();
+  const [personal, groups] = await Promise.all([api.personalKeyring(), api.keyrings()]);
+  if (personal?.id === id) {
+    if (personal.version !== version) throw new Error("personal key version unavailable");
+    return unwrapGroupKey(personal.wrappedKey, priv, pub, personal.prefix, version);
+  }
+  const group = groups.find((row) => row.id === id);
+  if (!group) throw new Error("keyring unavailable");
+  const key = await api.groupKey(group.prefix, version);
+  if (key.version !== version) throw new Error("key version mismatch");
+  return unwrapGroupKey(key.wrappedKey, priv, pub, group.prefix, version);
+}
 export interface OpenedLogin {
   record: LoginRecord;
   login: Login;
