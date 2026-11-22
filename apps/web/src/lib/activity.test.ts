@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ACTION_NAMES,
   auditQuery,
-  exportQuery,
   chainState,
+  exportQuery,
   formatCount,
   meterState,
   NO_FILTERS,

@@ -155,6 +155,8 @@ describe("CLI approve: device lookup and attempts", () => {
 });
 
 // ADR 24 (Activity): the Type column, the stat cards and the CSV export.
+type Stats = { accesses: number; byApps: number; blocked: number; actors: number };
+
 describe("GET /audit kind, /audit/stats and /audit/export.csv", () => {
   const nowSec = () => Math.floor(Date.now() / 1000);
 
@@ -197,7 +199,7 @@ describe("GET /audit kind, /audit/stats and /audit/export.csv", () => {
   it("counts the last 24 hours for the stat cards", async () => {
     const adm = await admin();
     const t = tag();
-    const before = (await api<Record<string, number>>("GET", "/audit/stats", adm.token)).body;
+    const before = (await api<Stats>("GET", "/audit/stats", adm.token)).body;
     const person = await makeIdentity({ name: `s-${t}@test.dev`, kind: "user" });
     const bot = await makeIdentity({ name: `sbot-${t}`, kind: "app" });
     await appendRow(
@@ -221,7 +223,7 @@ describe("GET /audit kind, /audit/stats and /audit/export.csv", () => {
       nowSec() - 90_000,
     );
 
-    const after = (await api<Record<string, number>>("GET", "/audit/stats", adm.token)).body;
+    const after = (await api<Stats>("GET", "/audit/stats", adm.token)).body;
     expect(after.accesses - before.accesses).toBe(2);
     expect(after.byApps - before.byApps).toBe(1);
     expect(after.blocked - before.blocked).toBe(1);
