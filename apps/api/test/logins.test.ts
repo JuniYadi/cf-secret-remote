@@ -68,7 +68,44 @@ describe("Login API", () => {
         .status,
     ).toBe(200);
     expect((await api("GET", `/logins/${id}`, user.token)).body.keyringId).toBe(destination);
+    expect(
+      (
+        await api("POST", `/logins/${id}/reveal`, user.token, {
+          field: "password",
+          purpose: "test run",
+        })
+      ).status,
+    ).toBe(200);
+    expect((await api("POST", `/logins/${id}/fill`, user.token, {})).status).toBe(200);
+    const entries = await env.DB.prepare(
+      "SELECT entry FROM audit WHERE json_extract(entry, '$.path') = ? ORDER BY seq",
+    )
+      .bind(id)
+      .all<{ entry: string }>();
+    const events = entries.results.map(
+      (row) => JSON.parse(row.entry) as { action: string; purpose?: string; version: number },
+    );
+    expect(events.map((e) => e.action)).toEqual([
+      "login.create",
+      "login.update",
+      "login.restore",
+      "login.move",
+      "login.reveal",
+      "login.fill",
+    ]);
+    expect(events[4]?.purpose).toBe("test run");
+    expect(events.map((e) => e.version)).toEqual([1, 2, 3, 4, 4, 4]);
+    expect(JSON.stringify(events)).not.toContain(value.name);
+    expect(JSON.stringify(events)).not.toContain(value.url);
+
     expect((await api("DELETE", `/logins/${id}`, user.token)).status).toBe(200);
+    const deleted = await env.DB.prepare(
+      "SELECT entry FROM audit WHERE json_extract(entry, '$.path') = ? ORDER BY seq DESC LIMIT 1",
+    )
+      .bind(id)
+      .first<{ entry: string }>();
+    expect(JSON.parse(deleted?.entry ?? "{}").action).toBe("login.delete");
+
     expect((await api("GET", `/logins/${id}`, user.token)).status).toBe(404);
     expect((await api("POST", `/logins/${id}/undelete`, user.token)).status).toBe(200);
     await api("DELETE", `/logins/${id}`, user.token);

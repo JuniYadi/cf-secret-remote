@@ -1,5 +1,6 @@
 import { b64uDecode, LOGIN_CIPHERTEXT_LIMIT } from "@cfs/core";
 import { Hono } from "hono";
+import { audit } from "../audit.ts";
 import type { AppEnv } from "../types.ts";
 import { now, sha256Hex } from "../util.ts";
 import { RESTORE_WINDOW } from "./versions.ts";
@@ -195,6 +196,13 @@ async function write(
       now(),
     ),
   ]);
+  await audit(c.env.DB, {
+    who: who.name,
+    action: `login.${mode}`,
+    path: id,
+    version,
+    result: "ok",
+  });
   return c.json({ id, version }, mode === "create" ? 201 : 200);
 }
 logins.post("/logins", (c) => write(c, "create"));
@@ -207,6 +215,13 @@ logins.delete("/logins/:id", async (c) => {
   await c.env.DB.prepare("UPDATE login SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL")
     .bind(now(), l.id)
     .run();
+  await audit(c.env.DB, {
+    who: c.get("who").name,
+    action: "login.delete",
+    path: l.id,
+    version: l.current,
+    result: "ok",
+  });
   return c.json({ ok: true });
 });
 logins.post("/logins/:id/undelete", async (c) => {
@@ -217,3 +232,31 @@ logins.post("/logins/:id/undelete", async (c) => {
   await c.env.DB.prepare("UPDATE login SET deleted_at = NULL WHERE id = ?").bind(l.id).run();
   return c.json({ ok: true });
 });
+
+for (const action of ["reveal", "fill"] as const) {
+  logins.post(`/logins/:id/${action}`, async (c) => {
+    const body = await c.req.json<{ field?: unknown; purpose?: unknown }>().catch(() => null);
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body) ||
+      Object.keys(body).some((k) => k !== "field" && k !== "purpose") ||
+      (body.field !== undefined &&
+        (typeof body.field !== "string" || !fields.includes(body.field))) ||
+      (body.purpose !== undefined &&
+        (typeof body.purpose !== "string" || body.purpose.length > 500))
+    )
+      return c.json({ error: "bad request" }, 400);
+    const l = await item(c.env.DB, c.req.param("id"), c.get("who").id);
+    if (!l) return c.json({ error: "not found" }, 404);
+    await audit(c.env.DB, {
+      who: c.get("who").name,
+      action: `login.${action}`,
+      path: l.id,
+      version: l.current,
+      result: "ok",
+      ...(body.purpose !== undefined ? { purpose: body.purpose as string } : {}),
+    });
+    return c.json({ ok: true });
+  });
+}

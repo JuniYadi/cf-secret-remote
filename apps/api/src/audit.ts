@@ -11,6 +11,7 @@ export interface AuditEntry {
   result: "ok" | "denied" | "error";
   ip?: string;
   note?: string;
+  purpose?: string;
 }
 
 export type AuditRow = AuditEntry & { at: number };
