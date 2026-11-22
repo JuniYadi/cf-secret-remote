@@ -16,7 +16,7 @@ const value = {
 };
 describe("Login API", () => {
   it("syncs, versions, restores, moves and deletes with membership checks", async () => {
-    const user = await makeIdentity();
+    const user = await makeIdentity({ role: "admin" });
     const stranger = await makeIdentity();
     const id = crypto.randomUUID();
     const keyringId = crypto.randomUUID();
@@ -43,6 +43,15 @@ describe("Login API", () => {
       fps: await loginFingerprints(groupKey, id, value),
     });
     expect((await api("POST", "/logins", user.token, await payload(1))).status).toBe(201);
+    expect(
+      (
+        await api("POST", `/keyrings/${keyringId}/rotate/start`, user.token, {
+          removeIdentityId: stranger.id,
+          members: [{ identityId: user.id, wrappedKey: "new-key" }],
+        })
+      ).status,
+    ).toBe(409);
+
     expect((await api("GET", `/logins/${id}`, stranger.token)).status).toBe(404);
     expect((await api("PUT", `/logins/${id}`, stranger.token, await payload(2))).status).toBe(404);
     const list = await SELF.fetch("http://t.test/api/v1/logins", {

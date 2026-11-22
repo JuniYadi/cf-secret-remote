@@ -156,6 +156,10 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   const g = await memberGate(c, prefix, "group.rotate.start");
   if (g instanceof Response) return g;
   if (g.status !== "active") return c.json({ error: "group is already rotating" }, 409);
+  // Rotation currently re-encrypts secrets only. Refuse to strand Login ciphertext under the old key.
+  if (await db.prepare("SELECT 1 FROM login WHERE keyring_id = ? LIMIT 1").bind(g.id).first())
+    return c.json({ error: "move or purge group logins before rotation" }, 409);
+
   // The rotating admin needs the old key until commit, so it must stay a member.
   if (removeId === who.id)
     return c.json({ error: "you cannot remove yourself from the group" }, 400);

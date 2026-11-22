@@ -150,6 +150,8 @@ async function write(
   const id = mode === "create" ? (b.id as string) : (c.req.param("id") as string);
   const old = mode === "create" ? null : await item(c.env.DB, id, who.id);
   if (mode !== "create" && !old) return c.json({ error: "not found" }, 404);
+  if (old && (await member(c.env.DB, old.keyringId, who.id))?.status !== "active")
+    return c.json({ error: "keyring rotating" }, 409);
   if (old && mode !== "move" && old.keyringId !== b.keyringId)
     return c.json({ error: "wrong keyring" }, 400);
   if (old && mode === "move" && old.keyringId === b.keyringId)
@@ -174,16 +176,16 @@ async function write(
     (await c.env.DB.prepare("SELECT 1 FROM login WHERE id = ?").bind(id).first())
   )
     return c.json({ error: "already exists" }, 409);
-  await c.env.DB.batch([
+  const written = await c.env.DB.batch([
     old
       ? c.env.DB.prepare(
-          "UPDATE login SET current = ?, keyring_id = ? WHERE id = ? AND current = ? AND deleted_at IS NULL",
-        ).bind(version, b.keyringId, id, old.current)
+          "UPDATE login SET current = ?, keyring_id = ? WHERE id = ? AND current = ? AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ? AND status = 'active')",
+        ).bind(version, b.keyringId, id, old.current, b.keyringId, b.keyringVersion)
       : c.env.DB.prepare(
-          "INSERT INTO login (id, keyring_id, current, created_at) VALUES (?, ?, ?, ?)",
-        ).bind(id, b.keyringId, version, now()),
+          "INSERT INTO login (id, keyring_id, current, created_at) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ? AND status = 'active')",
+        ).bind(id, b.keyringId, version, now(), b.keyringId, b.keyringVersion),
     c.env.DB.prepare(
-      "INSERT INTO login_version (login_id, version, keyring_id, keyring_version, wrapped_dek, ciphertext, fps, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO login_version (login_id, version, keyring_id, keyring_version, wrapped_dek, ciphertext, fps, created_by, created_at) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM login WHERE id = ? AND current = ? AND keyring_id = ? AND deleted_at IS NULL)",
     ).bind(
       id,
       version,
@@ -194,8 +196,12 @@ async function write(
       JSON.stringify(b.fps),
       who.id,
       now(),
+      id,
+      version,
+      b.keyringId,
     ),
   ]);
+  if (!written[0]?.meta.changes) return c.json({ error: "keyring or version changed" }, 409);
   await audit(c.env.DB, {
     who: who.name,
     action: `login.${mode}`,
@@ -259,4 +265,18 @@ for (const action of ["reveal", "fill"] as const) {
     });
     return c.json({ ok: true });
   });
+}
+
+/** Purge Login versions once their 30-day restore window has expired. */
+export async function purgeDeletedLogins(db: D1Database, at: number = now()): Promise<void> {
+  await db.batch([
+    db
+      .prepare(
+        "DELETE FROM login_version WHERE login_id IN (SELECT id FROM login WHERE deleted_at IS NOT NULL AND deleted_at < ?)",
+      )
+      .bind(at - RESTORE_WINDOW),
+    db
+      .prepare("DELETE FROM login WHERE deleted_at IS NOT NULL AND deleted_at < ?")
+      .bind(at - RESTORE_WINDOW),
+  ]);
 }

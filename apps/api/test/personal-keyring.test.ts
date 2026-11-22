@@ -33,11 +33,11 @@ describe("personal keyring", () => {
     expect(
       (
         await api("POST", `/keyrings/${prefix}/rotate/start`, owner.token, {
-          remove: other.id,
-          members: [],
+          removeIdentityId: other.id,
+          members: [{ identityId: owner.id, wrappedKey: "wrapped" }],
         })
       ).status,
-    ).not.toBe(200);
+    ).toBe(404);
     expect(
       (
         await api("PUT", "/secret", owner.token, {
