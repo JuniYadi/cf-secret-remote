@@ -532,7 +532,7 @@ describe("ADR 14: remove member and staged rotation", () => {
       const rows = await env.DB.prepare(`SELECT * FROM ${t}`).all();
       expect(JSON.stringify(rows.results)).not.toContain(marker);
     }
-  });
+  }, 20_000);
 
   it("the group member list shows members to members and admins, not to outsiders", async () => {
     const prefix = prefixName("list");

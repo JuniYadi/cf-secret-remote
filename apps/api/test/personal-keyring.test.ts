@@ -26,6 +26,30 @@ describe("personal keyring", () => {
       await unwrapGroupKey(got.body.wrappedKey, pair.privateKey, pair.publicKey, prefix, 1),
     ).toEqual(made.key);
     expect((await api("GET", "/me/personal-keyring", other.token)).body).toBeNull();
+    const groups = await api("GET", "/keyrings", owner.token);
+    expect(groups.body.some((group: { prefix: string }) => group.prefix === prefix)).toBe(false);
+    expect((await api("GET", `/keyrings/${prefix}/key`, owner.token)).status).toBe(404);
+    expect((await api("GET", `/keyrings/${prefix}/members`, owner.token)).status).toBe(404);
+    expect(
+      (
+        await api("POST", `/keyrings/${prefix}/rotate/start`, owner.token, {
+          remove: other.id,
+          members: [],
+        })
+      ).status,
+    ).not.toBe(200);
+    expect(
+      (
+        await api("PUT", "/secret", owner.token, {
+          path: `${prefix}/secret`,
+          names: ["A"],
+          wrappedDek: "wrapped",
+          ciphertext: "v1.data",
+          keyringVersion: 1,
+        })
+      ).status,
+    ).toBe(409);
+
     expect(
       (
         await api("POST", `/keyrings/${prefix}/members`, owner.token, {

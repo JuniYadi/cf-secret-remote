@@ -33,7 +33,7 @@ export async function countAdminsWithVault(db: D1Database, exceptId?: string): P
 
 const loadGroup = (db: D1Database, prefix: string) =>
   db
-    .prepare("SELECT id, version, status FROM keyring WHERE prefix = ?")
+    .prepare("SELECT id, version, status FROM keyring WHERE prefix = ? AND personal_owner IS NULL")
     .bind(prefix)
     .first<Group>();
 

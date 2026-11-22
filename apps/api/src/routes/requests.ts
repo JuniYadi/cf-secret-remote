@@ -85,7 +85,7 @@ requests.post("/requests", async (c) => {
 
   const prefix = prefixOf(b.path);
   const group = await db
-    .prepare("SELECT id FROM keyring WHERE prefix = ?")
+    .prepare("SELECT id FROM keyring WHERE prefix = ? AND personal_owner IS NULL")
     .bind(prefix)
     .first<{ id: string }>();
   if (!group) return c.json({ error: "no such group" }, 404);
@@ -257,7 +257,7 @@ requests.post("/requests/:id/approve", requireAdmin, async (c) => {
   if (overdue(row, t)) return c.json({ error: "request has expired" }, 409);
 
   const group = await db
-    .prepare("SELECT id, version, status FROM keyring WHERE prefix = ?")
+    .prepare("SELECT id, version, status FROM keyring WHERE prefix = ? AND personal_owner IS NULL")
     .bind(row.groupPrefix)
     .first<{ id: string; version: number; status: string }>();
   if (!group) return c.json({ error: "no such group" }, 404);

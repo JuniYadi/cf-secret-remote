@@ -11,7 +11,7 @@ keyrings.get("/keyrings", async (c) => {
   const who = c.get("who");
   const rows = await c.env.DB.prepare(
     `SELECT k.prefix, k.version FROM keyring k
-     WHERE ?1 = 'admin' OR EXISTS (SELECT 1 FROM keyring_member m WHERE m.keyring_id = k.id AND m.identity_id = ?2)
+     WHERE k.personal_owner IS NULL AND (?1 = 'admin' OR EXISTS (SELECT 1 FROM keyring_member m WHERE m.keyring_id = k.id AND m.identity_id = ?2))
      ORDER BY k.prefix`,
   )
     .bind(who.role, who.id)
@@ -56,7 +56,7 @@ keyrings.get("/keyrings/:prefix/key", async (c) => {
   const prefix = c.req.param("prefix");
   const row = await c.env.DB.prepare(
     `SELECT m.wrapped_key, m.version, m.expires_at AS expiresAt FROM keyring_member m JOIN keyring k ON k.id = m.keyring_id
-     WHERE k.prefix = ? AND m.identity_id = ? ORDER BY m.version DESC LIMIT 1`,
+     WHERE k.prefix = ? AND k.personal_owner IS NULL AND m.identity_id = ? ORDER BY m.version DESC LIMIT 1`,
   )
     .bind(prefix, who.id)
     .first<{ wrapped_key: string; version: number; expiresAt: number | null }>();
