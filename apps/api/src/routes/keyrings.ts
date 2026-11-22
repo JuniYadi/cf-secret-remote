@@ -100,3 +100,55 @@ keyrings.post("/invites", requireAdmin, async (c) => {
   await audit(c.env.DB, { who: who.name, action: "user.invite", note: email, result: "ok" });
   return c.json({ ok: true }, 201);
 });
+
+// A unique owner and database guards make creation safe across concurrent unlocks and prevent sharing.
+keyrings.get("/me/personal-keyring", async (c) => {
+  const row = await c.env.DB.prepare(
+    `SELECT k.id, k.prefix, k.version, m.wrapped_key AS wrappedKey FROM keyring k
+     JOIN keyring_member m ON m.keyring_id = k.id AND m.identity_id = k.personal_owner AND m.version = k.version
+     WHERE k.personal_owner = ?`,
+  )
+    .bind(c.get("who").id)
+    .first();
+  return c.json(row ?? null);
+});
+
+keyrings.post("/me/personal-keyring", async (c) => {
+  const who = c.get("who");
+  if (who.kind !== "user") return c.json({ error: "users only" }, 403);
+  const b = await c.req
+    .json<{ prefix?: unknown; wrappedKey?: unknown }>()
+    .catch(() => ({}) as { prefix?: unknown; wrappedKey?: unknown });
+  if (
+    typeof b.prefix !== "string" ||
+    !/^personal-[a-z0-9-]{1,100}$/.test(b.prefix) ||
+    typeof b.wrappedKey !== "string" ||
+    !b.wrappedKey ||
+    b.wrappedKey.length > 8192
+  )
+    return c.json({ error: "bad request" }, 400);
+  const identity = await c.env.DB.prepare("SELECT public_key FROM identity WHERE id = ?")
+    .bind(who.id)
+    .first<{ public_key: string | null }>();
+  if (!identity?.public_key) return c.json({ error: "set up your vault first" }, 409);
+  const id = newId();
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        "INSERT INTO keyring (id, prefix, created_at, personal_owner) VALUES (?, ?, ?, ?)",
+      ).bind(id, b.prefix, now(), who.id),
+      c.env.DB.prepare(
+        "INSERT INTO keyring_member (keyring_id, identity_id, version, wrapped_key) VALUES (?, ?, 1, ?)",
+      ).bind(id, who.id, b.wrappedKey),
+    ]);
+  } catch {
+    const existing = await c.env.DB.prepare(
+      "SELECT id, prefix, version FROM keyring WHERE personal_owner = ?",
+    )
+      .bind(who.id)
+      .first();
+    if (existing) return c.json(existing);
+    return c.json({ error: "group already exists" }, 409);
+  }
+  return c.json({ id, prefix: b.prefix, version: 1 }, 201);
+});
