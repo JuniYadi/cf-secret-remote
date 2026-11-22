@@ -92,3 +92,63 @@ export async function getSession(): Promise<Session | undefined> {
   }
   return session;
 }
+
+export async function openLogins(
+  host: string,
+  session: Session,
+): Promise<{ id: string; login: import("@cfs/core").Login }[]> {
+  if (
+    !session.privateKey ||
+    !session.publicKey ||
+    !session.unlockExpires ||
+    session.unlockExpires <= Date.now()
+  )
+    throw new Error("Locked");
+  const { openLogin, unwrapGroupKey } = await import("@cfs/core");
+  const headers = auth(session.token);
+  const [groups, personal, cache] = await Promise.all([
+    request(host, "/keyrings", { headers }).then((r) => r.json()) as Promise<
+      { id: string; prefix: string }[]
+    >,
+    request(host, "/me/personal-keyring", { headers }).then((r) => r.json()) as Promise<{
+      id: string;
+      prefix: string;
+      version: number;
+      wrappedKey: string;
+    } | null>,
+    chrome.storage.local.get("logins") as Promise<{ logins?: LoginRow[] }>,
+  ]);
+  const keys = new Map<string, Uint8Array>();
+  const out: { id: string; login: import("@cfs/core").Login }[] = [];
+  for (const row of cache.logins ?? []) {
+    const group =
+      groups.find((g) => g.id === row.keyringId) ??
+      (personal?.id === row.keyringId ? personal : undefined);
+    if (!group) continue;
+    const cacheKey = `${row.keyringId}:${row.keyringVersion}`;
+    let key = keys.get(cacheKey);
+    if (!key) {
+      const wrapped =
+        personal?.id === row.keyringId && personal.version === row.keyringVersion
+          ? personal
+          : ((await request(
+              host,
+              `/keyrings/${encodeURIComponent(group.prefix)}/key?version=${row.keyringVersion}`,
+              { headers },
+            ).then((r) => r.json())) as { wrappedKey: string });
+      key = await unwrapGroupKey(
+        wrapped.wrappedKey,
+        session.privateKey,
+        session.publicKey,
+        group.prefix,
+        row.keyringVersion,
+      );
+      keys.set(cacheKey, key);
+    }
+    out.push({
+      id: row.id,
+      login: await openLogin(key, row.id, row.version, row.wrappedDek, row.ciphertext),
+    });
+  }
+  return out;
+}

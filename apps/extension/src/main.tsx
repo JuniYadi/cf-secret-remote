@@ -1,6 +1,17 @@
+import type { Login } from "@cfs/core";
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { getSession, json, normalizeHost, request, type Session, sync, unlock } from "./client.ts";
+import {
+  getSession,
+  json,
+  normalizeHost,
+  openLogins,
+  request,
+  type Session,
+  sync,
+  unlock,
+} from "./client.ts";
+import { eligibleOrigin, fillPage } from "./fill.ts";
 import "./style.css";
 
 function App() {
@@ -12,12 +23,23 @@ function App() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [matches, setMatches] = useState<{ id: string; login: Login }[]>([]);
   useEffect(() => {
     void chrome.storage.local
       .get("host")
       .then((v) => setHost(typeof v.host === "string" ? v.host : ""));
     void getSession().then(setSession);
   }, []);
+  useEffect(() => {
+    if (!session?.unlockExpires) return;
+    const timer = setTimeout(
+      () => {
+        void getSession().then(setSession);
+      },
+      Math.max(0, session.unlockExpires - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [session]);
   async function login(event: Event) {
     event.preventDefault();
     setError("");
@@ -76,11 +98,64 @@ function App() {
       setBusy(false);
     }
   }
+  useEffect(() => {
+    if (!session?.privateKey) {
+      setMatches([]);
+      return;
+    }
+    let active = true;
+    void (async () => {
+      try {
+        const current = await getSession();
+        if (!current?.privateKey) {
+          if (active) setSession(current);
+          return;
+        }
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.url) return;
+        const items = await openLogins(host, current);
+        if (active)
+          setMatches(items.filter((item) => eligibleOrigin(tab.url as string, item.login.url)));
+      } catch {
+        if (active) setError(t("Could not open logins.", "Tidak dapat membuka login."));
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [host, session]);
+  async function fill(item: { id: string; login: Login }) {
+    setBusy(true);
+    setError("");
+    try {
+      const current = await getSession();
+      if (!current?.privateKey) {
+        setSession(current);
+        throw new Error("Locked");
+      }
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id || !tab.url || !eligibleOrigin(tab.url, item.login.url))
+        throw new Error("Origin mismatch");
+      await request(host, `/logins/${encodeURIComponent(item.id)}/fill`, json({}, current.token));
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: [0] },
+        func: fillPage,
+        args: [new URL(tab.url).origin, item.login.username, item.login.password],
+      });
+      if (!results[0]?.result) throw new Error("No eligible fields");
+      window.close();
+    } catch {
+      setError(t("Could not fill this page.", "Tidak dapat mengisi halaman ini."));
+    } finally {
+      setBusy(false);
+    }
+  }
   async function refresh() {
     if (!session) return;
     setBusy(true);
     try {
       await sync(host, session.token);
+      setSession({ ...session });
     } catch {
       setError(t("Refresh failed.", "Penyegaran gagal."));
     } finally {
@@ -147,6 +222,17 @@ function App() {
       ) : (
         <>
           <p>{t("Vault unlocked", "Vault terbuka")}</p>
+          {matches.length === 0 ? (
+            <p>{t("No matching logins.", "Tidak ada login yang cocok.")}</p>
+          ) : (
+            matches.map((item) => (
+              <div key={item.id}>
+                <button type="button" disabled={busy} onClick={() => void fill(item)}>
+                  {t("Fill", "Isi")} {item.login.name} {item.login.environment} {item.login.role}
+                </button>
+              </div>
+            ))
+          )}
           <button type="button" disabled={busy} onClick={() => void refresh()}>
             {t("Refresh", "Segarkan")}
           </button>{" "}
