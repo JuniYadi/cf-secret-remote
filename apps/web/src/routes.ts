@@ -447,6 +447,9 @@ export interface GuardInput {
 export function guardTarget(input: GuardInput): string | null {
   const { page, phase, vaultReady, unlocked } = input;
   if (page === "root") return PATHS.secrets;
+  // A person whose session is live must not stay on these pages (for example a reloaded /session-ended URL
+  // from before they signed in); go on to the app, which sends them to setup or unlock.
+  if ((page === "signIn" || page === "sessionEnded") && phase === "ready") return PATHS.secrets;
   if (
     page === "signIn" ||
     page === "sessionEnded" ||

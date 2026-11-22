@@ -1,0 +1,48 @@
+{
+  // One Worker serves the API and the web app, on one hostname.
+  "name": "cfs-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  // AsyncLocalStorage, used to hand the request context to the alert evaluator (src/alerts.ts, ADR 18).
+  "compatibility_flags": ["nodejs_als"],
+
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    // Unknown paths get index.html, so deep links into the SPA work.
+    "not_found_handling": "single-page-application",
+    // The Worker runs for every path so it can add the security headers (ADR 24, src/static.ts).
+    // Static files are still served by the assets binding.
+    "run_worker_first": ["/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cfs-test",
+      // Replaced by `cfs deploy` when it creates the database.
+      "database_id": "d5a75e8c-da35-42fe-94a4-3e8a16949d04",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "vars": {
+    // The first person to sign in with this email becomes admin.
+    "BOOTSTRAP_ADMIN_EMAIL": "",
+    // Cloudflare Access team domain and application audience, used to check sign-in tokens.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    // ADR 19: audit retention in days. Minimum 90 is enforced in code.
+    "AUDIT_RETENTION_DAYS": "365"
+    // Optional: CHECKPOINT_WEBHOOK_URL as a var or secret. The daily checkpoint is posted there when set.
+  },
+
+  // ADR 23 (optional): with an R2 bucket bound as BACKUP, the daily job keeps the last 30 backups there.
+  // Without it the daily job does nothing and backups are downloads only.
+  // "r2_buckets": [{ "binding": "BACKUP", "bucket_name": "cfs-backups" }],
+
+  // ADR 19: 00:05 UTC checkpoint, pruning, and sweeps. Runs `scheduled` in src/index.ts.
+  "triggers": { "crons": ["5 0 * * *"] },
+
+  "observability": { "enabled": true }
+}

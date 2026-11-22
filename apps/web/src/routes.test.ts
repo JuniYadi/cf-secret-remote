@@ -148,6 +148,20 @@ describe("guardTarget", () => {
     expect(guardTarget({ ...base, page: "setup" })).toBe(PATHS.secrets);
   });
 
+  it("leaves Sign in and Session ended once the session is live (a stale URL must not trap a signed-in person)", () => {
+    for (const page of ["signIn", "sessionEnded"] as const) {
+      // Signed in: go on to the app, which then sends the person to setup or unlock.
+      expect(guardTarget({ ...base, page })).toBe(PATHS.secrets);
+      expect(guardTarget({ ...base, vaultReady: false, unlocked: false, page })).toBe(
+        PATHS.secrets,
+      );
+      // Not signed in, still loading, or a load error: stay, so the person sees the page.
+      expect(guardTarget({ ...base, phase: "signed-out", page })).toBeNull();
+      expect(guardTarget({ ...base, phase: "loading", page })).toBeNull();
+      expect(guardTarget({ ...base, phase: "error", page })).toBeNull();
+    }
+  });
+
   it("sends a signed-out person to Session ended, but not for public pages", () => {
     const out = { phase: "signed-out" as const, vaultReady: false, unlocked: false };
     expect(guardTarget({ ...out, page: "secrets" })).toBe(PATHS.sessionEnded);
