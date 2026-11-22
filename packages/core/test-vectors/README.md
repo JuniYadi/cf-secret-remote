@@ -16,3 +16,5 @@ A vector is a JSON file with the inputs (keys, plaintext, nonces) and the bytes 
 | `secret.json`      | ADR 10 key hierarchy: member private key opens the group key, the group key opens the DEK, the DEK opens the values. Each AAD binds its layer.                                                                                                                  | Bun and Chromium, as above                                                                       |
 
 The Bun runner (`src/vectors.test.ts`) and the Chromium runner (`browser-test/vectors.pw.ts`) share one set of checks (`browser-test/checks.ts`), so both runtimes run the same assertions on the same files. Run the browser one with `bun run test:browser` (Chromium from `bunx playwright install chromium`).
+
+`login.json` contains a fixed Login envelope and fingerprints, plus all RFC 6238 Appendix B TOTP cases. The shared vector runner checks it in Bun and Chromium; the CLI suite checks the same file.

@@ -1,0 +1,120 @@
+{
+  "groupKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "id": "login-vector",
+  "version": 1,
+  "login": {
+    "v": 1,
+    "name": "Example",
+    "url": "https://example.com/login",
+    "environment": "test",
+    "role": "admin",
+    "username": "alice",
+    "password": "password",
+    "totp": "JBSWY3DPEHPK3PXP",
+    "notes": "example"
+  },
+  "wrappedDek": "v1.BwxQ4sKramv9_RjI.RpGG0ofxEFNDpUsTYKzgGxTKdhCsEHVELayWNkJ6J_DB-Om4K5pkpEzHdbIeAnzo",
+  "ciphertext": "v1.1x1rLrsQvWdRt9Cw.PJ40BcZ08oGpgrft_0B4_gEM13vidT2rYoZBIWkcS0JFgTdh0P3qgoV1O8_GJ9Haml99ANLdwfcyKTR_h_PhIs22AJG3jN7PmGaGHFKEuk8Jd4TAeQfKycgL_PL966LJ-V6GD9k3BX9AgVcj83rp8oNHOn-s8drj0NBON7X-h3aQ8wyIdhhc0TnIHfiedZCNI_O2K1ck5kj_2Jn5LUZBloYRAF8M8-ljsXvNyjVgY9AzfO0LAcxxkGpKxHw-RuJzdZy4",
+  "fps": {
+    "name": "3f6d9291581c02be",
+    "url": "4dbc818320693926",
+    "environment": "065cff2b7d90daf5",
+    "role": "e725442bcb91b621",
+    "username": "3f35aa24c61c234e",
+    "password": "43f6a3ef55ce0ab8",
+    "totp": "cb988cb1bc91cdf2",
+    "notes": "d8c9aa4534b80d76"
+  },
+  "totp": [
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&algorithm=SHA1&digits=8",
+      "time": 59,
+      "code": "94287082"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&algorithm=SHA1&digits=8",
+      "time": 1111111109,
+      "code": "07081804"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&algorithm=SHA1&digits=8",
+      "time": 1111111111,
+      "code": "14050471"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&algorithm=SHA1&digits=8",
+      "time": 1234567890,
+      "code": "89005924"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&algorithm=SHA1&digits=8",
+      "time": 2000000000,
+      "code": "69279037"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&algorithm=SHA1&digits=8",
+      "time": 20000000000,
+      "code": "65353130"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA====&algorithm=SHA256&digits=8",
+      "time": 59,
+      "code": "46119246"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA====&algorithm=SHA256&digits=8",
+      "time": 1111111109,
+      "code": "68084774"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA====&algorithm=SHA256&digits=8",
+      "time": 1111111111,
+      "code": "67062674"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA====&algorithm=SHA256&digits=8",
+      "time": 1234567890,
+      "code": "91819424"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA====&algorithm=SHA256&digits=8",
+      "time": 2000000000,
+      "code": "90698825"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA====&algorithm=SHA256&digits=8",
+      "time": 20000000000,
+      "code": "77737706"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNA=&algorithm=SHA512&digits=8",
+      "time": 59,
+      "code": "90693936"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNA=&algorithm=SHA512&digits=8",
+      "time": 1111111109,
+      "code": "25091201"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNA=&algorithm=SHA512&digits=8",
+      "time": 1111111111,
+      "code": "99943326"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNA=&algorithm=SHA512&digits=8",
+      "time": 1234567890,
+      "code": "93441116"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNA=&algorithm=SHA512&digits=8",
+      "time": 2000000000,
+      "code": "38618901"
+    },
+    {
+      "uri": "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNA=&algorithm=SHA512&digits=8",
+      "time": 20000000000,
+      "code": "47863826"
+    }
+  ]
+}

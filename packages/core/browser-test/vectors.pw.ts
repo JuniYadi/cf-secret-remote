@@ -20,6 +20,7 @@ const vectors: Vectors = {
   auditChain: vec("audit-chain.json"),
   secret: vec("secret.json"),
   backupSeal: vec("backup-seal.json"),
+  login: vec("login.json"),
 };
 
 const bundle = readFileSync(`${here}.out/vectors.js`, "utf8");
@@ -55,6 +56,7 @@ test("shared vectors give the same answers in Chromium", async ({ page }) => {
       "audit-chain",
       "secret-hierarchy",
       "backup-seal",
+      "login",
     ]),
   );
   expect(checks.length).toBeGreaterThanOrEqual(20);
