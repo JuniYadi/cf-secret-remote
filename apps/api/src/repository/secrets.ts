@@ -40,12 +40,6 @@ export function readSecret(db: D1Database, version: number | null, path: string)
     .bind(version, path)
     .first<{ version: number; names: string }>();
 }
-export function findKeyring(db: D1Database, prefix: string) {
-  return db
-    .prepare("SELECT id, version, status FROM keyring WHERE prefix = ? AND personal_owner IS NULL")
-    .bind(prefix)
-    .first<{ id: string; version: number; status: string }>();
-}
 export function findSecret(db: D1Database, path: string) {
   return db
     .prepare("SELECT id, current, deleted_at AS deletedAt, meta FROM secret WHERE path = ?")

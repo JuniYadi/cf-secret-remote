@@ -1,21 +1,3 @@
-export interface Person {
-  id: string;
-  kind: string;
-  name: string;
-  role: string;
-  status: string;
-  publicKey: string | null;
-}
-
-export function findPerson(db: D1Database, id: string | undefined) {
-  return db
-    .prepare(
-      "SELECT id, kind, name, role, status, public_key AS publicKey FROM identity WHERE id = ?",
-    )
-    .bind(id)
-    .first<Person>();
-}
-
 /** Groups the person still belongs to: current-version members (not lapsed) and staged members of a rotation. */
 export async function groupsOf(db: D1Database, id: string, at: number): Promise<string[]> {
   const current = await db

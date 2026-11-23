@@ -95,3 +95,21 @@ export async function approveCliLogin(db: D1Database, id: string, code: string, 
       .run()
   ).meta.changes;
 }
+
+export interface Person {
+  id: string;
+  kind: string;
+  name: string;
+  role: string;
+  status: string;
+  publicKey: string | null;
+}
+
+export function findPerson(db: D1Database, id: string | undefined) {
+  return db
+    .prepare(
+      "SELECT id, kind, name, role, status, public_key AS publicKey FROM identity WHERE id = ?",
+    )
+    .bind(id)
+    .first<Person>();
+}

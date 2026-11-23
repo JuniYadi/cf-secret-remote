@@ -1,14 +1,13 @@
 import { type Context, Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
+import { findPerson, type Person } from "../repository/identity.ts";
 import {
   activeAppsOf,
   findNextOwner,
   findOwnedApp,
-  findPerson,
   finishOffboard,
   groupsOf,
-  type Person,
   planData,
   reassignApp,
   secretNames,

@@ -4,6 +4,7 @@ import { audit } from "../audit.ts";
 import { lapsedGrant } from "../grants.ts";
 import { NAME_RE } from "../limits.ts";
 import { type Cap, can, prefixOf, type Rule, validPath } from "../policy.ts";
+import { loadGroup } from "../repository/keyrings.ts";
 import * as repository from "../repository/secrets.ts";
 import type { AppEnv, Who } from "../types.ts";
 import { newId, now } from "../util.ts";
@@ -203,7 +204,7 @@ secrets.put("/secret", async (c) => {
     if (typeof metaPatch.owner === "string" && !(await ownerExists(c.env.DB, metaPatch.owner)))
       return c.json({ error: "owner is not a known identity" }, 400);
   }
-  const keyring = await repository.findKeyring(c.env.DB, prefixOf(path));
+  const keyring = await loadGroup(c.env.DB, prefixOf(path));
   if (!keyring) return c.json({ error: "create the group first" }, 409);
   // ADR 14: no writes while the group is rotating.
   if (keyring.status === "rotating")

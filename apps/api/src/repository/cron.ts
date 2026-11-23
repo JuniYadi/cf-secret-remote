@@ -1,4 +1,5 @@
 import { GENESIS } from "@cfs/core";
+import { findAuditBase } from "./audit.ts";
 
 const DAY = 86400;
 
@@ -10,9 +11,7 @@ export async function currentHead(
     .prepare("SELECT seq, hash FROM audit ORDER BY seq DESC LIMIT 1")
     .first<{ seq: number; hash: string }>();
   if (last) return { ...last, rows: count?.n ?? 0 };
-  const base = await db
-    .prepare("SELECT seq, hash FROM audit_base WHERE id = 1")
-    .first<{ seq: number; hash: string }>();
+  const base = await findAuditBase(db);
   return { seq: base?.seq ?? 0, hash: base?.hash ?? GENESIS, rows: 0 };
 }
 

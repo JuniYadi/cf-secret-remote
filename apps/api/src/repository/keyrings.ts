@@ -110,3 +110,15 @@ export function grantCounts(db: D1Database, identityId: string, prefix: string, 
     .bind(t, t, prefix, identityId)
     .first<{ lapsed: number; live: number }>();
 }
+
+export interface Group {
+  id: string;
+  version: number;
+  status: "active" | "rotating";
+}
+
+export const loadGroup = (db: D1Database, prefix: string) =>
+  db
+    .prepare("SELECT id, version, status FROM keyring WHERE prefix = ? AND personal_owner IS NULL")
+    .bind(prefix)
+    .first<Group>();

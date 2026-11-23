@@ -2,13 +2,13 @@ import { type Context, Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { prefixOf, validPath } from "../policy.ts";
+import { loadGroup } from "../repository/keyrings.ts";
+import { findMembership } from "../repository/membership.ts";
 import {
   approveRequest,
   cancelRequest,
   createRequest,
   denyRequest,
-  findApprovalGroup,
-  findApprovalMembership,
   findRequester,
   findRequestGroup,
   listRequests,
@@ -217,13 +217,13 @@ requests.post("/requests/:id/approve", requireAdmin, async (c) => {
   const t = now();
   if (overdue(row, t)) return c.json({ error: "request has expired" }, 409);
 
-  const group = await findApprovalGroup(db, row.groupPrefix);
+  const group = await loadGroup(db, row.groupPrefix);
   if (!group) return c.json({ error: "no such group" }, 404);
   if (group.status !== "active")
     return c.json({ error: "group is rotating, try again later" }, 409);
 
   // The approver must hold the group key at the current version, and that grant must not have lapsed.
-  const mine = await findApprovalMembership(db, group.id, who.id, group.version, t);
+  const mine = await findMembership(db, group.id, who.id, group.version, t);
   if (!mine) {
     await audit(db, {
       who: who.name,

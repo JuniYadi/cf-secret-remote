@@ -4,7 +4,8 @@ import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { NAME_RE } from "../limits.ts";
 import { prefixOf, validPath } from "../policy.ts";
-import type { Group } from "../repository/membership.ts";
+import { findPerson } from "../repository/identity.ts";
+import { type Group, loadGroup } from "../repository/keyrings.ts";
 import * as membershipRepo from "../repository/membership.ts";
 import type { AppEnv } from "../types.ts";
 import { now } from "../util.ts";
@@ -16,7 +17,6 @@ import { ciphertextSize, validInput } from "./logins.ts";
 export const CHUNK_SIZE = 50;
 
 export const countAdminsWithVault = membershipRepo.countAdminsWithVault;
-const loadGroup = membershipRepo.loadGroup;
 
 /**
  * Loads the group and checks the caller holds its key at the current version.
@@ -363,7 +363,7 @@ membership.patch("/identities/:id", requireAdmin, async (c) => {
     (b.role !== undefined && b.role !== "admin" && b.role !== "member")
   )
     return c.json({ error: "bad request" }, 400);
-  const t = await membershipRepo.findIdentity(db, id);
+  const t = await findPerson(db, id);
   if (!t) return c.json({ error: "unknown identity" }, 404);
 
   const role = b.role ?? t.role;
