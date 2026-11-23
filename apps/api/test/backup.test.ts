@@ -1,6 +1,7 @@
 import { env, SELF } from "cloudflare:test";
 import { generateDek, sealText } from "@cfs/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushAlerts, resetAlertSenders, setAlertSenders } from "../src/alerts.ts";
 import { appendRow } from "../src/audit.ts";
 import { runDaily } from "../src/cron.ts";
 import {
@@ -50,6 +51,8 @@ async function resetDb() {
 
 beforeEach(resetDb);
 afterEach(async () => {
+  await flushAlerts();
+  resetAlertSenders();
   vi.restoreAllMocks();
   await db.prepare("DROP TRIGGER IF EXISTS fail_policy_insert").run();
 });
@@ -298,7 +301,11 @@ describe("ADR 23: export format", () => {
     const r = await download(adm.token, PASS);
     expect(r.status).toBe(200);
     expect(new TextDecoder().decode(r.bytes.slice(0, 8))).toBe("CFSSEAL1");
+    const webhook = vi.fn(async () => {});
+    setAlertSenders({ webhook });
     expect(await SELF.fetch("http://t.test/api/v1/backup").then((x) => x.status)).toBe(401);
+    await flushAlerts();
+    expect(webhook).toHaveBeenCalledTimes(1);
     expect((await post("/restore/check", adm.token, restoreBody(r.bytes))).status).toBe(400);
     expect(
       (await post("/restore/check", adm.token, restoreBody(r.bytes), "not the passphrase")).status,
