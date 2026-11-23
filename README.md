@@ -1,8 +1,12 @@
 # cf-secret-remote
 
-A secret vault that runs entirely on Cloudflare's free tier. Secrets are locked in the browser or CLI before they are saved, so the server never holds a readable value. Every access is recorded.
+A vault for QA credentials and secrets, for a team or one person. It is for small technical teams—developers, QA, agencies, and startups—with a Cloudflare account. It runs on Cloudflare Workers and D1 in your own account; hosted SaaS is out of scope.
 
-Status: skeleton only. No logic yet. The design lives in [`DESIGN.md`](DESIGN.md), and the screens are in `design/`.
+The server cannot read values ([ADR 2](docs/adr/0002-end-to-end-encryption.md)); hash-chained audit makes access provable ([ADR 6](docs/adr/0006-hash-chained-audit.md)); and machines and agents use AppRole to get credentials ([ADR 15](docs/adr/0015-apps-and-bots-lifecycle.md), [ADR 17](docs/adr/0017-agent-proxy-and-rules.md)). Login items and their CLI, web, extension, and import workflows are planned ([ADRs 29–33](docs/adr/README.md)).
+
+This is not a general consumer password manager: v1 has no cards, identities, passkeys, or file attachments. Secure notes are Secrets. In v1, credentials are returned to the test runner, not an LLM. Do not give agents raw passwords; for HTTP keys, use the [agent-safe proxy](docs/adr/0017-agent-proxy-and-rules.md) ([ADR 35](docs/adr/0035-deferred-agent-fill-and-account-lease.md)).
+
+The design lives in [`DESIGN.md`](DESIGN.md), and the screens are in `design/`.
 
 ## Install the CLI
 Linux and macOS:
@@ -15,6 +19,14 @@ irm https://raw.githubusercontent.com/JuniYadi/cf-secret-remote/main/install.ps1
 ```
 Both pick the right binary for your OS and CPU, check it against the release `SHA256SUMS`, and install it as `cfs` (`~/.local/bin` or `%LOCALAPPDATA%\cfs\bin`). Pin a version with `sh -s -- v0.0.1`. Later, `cfs upgrade` updates it.
 
+## Login accounts
+
+After signing in and unlocking, add an encrypted login with `cfs account add shop --group team --env staging --role admin --username alice`. Enter the password at the hidden prompt, or pipe it on stdin. Omit `--group` for your personal keyring. Optional fields include `--url`, `--totp` (seed or URI), and `--notes`.
+
+Use `cfs account list`, `cfs account get shop --env staging --role admin`, `cfs account totp shop`, `cfs account edit shop`, or `cfs account rm shop`. Use `--show` to reveal a password on a terminal, or `--json` for a pipe. Add `--purpose` to record why credentials were revealed.
+
+`cfs run --account shop:staging:admin --purpose ci-run -- command` injects `CFS_SHOP_USER`, `CFS_SHOP_PASS`, and `CFS_SHOP_TOTP` into the child. Repeat `--account` for more accounts. AppRole kits work through `CFS_KIT`. The private [SDK](packages/sdk/README.md) supports test setup; give credentials to the test runner, not to an LLM.
+
 ## Layout
 ```
 apps/
@@ -23,6 +35,7 @@ apps/
   cli/    `cfs` command line, compiled to one binary with Bun.
 packages/
   core/   Crypto (WebCrypto only), kit format, schemas, fingerprint code. Shared by all three.
+  sdk/    Private Node and Bun account SDK (not published yet).
 design/   UI canvas, brand files.
 ```
 

@@ -1,3 +1,4 @@
+import { account } from "./account.ts";
 import { app } from "./app.ts";
 import { audit } from "./audit.ts";
 import { backup } from "./backup.ts";
@@ -14,6 +15,7 @@ import { versions } from "./versions.ts";
 
 export const commands: Commands = {
   ...session,
+  ...account,
   ...secrets,
   ...group,
   ...app,

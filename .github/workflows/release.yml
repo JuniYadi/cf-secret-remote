@@ -55,6 +55,13 @@ jobs:
         env:
           CFS_VERSION: ${{ github.ref_name }}
         run: bun run bundle:worker
+      - name: Archive web dist
+        run: tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf dist/web-dist.tgz -C apps/web/dist .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist.tgz
+          path: dist/web-dist.tgz
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: worker-bundle.tgz
@@ -98,7 +105,7 @@ jobs:
         working-directory: dist/release
         run: |
           set -euo pipefail
-          sha256sum cfs-* worker-bundle.tgz > SHA256SUMS
+          sha256sum cfs-* worker-bundle.tgz web-dist.tgz > SHA256SUMS
           cat SHA256SUMS
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v2
@@ -112,4 +119,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes \
-            dist/release/cfs-* dist/release/worker-bundle.tgz dist/release/SHA256SUMS
+            dist/release/cfs-* dist/release/worker-bundle.tgz dist/release/web-dist.tgz dist/release/SHA256SUMS

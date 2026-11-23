@@ -411,6 +411,7 @@ export interface SecretWrite {
 // --- Groups, permissions, apps (ADR 14, 5, 15). Shapes match apps/api/src/routes. ---
 
 export interface KeyringRow {
+  id: string;
   prefix: string;
   version: number;
 }
@@ -665,8 +666,11 @@ export const api = {
   approveRequest: (id: string, wrappedKey: string, version: number) =>
     request<AccessRequest>("POST", `/requests/${id}/approve`, { wrappedKey, version }),
   /** The caller's wrapped copy of a group key. Used by an approver before approving. */
-  groupKey: (prefix: string) =>
-    request<{ wrappedKey: string; version: number }>("GET", `/keyrings/${prefix}/key`),
+  groupKey: (prefix: string, version?: number) =>
+    request<{ wrappedKey: string; version: number }>(
+      "GET",
+      `/keyrings/${encodeURIComponent(prefix)}/key${queryString({ version })}`,
+    ),
   identities: () => request<Identity[]>("GET", "/identities"),
 
   // Secrets (ADR 10, 22)
