@@ -514,7 +514,8 @@ describe("Give access again", () => {
       ?.click();
     await flush();
     expect(wrap.mock.calls[0]?.[1].groups).toEqual(["infra"]);
-    expect(text()).toContain("Not given: infra, team.");
+    expect(text()).toContain("Not given: infra.");
+    expect(text()).not.toContain("Not given: infra, team");
     expect(text()).toContain("Another admin who holds these groups");
   });
 });

@@ -156,7 +156,8 @@ function RegrantOne({ id }: { id: string }) {
       const out = await submitWords(re.keys);
       setDone({
         granted: out.groups,
-        notRewrapped: req.groups.filter((g) => !out.groups.includes(g)),
+        // Groups this admin chose but could not give; groups they unticked are left out on purpose.
+        notRewrapped: selected.filter((g) => !out.groups.includes(g)),
       });
     } catch (err) {
       setError(err);
