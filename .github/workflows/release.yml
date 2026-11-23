@@ -38,7 +38,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Compile ${{ matrix.asset }}
         run: bun build --compile --target=${{ matrix.target }} apps/cli/src/index.ts --outfile dist/${{ matrix.asset }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.asset }}
           path: dist/${{ matrix.asset }}
@@ -57,12 +57,12 @@ jobs:
         run: bun run bundle:worker
       - name: Archive web dist
         run: tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf dist/web-dist.tgz -C apps/web/dist .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-dist.tgz
           path: dist/web-dist.tgz
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: worker-bundle.tgz
           path: dist/worker-bundle.tgz
@@ -82,7 +82,7 @@ jobs:
           mkdir -p dist
           find apps/extension/dist -exec touch -t 198001010000 {} +
           (cd apps/extension/dist && find . -type f | LC_ALL=C sort | zip -X "${GITHUB_WORKSPACE}/dist/cfs-extension.zip" -@)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cfs-extension.zip
           path: dist/cfs-extension.zip
