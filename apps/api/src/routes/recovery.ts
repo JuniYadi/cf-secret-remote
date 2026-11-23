@@ -5,6 +5,19 @@ import { RECOVERY_ACTION } from "../alerts.ts";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { notifyRecovery, type RecoveryEvent } from "../recovery-notify.ts";
+import {
+  cancelRecovery,
+  createRecovery,
+  findCancellation,
+  findPendingRecovery,
+  findRecoveryGroup,
+  findRecoveryMember,
+  grantRecovery,
+  listRecoveries,
+  loadRequest,
+  recordWrongCode,
+  recoveryGroups,
+} from "../repository/recovery.ts";
 import type { AppEnv } from "../types.ts";
 import { newId, newToken, now, sha256Hex } from "../util.ts";
 
@@ -40,23 +53,6 @@ async function validPublicKey(s: string): Promise<boolean> {
   }
 }
 
-interface RequestRow {
-  id: string;
-  identity_id: string;
-  name: string;
-  public_key: string;
-  status: string;
-  attempts: number;
-}
-
-const loadRequest = (c: Context<AppEnv>, id: string) =>
-  c.env.DB.prepare(
-    `SELECT r.id, r.identity_id, i.name, r.public_key, r.status, r.attempts
-     FROM recovery_request r JOIN identity i ON i.id = r.identity_id WHERE r.id = ?`,
-  )
-    .bind(id)
-    .first<RequestRow>();
-
 const ip = (c: Context<AppEnv>) => c.req.header("CF-Connecting-IP");
 
 export const recovery = new Hono<AppEnv>();
@@ -88,26 +84,13 @@ recovery.post("/recovery/request", async (c) => {
   if (!isStr(b.publicKey) || !(await validPublicKey(b.publicKey)) || !isPrivateKeyLock(b.lockedKey))
     return c.json({ error: "bad request" }, 400);
 
-  const pending = await db
-    .prepare("SELECT id FROM recovery_request WHERE identity_id = ? AND status = 'pending'")
-    .bind(who.id)
-    .first();
+  const pending = await findPendingRecovery(db, who.id);
   if (pending) return c.json({ error: "a recovery request is already waiting for an admin" }, 409);
 
   const id = newId();
   const cancelToken = newToken("cfsr");
   try {
-    await db.batch([
-      // A locked request is finished; clear it so the record stays small.
-      db
-        .prepare("DELETE FROM recovery_request WHERE identity_id = ? AND status = 'locked'")
-        .bind(who.id),
-      db
-        .prepare(
-          "INSERT INTO recovery_request (id, identity_id, public_key, locked_key, cancel_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        )
-        .bind(id, who.id, b.publicKey, b.lockedKey, await sha256Hex(cancelToken), t),
-    ]);
+    await createRecovery(db, id, who.id, b.publicKey, b.lockedKey, await sha256Hex(cancelToken), t);
   } catch {
     // The partial unique index stopped a second open request at the same moment.
     return c.json({ error: "a recovery request is already waiting for an admin" }, 409);
@@ -126,23 +109,15 @@ recovery.post("/recovery/request", async (c) => {
 
 // Admin: the pending requests, names and times only. The admin opens one to give access again (ADR 20).
 recovery.get("/recovery", requireAdmin, async (c) => {
-  const rows = await c.env.DB.prepare(
-    `SELECT r.id, i.name, r.created_at AS createdAt, r.attempts FROM recovery_request r
-     JOIN identity i ON i.id = r.identity_id WHERE r.status = 'pending' ORDER BY r.created_at`,
-  ).all<{ id: string; name: string; createdAt: number; attempts: number }>();
+  const rows = await listRecoveries(c.env.DB);
   return c.json(rows.results);
 });
 
 // An admin reads a pending request: the new public key (to re-wrap to), the person's groups, and attempts left.
 recovery.get("/recovery/:id", requireAdmin, async (c) => {
-  const r = await loadRequest(c, c.req.param("id"));
+  const r = await loadRequest(c.env.DB, c.req.param("id"));
   if (!r) return c.json({ error: "no such request" }, 404);
-  const groups = await c.env.DB.prepare(
-    `SELECT k.prefix FROM keyring_member m JOIN keyring k ON k.id = m.keyring_id
-     WHERE m.identity_id = ? AND m.version = k.version ORDER BY k.prefix`,
-  )
-    .bind(r.identity_id)
-    .all<{ prefix: string }>();
+  const groups = await recoveryGroups(c.env.DB, r.identity_id);
   return c.json({
     id: r.id,
     name: r.name,
@@ -164,7 +139,7 @@ recovery.post("/recovery/:id/grant", requireAdmin, async (c) => {
   }>(c);
   if (!isStr(b.words)) return c.json({ error: "bad request" }, 400);
 
-  const r = await loadRequest(c, id);
+  const r = await loadRequest(c.env.DB, id);
   if (!r) return c.json({ error: "no such request" }, 404);
   if (r.status !== "pending") return c.json({ error: "this request is not open" }, 409);
   if (r.identity_id === who.id)
@@ -173,13 +148,8 @@ recovery.post("/recovery/:id/grant", requireAdmin, async (c) => {
   // The words are checked before anything else. Each wrong code is counted; the fifth locks the request.
   const expected = await fingerprintWords(r.public_key);
   if (normalizeWords(b.words) !== expected) {
-    await db
-      .prepare(
-        "UPDATE recovery_request SET attempts = attempts + 1, status = CASE WHEN attempts + 1 >= ? THEN 'locked' ELSE status END WHERE id = ? AND status = 'pending'",
-      )
-      .bind(MAX_ATTEMPTS, id)
-      .run();
-    const after = await loadRequest(c, id);
+    await recordWrongCode(db, MAX_ATTEMPTS, id);
+    const after = await loadRequest(c.env.DB, id);
     const left = Math.max(0, MAX_ATTEMPTS - (after?.attempts ?? MAX_ATTEMPTS));
     const locked = after?.status === "locked";
     await audit(db, {
@@ -221,64 +191,22 @@ recovery.post("/recovery/:id/grant", requireAdmin, async (c) => {
   // A group the person is not in (removed earlier) can never be re-granted through recovery.
   const plan: { keyringId: string; prefix: string; version: number; wrappedKey: string }[] = [];
   for (const k of keys) {
-    const g = await db
-      .prepare("SELECT id, version, status FROM keyring WHERE prefix = ?")
-      .bind(k.prefix)
-      .first<{ id: string; version: number; status: string }>();
+    const g = await findRecoveryGroup(db, k.prefix);
     if (!g) return c.json({ error: `no such group: ${k.prefix}` }, 404);
     if (g.status !== "active") return c.json({ error: `group is rotating: ${k.prefix}` }, 409);
     if (k.version !== g.version) return c.json({ error: "group changed, reload and retry" }, 409);
-    const adminIn = await db
-      .prepare(
-        "SELECT 1 AS ok FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND version = ?",
-      )
-      .bind(g.id, who.id, g.version)
-      .first();
+    const adminIn = await findRecoveryMember(db, g.id, who.id, g.version);
     if (!adminIn) return c.json({ error: `you are not in group: ${k.prefix}` }, 403);
-    const personIn = await db
-      .prepare(
-        "SELECT 1 AS ok FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND version = ?",
-      )
-      .bind(g.id, r.identity_id, g.version)
-      .first();
+    const personIn = await findRecoveryMember(db, g.id, r.identity_id, g.version);
     if (!personIn) return c.json({ error: `the person is not in group: ${k.prefix}` }, 400);
     plan.push({ keyringId: g.id, prefix: k.prefix, version: g.version, wrappedKey: k.wrappedKey });
   }
 
   // One batch. Every statement is conditioned on this request being granted by this admin, so a
   // concurrent request cannot leave the key swapped without its groups, or the reverse.
-  const guard =
-    "EXISTS (SELECT 1 FROM recovery_request WHERE id = ? AND status = 'granted' AND resolved_by = ?)";
-  const t = now();
-  await db.batch([
-    db
-      .prepare(
-        "UPDATE recovery_request SET status = 'granted', resolved_by = ?, resolved_at = ? WHERE id = ? AND status = 'pending'",
-      )
-      .bind(who.id, t, id),
-    db
-      .prepare(
-        `UPDATE identity SET
-           public_key = (SELECT public_key FROM recovery_request WHERE id = ?),
-           locked_key = (SELECT locked_key FROM recovery_request WHERE id = ?),
-           recovery_locked_key = NULL
-         WHERE id = ? AND ${guard}`,
-      )
-      .bind(id, id, r.identity_id, id, who.id),
-    ...plan.flatMap((p) => [
-      db
-        .prepare(`DELETE FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND ${guard}`)
-        .bind(p.keyringId, r.identity_id, id, who.id),
-      db
-        .prepare(
-          `INSERT INTO keyring_member (keyring_id, identity_id, version, wrapped_key)
-           SELECT ?, ?, ?, ? WHERE ${guard}`,
-        )
-        .bind(p.keyringId, r.identity_id, p.version, p.wrappedKey, id, who.id),
-    ]),
-  ]);
+  await grantRecovery(db, who.id, now(), id, r.identity_id, plan);
 
-  const done = await loadRequest(c, id);
+  const done = await loadRequest(c.env.DB, id);
   if (done?.status !== "granted")
     return c.json({ error: "request changed, reload and retry" }, 409);
   await audit(db, {
@@ -300,10 +228,7 @@ recovery.post("/recovery/:id/cancel", async (c) => {
   const id = c.req.param("id");
   const b = await body<{ token: string }>(c);
   if (!isStr(b.token)) return c.json({ error: "bad request" }, 400);
-  const r = await db
-    .prepare("SELECT identity_id, cancel_hash, status FROM recovery_request WHERE id = ?")
-    .bind(id)
-    .first<{ identity_id: string; cancel_hash: string; status: string }>();
+  const r = await findCancellation(db, id);
   // Someone else's request looks the same as no request.
   if (!r || r.identity_id !== who.id) return c.json({ error: "no such request" }, 404);
   if (r.status !== "pending") return c.json({ error: "this request is not open" }, 409);
@@ -317,10 +242,7 @@ recovery.post("/recovery/:id/cancel", async (c) => {
     });
     return c.json({ error: "bad cancel link" }, 403);
   }
-  await db
-    .prepare("DELETE FROM recovery_request WHERE id = ? AND status = 'pending'")
-    .bind(id)
-    .run();
+  await cancelRecovery(db, id);
   await audit(db, {
     who: who.name,
     action: "recovery.cancel",
