@@ -4,10 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fillPage } from "./fill.ts";
 
 beforeEach(() => {
-  document.body.innerHTML = readFileSync("test-fixtures/fill.html", "utf8").replace(
-    /<iframe[^>]*><\/iframe>/g,
-    "",
-  );
+  // Parse into an inert template and drop frames as DOM nodes, not by regex.
+  const fixture = document.createElement("template");
+  fixture.innerHTML = readFileSync("test-fixtures/fill.html", "utf8");
+  for (const frame of Array.from(fixture.content.querySelectorAll("iframe"))) frame.remove();
+  document.body.replaceChildren(fixture.content);
   vi.stubGlobal("location", new URL("https://shop.com/login"));
   vi.stubGlobal("top", window);
   vi.stubGlobal("getComputedStyle", (element: HTMLElement) => ({
