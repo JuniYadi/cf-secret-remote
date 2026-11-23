@@ -1,9 +1,18 @@
 import { Hono } from "hono";
-import { PROD_GLOB, RULE_COLS, type StoredRule } from "../agent-guard.ts";
+import { PROD_GLOB, type StoredRule } from "../agent-guard.ts";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { NAME_RE } from "../limits.ts";
 import { globMatch, validPath } from "../policy.ts";
+import {
+  deleteRule,
+  findRule,
+  insertRule,
+  isApp,
+  listRules,
+  type RuleInput,
+  updateRule,
+} from "../repository/agent.ts";
 import type { AppEnv, Who } from "../types.ts";
 
 // ADR 17. Agent rules: which secret an app's alias reads, where the value goes, and the limits on it.
@@ -75,17 +84,6 @@ export function parseInject(raw: unknown): Check<string> {
   return { value: raw };
 }
 
-/** Fields a rule holds, after validation. Used by create (all present) and update (merged over the old row). */
-interface RuleInput {
-  secretPath: string;
-  name: string;
-  upstream: string;
-  inject: string;
-  maxReadsPerHour: number;
-  requireReason: boolean;
-  requireApproval: boolean;
-}
-
 function checkSecretPath(raw: unknown): Check<string> {
   return typeof raw === "string" && validPath(raw) && !raw.includes("*")
     ? { value: raw }
@@ -108,18 +106,6 @@ function checkBool(raw: unknown, field: string): Check<boolean> {
   return typeof raw === "boolean" ? { value: raw } : { error: `${field} must be true or false` };
 }
 
-const isApp = (db: D1Database, id: string) =>
-  db
-    .prepare("SELECT id, name FROM identity WHERE id = ? AND kind = 'app'")
-    .bind(id)
-    .first<{ id: string; name: string }>();
-
-const findRule = (db: D1Database, appId: string, alias: string) =>
-  db
-    .prepare(`SELECT ${RULE_COLS} FROM agent_rule WHERE identity_id = ? AND alias = ?`)
-    .bind(appId, alias)
-    .first<StoredRule>();
-
 // Approval is on for prod paths unless the admin says otherwise (ADR 17).
 const defaultApproval = (secretPath: string) => globMatch(PROD_GLOB, secretPath);
 
@@ -129,11 +115,7 @@ export const agent_rules = new Hono<AppEnv>();
 agent_rules.get("/apps/:id/rules", requireAdmin, async (c) => {
   const app = await isApp(c.env.DB, c.req.param("id") ?? "");
   if (!app) return c.json({ error: "not found" }, 404);
-  const rows = await c.env.DB.prepare(
-    `SELECT ${RULE_COLS} FROM agent_rule WHERE identity_id = ? ORDER BY alias`,
-  )
-    .bind(app.id)
-    .all<StoredRule>();
+  const rows = await listRules(c.env.DB, app.id);
   return c.json(rows.results.map(view));
 });
 
@@ -155,23 +137,7 @@ agent_rules.post("/apps/:id/rules", requireAdmin, async (c) => {
 
   if (await findRule(db, app.id, alias))
     return c.json({ error: "alias already used for this app" }, 409);
-  await db
-    .prepare(
-      `INSERT INTO agent_rule (identity_id, alias, secret_path, name, upstream, inject,
-         max_reads_per_hour, require_reason, require_approval) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      app.id,
-      alias,
-      input.secretPath,
-      input.name,
-      input.upstream,
-      input.inject,
-      input.maxReadsPerHour,
-      input.requireReason ? 1 : 0,
-      input.requireApproval ? 1 : 0,
-    )
-    .run();
+  await insertRule(db, app.id, alias, input);
   await audit(db, {
     who: who.name,
     action: "agent_rule.create",
@@ -218,24 +184,7 @@ agent_rules.put("/apps/:id/rules/:alias", requireAdmin, async (c) => {
   if ("error" in checked) return c.json({ error: checked.error }, 400);
   const input = checked.value;
 
-  await db
-    .prepare(
-      `UPDATE agent_rule SET secret_path = ?, name = ?, upstream = ?, inject = ?,
-         max_reads_per_hour = ?, require_reason = ?, require_approval = ?
-       WHERE identity_id = ? AND alias = ?`,
-    )
-    .bind(
-      input.secretPath,
-      input.name,
-      input.upstream,
-      input.inject,
-      input.maxReadsPerHour,
-      input.requireReason ? 1 : 0,
-      input.requireApproval ? 1 : 0,
-      app.id,
-      alias,
-    )
-    .run();
+  await updateRule(db, app.id, alias, input);
   await audit(db, {
     who: who.name,
     action: "agent_rule.update",
@@ -257,10 +206,7 @@ agent_rules.delete("/apps/:id/rules/:alias", requireAdmin, async (c) => {
   const alias = c.req.param("alias") ?? "";
   const current = await findRule(db, app.id, alias);
   if (!current) return c.json({ error: "not found" }, 404);
-  await db
-    .prepare("DELETE FROM agent_rule WHERE identity_id = ? AND alias = ?")
-    .bind(app.id, alias)
-    .run();
+  await deleteRule(db, app.id, alias);
   await audit(db, {
     who: who.name,
     action: "agent_rule.delete",
@@ -275,11 +221,7 @@ agent_rules.delete("/apps/:id/rules/:alias", requireAdmin, async (c) => {
 // The caller's own rules. Any identity may call it; it only ever lists rows where identity_id is the caller.
 agent_rules.get("/agent/rules", async (c) => {
   const who: Who = c.get("who");
-  const rows = await c.env.DB.prepare(
-    `SELECT ${RULE_COLS} FROM agent_rule WHERE identity_id = ? ORDER BY alias`,
-  )
-    .bind(who.id)
-    .all<StoredRule>();
+  const rows = await listRules(c.env.DB, who.id);
   return c.json(rows.results.map(view));
 });
 
