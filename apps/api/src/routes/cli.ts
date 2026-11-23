@@ -1,5 +1,13 @@
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
+import {
+  approveCliLogin,
+  claimCliLogin,
+  createCliSession,
+  findCliLogin,
+  findPendingCliLogin,
+  startCliLogin,
+} from "../repository/identity.ts";
 import { attemptsLeft, hit, spent } from "../throttle.ts";
 import type { AppEnv, Env } from "../types.ts";
 import { newToken, now, sha256Hex } from "../util.ts";
@@ -25,17 +33,14 @@ cliPublic.post("/cli/start", async (c) => {
     return c.json({ error: "bad request" }, 400);
   const deviceCode = newToken("cfsdev");
   const code = userCode();
-  await c.env.DB.prepare(
-    "INSERT INTO cli_login (device_hash, user_code, device, expires_at, device_type) VALUES (?, ?, ?, ?, ?)",
-  )
-    .bind(
-      await sha256Hex(deviceCode),
-      code,
-      (b.device ?? "").slice(0, 80),
-      now() + CODE_TTL,
-      b.device_type ?? "cli",
-    )
-    .run();
+  await startCliLogin(
+    c.env.DB,
+    await sha256Hex(deviceCode),
+    code,
+    (b.device ?? "").slice(0, 80),
+    now() + CODE_TTL,
+    b.device_type ?? "cli",
+  );
   return c.json({ deviceCode, userCode: code, expiresIn: CODE_TTL, interval: 2 });
 });
 
@@ -48,34 +53,23 @@ cliPublic.post("/cli/poll", async (c) => {
   // ADR 27: about one poll per 2 seconds, with some slack
   if (!(await hit(c.env.DB, `cli-poll:${hash}`, 40, 60)))
     return c.json({ error: "slow down" }, 429);
-  const row = await c.env.DB.prepare(
-    "SELECT l.status, l.identity_id, l.device, l.expires_at, i.name FROM cli_login l LEFT JOIN identity i ON i.id = l.identity_id WHERE l.device_hash = ?",
-  )
-    .bind(hash)
-    .first<{
-      status: string;
-      identity_id: string | null;
-      device: string;
-      expires_at: number;
-      name: string | null;
-    }>();
+  const row = await findCliLogin(c.env.DB, hash);
   if (!row || row.expires_at < now() || row.status === "used")
     return c.json({ error: "expired" }, 410);
   if (row.status === "pending" || !row.identity_id) return c.json({ status: "pending" }, 202);
 
   // Mark used first, so a replayed poll cannot mint a second token.
-  const claimed = await c.env.DB.prepare(
-    "UPDATE cli_login SET status = 'used' WHERE device_hash = ? AND status = 'approved'",
-  )
-    .bind(hash)
-    .run();
-  if (!claimed.meta.changes) return c.json({ error: "expired" }, 410);
+  const claimed = await claimCliLogin(c.env.DB, hash);
+  if (!claimed) return c.json({ error: "expired" }, 410);
   const token = newToken("cfs");
-  await c.env.DB.prepare(
-    "INSERT INTO session (token_hash, identity_id, kind, device, created_at, expires_at) VALUES (?, ?, 'cli', ?, ?, ?)",
-  )
-    .bind(await sha256Hex(token), row.identity_id, row.device, now(), now() + TOKEN_TTL)
-    .run();
+  await createCliSession(
+    c.env.DB,
+    await sha256Hex(token),
+    row.identity_id,
+    row.device,
+    now(),
+    now() + TOKEN_TTL,
+  );
   await audit(c.env.DB, {
     who: row.name ?? row.identity_id,
     action: "login.ok",
@@ -107,11 +101,7 @@ cliApprove.get("/cli/login", async (c) => {
   if (await spent(c.env.DB, key, CODE_LIMIT, CODE_WINDOW))
     return c.json({ error: "too many attempts" }, 429);
   const code = normalizeUserCode(c.req.query("code") ?? "");
-  const row = await c.env.DB.prepare(
-    "SELECT device, device_type AS deviceType, expires_at AS expiresAt FROM cli_login WHERE user_code = ? AND status = 'pending' AND expires_at > ?",
-  )
-    .bind(code, now())
-    .first<{ device: string; deviceType: string; expiresAt: number }>();
+  const row = await findPendingCliLogin(c.env.DB, code, now());
   if (!row) {
     const left = await attemptsLeft(c.env.DB, key, CODE_LIMIT, CODE_WINDOW);
     return c.json({ error: "code not found or expired", attemptsLeft: Math.max(0, left) }, 404);
@@ -130,13 +120,8 @@ cliApprove.post("/cli/approve", async (c) => {
   const b = await c.req.json<{ userCode?: string }>().catch(() => ({}) as { userCode?: string });
   const left = await attemptsLeft(c.env.DB, `cli-approve:${who.id}`, CODE_LIMIT, CODE_WINDOW);
   if (left < 0) return c.json({ error: "too many attempts" }, 429);
-  const res = await c.env.DB.prepare(
-    "UPDATE cli_login SET status = 'approved', identity_id = ? WHERE user_code = ? AND status = 'pending' AND expires_at > ?",
-  )
-    .bind(who.id, normalizeUserCode(b.userCode ?? ""), now())
-    .run();
-  if (!res.meta.changes)
-    return c.json({ error: "code not found or expired", attemptsLeft: left }, 404);
+  const res = await approveCliLogin(c.env.DB, who.id, normalizeUserCode(b.userCode ?? ""), now());
+  if (!res) return c.json({ error: "code not found or expired", attemptsLeft: left }, 404);
   await audit(c.env.DB, {
     who: who.name,
     action: "cli.approve",
