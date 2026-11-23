@@ -1,7 +1,18 @@
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import { can, validPath } from "../policy.ts";
-import type { AppEnv, Who } from "../types.ts";
+import {
+  deleteSecretVersions,
+  findDeletedSecret,
+  findSecretMeta,
+  historyIdentity,
+  historyMembership,
+  historyRows,
+  listExpiredSecrets,
+  restoreDeletedSecret,
+  updateSecretMeta,
+} from "../repository/versions.ts";
+import type { AppEnv } from "../types.ts";
 import { now } from "../util.ts";
 import { applyMeta, check, type Meta, ownerExists, parseMetaPatch, rulesFor } from "./secrets.ts";
 
@@ -21,18 +32,7 @@ versions.get("/secret/history", async (c) => {
   if (!(await check(c, path, "update"))) return c.json({ error: "denied" }, 403);
   const db = c.env.DB;
   const since = now() - HISTORY_WINDOW;
-  const rows = await db
-    .prepare(
-      `SELECT at, json_extract(entry, '$.who') AS who, json_extract(entry, '$.version') AS version
-       FROM audit
-       WHERE json_extract(entry, '$.action') = 'secret.read'
-         AND json_extract(entry, '$.path') = ?
-         AND json_extract(entry, '$.result') = 'ok'
-         AND at >= ?
-       ORDER BY at DESC, seq DESC`,
-    )
-    .bind(path, since)
-    .all<{ at: number; who: string; version: number }>();
+  const rows = await historyRows(db, path, since);
 
   const byName = new Map<string, { opens: number; lastOpened: number; lastVersion: number }>();
   for (const r of rows.results) {
@@ -60,21 +60,10 @@ versions.get("/secret/history", async (c) => {
 
 /** A person keeps access only with a read policy AND the current group key (ADR 2: two gates). */
 async function stillHasAccess(db: D1Database, name: string, path: string): Promise<boolean> {
-  const ident = await db
-    .prepare(
-      "SELECT id, kind, name, role, status FROM identity WHERE name = ? ORDER BY kind LIMIT 1",
-    )
-    .bind(name)
-    .first<Who & { status: string }>();
+  const ident = await historyIdentity(db, name);
   if (ident?.status !== "active") return false;
   if (!can(await rulesFor(db, ident), path, "read")) return false;
-  const member = await db
-    .prepare(
-      `SELECT 1 AS ok FROM keyring k JOIN keyring_member km ON km.keyring_id = k.id
-       WHERE k.prefix = ? AND km.identity_id = ? AND km.version = k.version`,
-    )
-    .bind(path.split("/")[0] ?? "", ident.id)
-    .first();
+  const member = await historyMembership(db, path.split("/")[0] ?? "", ident.id);
   return member !== null;
 }
 
@@ -88,16 +77,10 @@ versions.put("/secret/meta", async (c) => {
   if (typeof parsed.patch.owner === "string" && !(await ownerExists(c.env.DB, parsed.patch.owner)))
     return c.json({ error: "owner is not a known identity" }, 400);
   if (!(await check(c, path, "update"))) return c.json({ error: "denied" }, 403);
-  const row = await c.env.DB.prepare(
-    "SELECT id, meta FROM secret WHERE path = ? AND deleted_at IS NULL",
-  )
-    .bind(path)
-    .first<{ id: string; meta: string | null }>();
+  const row = await findSecretMeta(c.env.DB, path);
   if (!row) return c.json({ error: "not found" }, 404);
   const next: Meta = applyMeta(row.meta ? (JSON.parse(row.meta) as Meta) : {}, parsed.patch);
-  await c.env.DB.prepare("UPDATE secret SET meta = ? WHERE id = ?")
-    .bind(JSON.stringify(next), row.id)
-    .run();
+  await updateSecretMeta(c.env.DB, JSON.stringify(next), row.id);
   await audit(c.env.DB, {
     who: c.get("who").name,
     action: "secret.meta",
@@ -123,14 +106,10 @@ versions.post("/secret/restore-delete", async (c) => {
     });
     return c.json({ error: "denied" }, 403);
   }
-  const row = await c.env.DB.prepare(
-    "SELECT id, deleted_at AS deletedAt FROM secret WHERE path = ?",
-  )
-    .bind(path)
-    .first<{ id: string; deletedAt: number | null }>();
+  const row = await findDeletedSecret(c.env.DB, path);
   if (!row?.deletedAt) return c.json({ error: "not found" }, 404);
   if (now() - row.deletedAt > RESTORE_WINDOW) return c.json({ error: "too old to restore" }, 410);
-  await c.env.DB.prepare("UPDATE secret SET deleted_at = NULL WHERE id = ?").bind(row.id).run();
+  await restoreDeletedSecret(c.env.DB, row.id);
   await audit(c.env.DB, {
     who: who.name,
     action: "secret.restore",
@@ -146,15 +125,9 @@ versions.post("/secret/restore-delete", async (c) => {
  * Called by the cron job (ADR 19). Returns the number of secrets purged.
  */
 export async function purgeDeletedSecrets(db: D1Database, at: number = now()): Promise<number> {
-  const old = await db
-    .prepare("SELECT id, path FROM secret WHERE deleted_at IS NOT NULL AND deleted_at < ?")
-    .bind(at - RESTORE_WINDOW)
-    .all<{ id: string; path: string }>();
+  const old = await listExpiredSecrets(db, at - RESTORE_WINDOW);
   for (const s of old.results) {
-    await db.batch([
-      db.prepare("DELETE FROM secret_version WHERE secret_id = ?").bind(s.id),
-      db.prepare("DELETE FROM secret WHERE id = ?").bind(s.id),
-    ]);
+    await deleteSecretVersions(db, s.id);
     await audit(db, { who: "system", action: "secret.purge", path: s.path, result: "ok" });
   }
   return old.results.length;
