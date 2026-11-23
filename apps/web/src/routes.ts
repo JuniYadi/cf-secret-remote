@@ -60,6 +60,11 @@ export const SECRET_TABS = {
 } as const;
 
 /** Paths with a name or id in them. Each is built with encodeURIComponent, so a slash stays inside one segment. */
+/** Secret names keep their slashes in the path, like /secrets/<name>. Other characters are escaped. */
+const encodeName = (name: string) => name.split("/").map(encodeURIComponent).join("/");
+export const deniedPath = (name: string) => `${PATHS.denied}/${encodeName(name)}`;
+/** The access request form, with the secret name filled in. */
+export const askAccessPath = (name: string) => `${PATHS.requests}?path=${encodeURIComponent(name)}`;
 export const groupPath = (prefix: string) => `${PATHS.groups}/${encodeURIComponent(prefix)}`;
 export const groupAddPath = (prefix: string) => `${groupPath(prefix)}/add`;
 export const groupRelockPath = (prefix: string) => `${groupPath(prefix)}/relock`;
@@ -237,7 +242,8 @@ const PARAM_PATHS: readonly { re: RegExp; id: PageId }[] = [
 /** Maps a pathname to a page. Unknown paths map to notFound. Trailing slashes are ignored. */
 export function matchPage(pathname: string): MatchedPage {
   const path = pathname.replace(/\/+$/, "") || "/";
-  const denied = path.match(/^\/denied\/([^/]+)$/);
+  // The name is the rest of the path, so myapp/prod/db (raw slashes) and myapp%2Fprod both work.
+  const denied = path.match(/^\/denied\/(.+)$/);
   if (denied?.[1] !== undefined) {
     const name = decodeSegment(denied[1]);
     return name ? { id: "denied", name } : { id: "notFound" };

@@ -2,7 +2,7 @@ import { Link } from "wouter-preact";
 import { Icon, PageTitle } from "../components/shared.tsx";
 import { useLang } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
-import { PATHS, pageCrumbs } from "../routes.ts";
+import { askAccessPath, PATHS, pageCrumbs } from "../routes.ts";
 
 /**
  * A secret the person's permissions do not cover. Shown inside the shell with a breadcrumb.
@@ -42,6 +42,9 @@ export function AccessDeniedPage({ name }: { name: string }) {
           </li>
         </ul>
         <div class="row-actions">
+          <Link class="btn" href={askAccessPath(name)}>
+            {t("Ask for access", "Minta akses")}
+          </Link>
           <Link class="btn ghost" href={PATHS.secrets}>
             {t("Back to Secrets", "Kembali ke Secret")}
           </Link>

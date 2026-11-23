@@ -323,7 +323,7 @@ function ApprovalCard({
 function AskForm({ onSent }: { onSent: () => void }) {
   useLang();
   const [draft, setDraft] = useState<RequestDraft>({
-    path: "",
+    path: new URLSearchParams(window.location.search).get("path") ?? "",
     reason: "",
     duration: REQUEST_DURATIONS[1] ?? 3600,
   });

@@ -43,6 +43,14 @@ describe("ADR 24 web security headers", () => {
     expect(seen).toEqual(["/secrets/myapp%2Fdev"]);
   });
 
+  it("passes /denied/<name with slashes> to the assets binding unchanged, without a redirect (#42)", async () => {
+    const { assets, seen } = stubAssets();
+    const res = await call("/denied/myapp/prod/db", assets);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Location")).toBeNull();
+    expect(seen).toEqual(["/denied/myapp/prod/db"]);
+  });
+
   it("sets the headers on static files and on the SPA fallback alike", async () => {
     const { assets } = stubAssets("body{}", 200);
     const res = await call("/assets/index-abc.css", assets);

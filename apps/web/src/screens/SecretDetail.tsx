@@ -28,7 +28,7 @@ import {
   type ValueType,
 } from "../lib/secrets.ts";
 import { type SecretState, useSecret } from "../lib/use-secret.ts";
-import { PATHS, pageCrumbs, SECRET_TABS, secretHref } from "../routes.ts";
+import { deniedPath, PATHS, pageCrumbs, SECRET_TABS, secretHref } from "../routes.ts";
 
 /** Cleartext metadata for one secret, from GET /secrets (GET /secret does not carry it). */
 export function useMeta(path: string): Meta {
@@ -57,7 +57,7 @@ export function SecretDetailPage({ name }: { name: string }) {
   const meta = useMeta(name);
 
   useEffect(() => {
-    if (state.status === "denied") navigate(`/denied/${name}`);
+    if (state.status === "denied") navigate(deniedPath(name));
   }, [state.status, name, navigate]);
 
   if (state.status === "loading" || state.status === "denied") {
