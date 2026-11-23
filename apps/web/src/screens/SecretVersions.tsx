@@ -5,9 +5,10 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { Link, useLocation } from "wouter-preact";
+import { ReasonForm } from "../components/reason-form.tsx";
 import { InfoBox, Pill, SecretTabs, WarnBox } from "../components/secrets-ui.tsx";
 import { PageTitle } from "../components/shared.tsx";
-import { api, type VersionRow } from "../lib/api.ts";
+import { ApiError, api, type VersionRow } from "../lib/api.ts";
 import { useLang } from "../lib/hooks.ts";
 import { currentLang, t } from "../lib/i18n.ts";
 import { isConflict, loadSecret, saveValues, secretConflictMessage } from "../lib/secret-store.ts";
@@ -214,14 +215,15 @@ function RestoreCard({
   const [, navigate] = useLocation();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [needsReason, setNeedsReason] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const next = current + 1;
 
-  const restore = async () => {
+  const restore = async (reason?: string) => {
     setBusy(true);
     setError(null);
     try {
-      const old = await loadSecret(name, from);
+      const old = await loadSecret(name, from, reason);
       await saveValues({
         path: name,
         values: old.values,
@@ -233,7 +235,9 @@ function RestoreCard({
     } catch (err) {
       setBusy(false);
       setConfirming(false);
-      if (secretConflictMessage(err)) {
+      if (err instanceof ApiError && err.kind === "reason-required") {
+        setNeedsReason(true);
+      } else if (secretConflictMessage(err)) {
         setError(secretConflictMessage(err) as string);
       } else if (isConflict(err)) {
         setError(
@@ -275,7 +279,14 @@ function RestoreCard({
           {error}
         </p>
       )}
-      {confirming ? (
+      {needsReason ? (
+        <ReasonForm
+          onSubmit={(reason) => {
+            setNeedsReason(false);
+            void restore(reason);
+          }}
+        />
+      ) : confirming ? (
         <div class="row-actions">
           <button
             type="button"
@@ -285,7 +296,7 @@ function RestoreCard({
           >
             {t("Cancel", "Batal")}
           </button>
-          <button type="button" class="btn" onClick={restore} disabled={busy}>
+          <button type="button" class="btn" onClick={() => void restore()} disabled={busy}>
             {t(`Yes, save as version ${next}`, `Ya, simpan sebagai versi ${next}`)}
           </button>
         </div>

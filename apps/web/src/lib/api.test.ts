@@ -90,6 +90,19 @@ describe("API client", () => {
     expect(init.headers).not.toHaveProperty("Authorization");
   });
 
+  it("omits the reason header for empty and whitespace-only reasons", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => json(200, {}));
+    try {
+      await api.secret("demo/prod", undefined, "");
+      await api.secret("demo/prod", undefined, "   ");
+      for (const [, init] of spy.mock.calls) {
+        expect(new Headers(init?.headers).has("X-Cfs-Reason")).toBe(false);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("sets the path on a fetched secret, because the Worker does not return it", async () => {
     const body = {
       version: 1,
