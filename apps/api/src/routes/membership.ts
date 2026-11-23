@@ -106,6 +106,23 @@ membership.post("/keyrings/:prefix/members", requireAdmin, async (c) => {
 
 // Rotation step 1. Ends the removed member's access at once and marks the group rotating.
 // `members` must be exactly the remaining members, each with the new group key wrapped to them.
+/** After a lost start: 409 `group_rotating` when another start won, `group_changed` when the version moved on. */
+async function rotationConflict(
+  c: Context<AppEnv>,
+  prefix: string,
+  version: number,
+): Promise<Response | null> {
+  const latest = await loadGroup(c.env.DB, prefix);
+  if (latest?.status === "rotating")
+    return c.json({ error: "group is already rotating", code: ConflictCode.group_rotating }, 409);
+  if (!latest || latest.version !== version)
+    return c.json(
+      { error: "group changed, reload and retry", code: ConflictCode.group_changed },
+      409,
+    );
+  return null;
+}
+
 membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   const db = c.env.DB;
   const who = c.get("who");
@@ -144,9 +161,8 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   const remaining = ids.filter((i) => i !== removeId).sort();
   const given = members.map((m) => m.identityId).sort();
   if (given.length !== remaining.length || given.some((id, i) => id !== remaining[i])) {
-    const latest = await loadGroup(db, prefix);
-    if (latest?.status !== "active" || latest.version !== g.version)
-      return c.json({ error: "group is already rotating", code: ConflictCode.group_rotating }, 409);
+    const conflict = await rotationConflict(c, prefix, g.version);
+    if (conflict) return conflict;
     return c.json({ error: "members must be exactly the remaining members" }, 400);
   }
 
@@ -155,7 +171,10 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   try {
     const started = await membershipRepo.startRotation(db, g.id, members, next, removeId);
     if (started[0]?.meta.changes !== 1)
-      return c.json({ error: "group is already rotating", code: ConflictCode.group_rotating }, 409);
+      return (
+        (await rotationConflict(c, prefix, g.version)) ??
+        c.json({ error: "group changed, reload and retry", code: ConflictCode.group_changed }, 409)
+      );
   } catch {
     return c.json(
       { error: "group changed, reload and retry", code: ConflictCode.group_changed },
