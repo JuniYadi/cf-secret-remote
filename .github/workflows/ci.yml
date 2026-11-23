@@ -10,6 +10,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun audit --audit-level=high
+      - run: bun run scripts/check-worker-node-imports.ts
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run test
@@ -43,6 +44,7 @@ jobs:
       - run: bunx playwright install --with-deps chromium
         working-directory: packages/core
       - run: bun run test:browser
+      - run: CFS_BROWSER_SMOKE=1 bun run e2e
 
   # Informational: reports ADR status drift and PR coverage. Never fails (continue-on-error + exit 0).
   adr-check:

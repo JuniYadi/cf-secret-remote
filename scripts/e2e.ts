@@ -514,6 +514,29 @@ async function run(): Promise<void> {
     return "2 values, version 1 (values not shown)";
   });
 
+  if (process.env.CFS_BROWSER_SMOKE === "1") {
+    await step("browser: sign in, unlock and list secrets", async () => {
+      const browserPort = await freePort();
+      const proc = Bun.spawn(
+        ["e2e/node_modules/.bin/playwright", "test", "-c", "e2e/playwright.config.ts"],
+        {
+          cwd: join(ROOT, "apps/web"),
+          env: cleanEnv({
+            CFS_BROWSER_API: HOST,
+            CFS_BROWSER_PORT: String(browserPort),
+            CFS_BROWSER_PASSWORD: adminPw,
+            VITE_DEV_TOKEN: savedToken(adminConfig),
+          }),
+          stdin: "ignore",
+          stdout: "inherit",
+          stderr: "inherit",
+        },
+      );
+      expect((await proc.exited) === 0, "Playwright smoke failed");
+    });
+    return;
+  }
+
   await step(`run: ${SECRET} values reach the child environment`, async () => {
     const ok = await cli(
       people.admin,
