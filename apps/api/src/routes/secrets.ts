@@ -4,6 +4,7 @@ import { audit } from "../audit.ts";
 import { lapsedGrant } from "../grants.ts";
 import { NAME_RE } from "../limits.ts";
 import { type Cap, can, prefixOf, type Rule, validPath } from "../policy.ts";
+import * as repository from "../repository/secrets.ts";
 import type { AppEnv, Who } from "../types.ts";
 import { newId, now } from "../util.ts";
 
@@ -12,13 +13,7 @@ export const secrets = new Hono<AppEnv>();
 export async function rulesFor(db: D1Database, who: Who): Promise<Rule[]> {
   if (who.role === "admin")
     return [{ path: "*", caps: ["create", "read", "update", "delete", "list"] }];
-  const rows = await db
-    .prepare(
-      `SELECT p.rules FROM identity_policy ip JOIN policy p ON p.id = ip.policy_id
-       WHERE ip.identity_id = ? AND (ip.expires_at IS NULL OR ip.expires_at > ?)`,
-    )
-    .bind(who.id, now())
-    .all<{ rules: string }>();
+  const rows = await repository.policyRules(db, who.id, now());
   return rows.results.flatMap((r) => JSON.parse(r.rules) as Rule[]);
 }
 
@@ -105,10 +100,7 @@ export function applyMeta(current: Meta, patch: MetaPatch): Meta {
 
 /** The owner must be a known, active identity (ADR 22: owner is an identity). */
 export async function ownerExists(db: D1Database, name: string): Promise<boolean> {
-  const row = await db
-    .prepare("SELECT 1 AS ok FROM identity WHERE name = ? AND status = 'active'")
-    .bind(name)
-    .first();
+  const row = await repository.findOwner(db, name);
   return row !== null;
 }
 
@@ -116,12 +108,7 @@ export async function ownerExists(db: D1Database, name: string): Promise<boolean
 secrets.get("/secrets", async (c) => {
   const who = c.get("who");
   const rules = await rulesFor(c.env.DB, who);
-  const rows = await c.env.DB.prepare(
-    `SELECT s.path, s.current AS version, v.names, v.created_at AS updatedAt, s.meta
-     FROM secret s JOIN secret_version v ON v.secret_id = s.id AND v.version = s.current
-     JOIN keyring k ON k.id = s.keyring_id AND k.personal_owner IS NULL
-     WHERE s.deleted_at IS NULL ORDER BY s.path`,
-  ).all<{ path: string; version: number; names: string; updatedAt: number; meta: string | null }>();
+  const rows = await repository.listSecrets(c.env.DB);
   return c.json(
     rows.results
       .filter((r) => can(rules, r.path, "list"))
@@ -166,14 +153,7 @@ secrets.get("/secret", async (c) => {
     return c.json({ error: guard.error }, guard.status);
   }
   const want = c.req.query("version");
-  const row = await c.env.DB.prepare(
-    `SELECT v.version, v.keyring_version AS keyringVersion, v.names, v.wrapped_dek AS wrappedDek, v.ciphertext, v.created_at AS createdAt
-     FROM secret s JOIN secret_version v ON v.secret_id = s.id AND v.version = COALESCE(?, s.current)
-     JOIN keyring k ON k.id = s.keyring_id AND k.personal_owner IS NULL
-     WHERE s.path = ? AND s.deleted_at IS NULL AND v.version <= s.current`,
-  )
-    .bind(want ? Number(want) : null, path)
-    .first<{ version: number; names: string }>();
+  const row = await repository.readSecret(c.env.DB, want ? Number(want) : null, path);
   if (!row) return c.json({ error: "not found" }, 404);
   await audit(c.env.DB, {
     who: who.name,
@@ -223,11 +203,7 @@ secrets.put("/secret", async (c) => {
     if (typeof metaPatch.owner === "string" && !(await ownerExists(c.env.DB, metaPatch.owner)))
       return c.json({ error: "owner is not a known identity" }, 400);
   }
-  const keyring = await c.env.DB.prepare(
-    "SELECT id, version, status FROM keyring WHERE prefix = ? AND personal_owner IS NULL",
-  )
-    .bind(prefixOf(path))
-    .first<{ id: string; version: number; status: string }>();
+  const keyring = await repository.findKeyring(c.env.DB, prefixOf(path));
   if (!keyring) return c.json({ error: "create the group first" }, 409);
   // ADR 14: no writes while the group is rotating.
   if (keyring.status === "rotating")
@@ -235,11 +211,7 @@ secrets.put("/secret", async (c) => {
   if (keyringVersion !== keyring.version)
     return c.json({ error: "group key changed, reload and retry" }, 409);
 
-  const existing = await c.env.DB.prepare(
-    "SELECT id, current, deleted_at AS deletedAt, meta FROM secret WHERE path = ?",
-  )
-    .bind(path)
-    .first<{ id: string; current: number; deletedAt: number | null; meta: string | null }>();
+  const existing = await repository.findSecret(c.env.DB, path);
   const cap: Cap = existing ? "update" : "create";
   if (!(await check(c, path, cap))) return c.json({ error: "denied" }, 403);
   // ADR 22: a deleted secret comes back only through an admin restore, not by a new write.
@@ -259,29 +231,22 @@ secrets.put("/secret", async (c) => {
         applyMeta(existing?.meta ? (JSON.parse(existing.meta) as Meta) : {}, metaPatch),
       )
     : null;
-  const stmts = [
-    existing
-      ? c.env.DB.prepare(
-          "UPDATE secret SET current = ?, meta = COALESCE(?, meta) WHERE id = ?",
-        ).bind(version, metaJson, id)
-      : c.env.DB.prepare(
-          "INSERT INTO secret (id, path, keyring_id, current, created_at, meta) VALUES (?, ?, ?, ?, ?, ?)",
-        ).bind(id, path, keyring.id, version, now(), metaJson),
-    c.env.DB.prepare(
-      "INSERT INTO secret_version (secret_id, version, keyring_version, names, wrapped_dek, ciphertext, created_by, created_at, fps) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ).bind(
-      id,
-      version,
-      keyringVersion,
-      JSON.stringify(names),
-      wrappedDek,
-      ciphertext,
-      who.id,
-      now(),
-      b.fps === undefined ? null : JSON.stringify(b.fps),
-    ),
-  ];
-  await c.env.DB.batch(stmts);
+  await repository.writeSecret(
+    c.env.DB,
+    !!existing,
+    id,
+    path,
+    keyring.id,
+    version,
+    metaJson,
+    keyringVersion,
+    JSON.stringify(names),
+    wrappedDek,
+    ciphertext,
+    who.id,
+    b.fps === undefined ? null : JSON.stringify(b.fps),
+    now,
+  );
   await audit(c.env.DB, {
     who: who.name,
     action: "secret.write",
@@ -298,18 +263,10 @@ secrets.delete("/secret", async (c) => {
   if (!validPath(path)) return c.json({ error: "bad path" }, 400);
   if (!(await check(c, path, "delete"))) return c.json({ error: "denied" }, 403);
   // ADR 14: no writes while the group is rotating.
-  const grp = await c.env.DB.prepare(
-    "SELECT k.status FROM secret s JOIN keyring k ON k.id = s.keyring_id WHERE s.path = ? AND s.deleted_at IS NULL",
-  )
-    .bind(path)
-    .first<{ status: string }>();
+  const grp = await repository.secretGroup(c.env.DB, path);
   if (grp?.status === "rotating")
     return c.json({ error: "group is rotating, writes are paused" }, 409);
-  const res = await c.env.DB.prepare(
-    "UPDATE secret SET deleted_at = ? WHERE path = ? AND deleted_at IS NULL",
-  )
-    .bind(now(), path)
-    .run();
+  const res = await repository.deleteSecret(c.env.DB, now(), path);
   if (!res.meta.changes) return c.json({ error: "not found" }, 404);
   await audit(c.env.DB, {
     who: c.get("who").name,
@@ -326,13 +283,7 @@ secrets.get("/secret/versions", async (c) => {
   const path = c.req.query("path") ?? "";
   if (!validPath(path)) return c.json({ error: "bad path" }, 400);
   if (!(await check(c, path, "list"))) return c.json({ error: "denied" }, 403);
-  const rows = await c.env.DB.prepare(
-    `SELECT v.version, v.names, v.fps, v.created_at AS createdAt, i.name AS createdBy
-     FROM secret s JOIN secret_version v ON v.secret_id = s.id JOIN identity i ON i.id = v.created_by
-     WHERE s.path = ? AND v.version <= s.current ORDER BY v.version DESC`,
-  )
-    .bind(path)
-    .all<{ names: string; fps: string | null }>();
+  const rows = await repository.secretVersions(c.env.DB, path);
   return c.json(
     rows.results.map((r) => ({
       ...r,
