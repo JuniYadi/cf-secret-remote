@@ -60,6 +60,7 @@ me.put("/me/vault", async (c) => {
   if (!res.meta.changes) return c.json({ error: "set up your vault first" }, 409);
   await audit(c.env.DB, {
     who: who.name,
+    actor: who,
     action: "vault.password",
     result: "ok",
     ip: c.req.header("CF-Connecting-IP"),
@@ -83,6 +84,7 @@ me.put("/me/recovery", async (c) => {
   if (!res.meta.changes) return c.json({ error: "set up your vault first" }, 409);
   await audit(c.env.DB, {
     who: who.name,
+    actor: who,
     action: "vault.recovery.set",
     result: "ok",
     ip: c.req.header("CF-Connecting-IP"),

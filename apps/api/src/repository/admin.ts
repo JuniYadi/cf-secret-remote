@@ -93,19 +93,21 @@ export async function auditStats(db: D1Database, since: number) {
         .bind(...binds)
         .first<{ n: number }>()
     )?.n ?? 0;
-  const reads =
-    "at >= ? AND json_extract(entry, '$.action') = 'secret.read' AND json_extract(entry, '$.result') = 'ok'";
+  const reads = "at >= ? AND action = 'secret.read' AND json_extract(entry, '$.result') = 'ok'";
   const [accesses, byApps, blocked, actors] = await Promise.all([
     one(`SELECT count(*) AS n FROM audit WHERE ${reads}`, since),
     one(
-      `SELECT count(*) AS n FROM audit WHERE ${reads} AND who IN (SELECT name FROM identity WHERE kind = 'app')`,
+      `SELECT count(*) AS n FROM audit WHERE ${reads} AND (identity_kind = 'app' OR (identity_id IS NULL AND who IN (SELECT name FROM identity WHERE kind = 'app')))`,
       since,
     ),
     one(
       "SELECT count(*) AS n FROM audit WHERE at >= ? AND json_extract(entry, '$.result') = 'denied'",
       since,
     ),
-    one("SELECT count(DISTINCT who) AS n FROM audit WHERE at >= ? AND who != 'system'", since),
+    one(
+      "SELECT count(DISTINCT COALESCE(identity_id, 'name:' || who)) AS n FROM audit WHERE at >= ? AND who != 'system'",
+      since,
+    ),
   ]);
   return { accesses, byApps, blocked, actors };
 }

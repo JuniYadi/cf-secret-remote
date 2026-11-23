@@ -56,6 +56,7 @@ async function refuse(
 ): Promise<GuardResult> {
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "secret.read",
     path,
     result: "denied",

@@ -19,13 +19,17 @@ export async function insertAuditRow(
   prev: string,
   hash: string,
   who: string,
+  identityId: string | null,
+  identityKind: string | null,
   day: string,
   readsLogged: number,
 ): Promise<void> {
   await db.batch([
     db
-      .prepare("INSERT INTO audit (at, entry, prev, hash, who) VALUES (?, ?, ?, ?, ?)")
-      .bind(at, entry, prev, hash, who),
+      .prepare(
+        "INSERT INTO audit (at, entry, prev, hash, who, identity_id, identity_kind) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
+      .bind(at, entry, prev, hash, who, identityId, identityKind),
     db
       .prepare(
         "INSERT INTO usage_day (day, writes, reads_logged) VALUES (?, 1, ?) ON CONFLICT (day) DO UPDATE SET writes = writes + 1, reads_logged = reads_logged + excluded.reads_logged",

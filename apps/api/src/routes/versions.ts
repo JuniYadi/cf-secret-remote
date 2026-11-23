@@ -34,16 +34,27 @@ versions.get("/secret/history", async (c) => {
   const since = now() - HISTORY_WINDOW;
   const rows = await historyRows(db, path, since);
 
-  const byName = new Map<string, { opens: number; lastOpened: number; lastVersion: number }>();
+  const byName = new Map<
+    string,
+    { name: string; id: string | null; opens: number; lastOpened: number; lastVersion: number }
+  >();
   for (const r of rows.results) {
-    const agg = byName.get(r.who);
+    const agg = byName.get(r.identityId ?? `name:${r.who}`);
     if (agg) agg.opens++;
-    else byName.set(r.who, { opens: 1, lastOpened: r.at, lastVersion: r.version });
+    else
+      byName.set(r.identityId ?? `name:${r.who}`, {
+        name: r.who,
+        id: r.identityId,
+        opens: 1,
+        lastOpened: r.at,
+        lastVersion: r.version,
+      });
   }
 
   const people = [];
-  for (const [name, agg] of byName) {
-    people.push({ name, ...agg, hasAccess: await stillHasAccess(db, name, path) });
+  for (const agg of byName.values()) {
+    const { name, id, ...counts } = agg;
+    people.push({ name, ...counts, hasAccess: await stillHasAccess(db, name, id, path) });
   }
   people.sort((a, b) => b.lastOpened - a.lastOpened);
   const last = rows.results[0];
@@ -59,8 +70,13 @@ versions.get("/secret/history", async (c) => {
 });
 
 /** A person keeps access only with a read policy AND the current group key (ADR 2: two gates). */
-async function stillHasAccess(db: D1Database, name: string, path: string): Promise<boolean> {
-  const ident = await historyIdentity(db, name);
+async function stillHasAccess(
+  db: D1Database,
+  name: string,
+  id: string | null,
+  path: string,
+): Promise<boolean> {
+  const ident = await historyIdentity(db, name, id);
   if (ident?.status !== "active") return false;
   if (!can(await rulesFor(db, ident), path, "read")) return false;
   const member = await historyMembership(db, path.split("/")[0] ?? "", ident.id);
@@ -83,6 +99,7 @@ versions.put("/secret/meta", async (c) => {
   await updateSecretMeta(c.env.DB, JSON.stringify(next), row.id);
   await audit(c.env.DB, {
     who: c.get("who").name,
+    actor: c.get("who"),
     action: "secret.meta",
     path,
     result: "ok",
@@ -99,6 +116,7 @@ versions.post("/secret/restore-delete", async (c) => {
   if (who.role !== "admin") {
     await audit(c.env.DB, {
       who: who.name,
+      actor: who,
       action: "secret.restore",
       path,
       result: "denied",
@@ -112,6 +130,7 @@ versions.post("/secret/restore-delete", async (c) => {
   await restoreDeletedSecret(c.env.DB, row.id);
   await audit(c.env.DB, {
     who: who.name,
+    actor: who,
     action: "secret.restore",
     path,
     result: "ok",

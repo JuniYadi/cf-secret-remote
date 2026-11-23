@@ -50,13 +50,13 @@ export async function planData(
 
   const reads = await db
     .prepare(
-      `SELECT json_extract(entry, '$.path') AS path, json_extract(entry, '$.version') AS version, at
+      `SELECT path, json_extract(entry, '$.version') AS version, at
        FROM audit
-       WHERE who = ? AND json_extract(entry, '$.action') = 'secret.read'
+       WHERE (identity_id = ? OR (identity_id IS NULL AND who = ?)) AND action = 'secret.read'
          AND json_extract(entry, '$.result') = 'ok' AND at >= ?
        ORDER BY at DESC, seq DESC`,
     )
-    .bind(name, since)
+    .bind(id, name, since)
     .all<{ path: string; version: number; at: number }>();
 
   return { sessions, apps, reads };

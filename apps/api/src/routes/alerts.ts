@@ -68,6 +68,7 @@ alerts.put("/alerts", async (c) => {
   // The audit note names the fields that changed, never their values.
   await audit(c.env.DB, {
     who: c.get("who").name,
+    actor: c.get("who"),
     action: "alerts.update",
     note: changed.join(","),
     result: "ok",
@@ -83,6 +84,7 @@ alerts.post("/alerts/test", async (c) => {
   const result = await sendTestAlert(c.env, who.name);
   await audit(c.env.DB, {
     who: who.name,
+    actor: who,
     action: "alerts.test",
     note: `webhook ${result.webhook}, email ${result.email}`,
     result: "ok",

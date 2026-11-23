@@ -85,6 +85,7 @@ requests.post("/requests", async (c) => {
   );
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "request.create",
     path: b.path,
     note: `request ${id}`,
@@ -139,6 +140,7 @@ requests.post("/requests/:id/cancel", async (c) => {
   if (row.requesterId !== who.id) {
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "request.cancel",
       path: row.path,
       note: `request ${row.id}`,
@@ -153,6 +155,7 @@ requests.post("/requests/:id/cancel", async (c) => {
   if (done.meta.changes !== 1) return c.json({ error: "already decided, reload" }, 409);
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "request.cancel",
     path: row.path,
     note: `request ${row.id}`,
@@ -178,6 +181,7 @@ requests.post("/requests/:id/deny", requireAdmin, async (c) => {
   if (done.meta.changes !== 1) return c.json({ error: "already decided, reload" }, 409);
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "request.deny",
     path: row.path,
     note: `request ${row.id} by ${row.requester}`,
@@ -205,6 +209,7 @@ requests.post("/requests/:id/approve", requireAdmin, async (c) => {
   if (row.requesterId === who.id) {
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "request.approve",
       path: row.path,
       note: `request ${row.id}: self-approval refused`,
@@ -227,6 +232,7 @@ requests.post("/requests/:id/approve", requireAdmin, async (c) => {
   if (!mine) {
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "request.approve",
       path: row.path,
       note: `request ${row.id}: approver is not in the group`,
@@ -253,6 +259,7 @@ requests.post("/requests/:id/approve", requireAdmin, async (c) => {
 
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "request.approve",
     path: row.path,
     version: group.version,

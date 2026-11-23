@@ -18,6 +18,7 @@ sessions.delete("/sessions/:id", async (c) => {
   if (!res.meta.changes) return c.json({ error: "not found" }, 404);
   await audit(c.env.DB, {
     who: who.name,
+    actor: who,
     action: "session.revoke",
     result: "ok",
     ip: c.req.header("CF-Connecting-IP"),
@@ -31,6 +32,7 @@ sessions.delete("/sessions", async (c) => {
   const res = await deleteSessions(c.env.DB, who.id);
   await audit(c.env.DB, {
     who: who.name,
+    actor: who,
     action: "session.revoke",
     note: `all, ${res.meta.changes} sessions`,
     result: "ok",

@@ -160,6 +160,7 @@ async function write(
   if (!written[0]?.meta.changes) return c.json({ error: "keyring or version changed" }, 409);
   await audit(c.env.DB, {
     who: who.name,
+    actor: who,
     action: `login.${mode}`,
     path: id,
     version,
@@ -177,6 +178,7 @@ logins.delete("/logins/:id", async (c) => {
   await deleteLogin(c.env.DB, now(), l.id);
   await audit(c.env.DB, {
     who: c.get("who").name,
+    actor: c.get("who"),
     action: "login.delete",
     path: l.id,
     version: l.current,
@@ -192,6 +194,7 @@ logins.post("/logins/:id/undelete", async (c) => {
   await undeleteLogin(c.env.DB, l.id);
   await audit(c.env.DB, {
     who: c.get("who").name,
+    actor: c.get("who"),
     action: "login.undelete",
     path: l.id,
     version: l.current,
@@ -218,6 +221,7 @@ for (const action of ["reveal", "fill"] as const) {
     if (!l) return c.json({ error: "not found" }, 404);
     await audit(c.env.DB, {
       who: c.get("who").name,
+      actor: c.get("who"),
       action: `login.${action}`,
       path: l.id,
       version: l.current,

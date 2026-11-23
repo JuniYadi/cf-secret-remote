@@ -39,7 +39,13 @@ keyrings.post("/keyrings", requireAdmin, async (c) => {
   } catch {
     return c.json({ error: "group already exists or a member is unknown" }, 409);
   }
-  await audit(c.env.DB, { who: who.name, action: "group.create", path: b.prefix, result: "ok" });
+  await audit(c.env.DB, {
+    who: who.name,
+    actor: who,
+    action: "group.create",
+    path: b.prefix,
+    result: "ok",
+  });
   return c.json({ id, prefix: b.prefix }, 201);
 });
 
@@ -62,6 +68,7 @@ keyrings.get("/keyrings/:prefix/key", async (c) => {
   if (row.expiresAt !== null && row.expiresAt <= now()) {
     await audit(c.env.DB, {
       who: who.name,
+      actor: who,
       action: "group.key",
       path: prefix,
       version: row.version,
@@ -89,7 +96,13 @@ keyrings.post("/invites", requireAdmin, async (c) => {
   } catch {
     return c.json({ error: "already invited" }, 409);
   }
-  await audit(c.env.DB, { who: who.name, action: "user.invite", note: email, result: "ok" });
+  await audit(c.env.DB, {
+    who: who.name,
+    actor: who,
+    action: "user.invite",
+    note: email,
+    result: "ok",
+  });
   return c.json({ ok: true }, 201);
 });
 
