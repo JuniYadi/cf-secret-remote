@@ -1,6 +1,10 @@
 # cf-secret-remote — Desain v1
 
-Alternatif Vault gratis di Cloudflare free tier (Workers + D1 + static assets), fokus untuk tim kecil dan agent AI.
+Vault untuk kredensial QA dan secret, untuk tim atau satu orang. Targetnya tim teknis kecil—developer, QA, agensi, dan startup—yang punya akun Cloudflare. Hanya berjalan di Cloudflare Workers + D1 dalam akun pengguna; SaaS hosted di luar cakupan.
+
+Server tidak bisa membaca nilai (ADR 2), akses dapat dibuktikan lewat audit (ADR 6), dan mesin serta agent mendapat kredensial lewat AppRole (ADR 15 dan 17). Login item dan alur CLI, web, ekstensi, serta import masih direncanakan (ADR 29–33).
+
+Ini bukan password manager konsumen umum: v1 tidak punya kartu, identitas, passkey, atau lampiran file; catatan aman disimpan sebagai Secrets. Di v1, kredensial diberikan ke test runner, bukan LLM. Jangan berikan password mentah ke agent; untuk HTTP key gunakan agent-safe proxy (ADR 17; lihat juga ADR 35).
 
 ## Platform
 - Worker + SPA: TypeScript, Hono. D1 untuk data. Migrasi lewat wrangler.

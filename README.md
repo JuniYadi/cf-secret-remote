@@ -1,6 +1,10 @@
 # cf-secret-remote
 
-A secret vault that runs entirely on Cloudflare's free tier. Secrets are locked in the browser or CLI before they are saved, so the server never holds a readable value. Every access is recorded.
+A vault for QA credentials and secrets, for a team or one person. It is for small technical teams—developers, QA, agencies, and startups—with a Cloudflare account. It runs on Cloudflare Workers and D1 in your own account; hosted SaaS is out of scope.
+
+The server cannot read values ([ADR 2](docs/adr/0002-end-to-end-encryption.md)); hash-chained audit makes access provable ([ADR 6](docs/adr/0006-hash-chained-audit.md)); and machines and agents use AppRole to get credentials ([ADR 15](docs/adr/0015-apps-and-bots-lifecycle.md), [ADR 17](docs/adr/0017-agent-proxy-and-rules.md)). Login items and their CLI, web, extension, and import workflows are planned ([ADRs 29–33](docs/adr/README.md)).
+
+This is not a general consumer password manager: v1 has no cards, identities, passkeys, or file attachments. Secure notes are Secrets. In v1, credentials are returned to the test runner, not an LLM. Do not give agents raw passwords; for HTTP keys, use the [agent-safe proxy](docs/adr/0017-agent-proxy-and-rules.md) ([ADR 35](docs/adr/0035-deferred-agent-fill-and-account-lease.md)).
 
 The design lives in [`DESIGN.md`](DESIGN.md), and the screens are in `design/`.
 
