@@ -1,10 +1,10 @@
 # 30. CLI and SDK for Logins
 
-Status: accepted (not implemented yet)
+Status: implemented; SDK not published yet
 
 ## Decision
 - **Commands.** `cfs login` is already the sign-in command (ADR 11), so Login items live under `cfs account`:
-  - `cfs account get <name> [--env E] [--role R] [--json]` prints the username and password, or JSON including the current TOTP code.
+  - `cfs account get <name> [--env E] [--role R] [--show] [--json]` prints the username; use `--show` to reveal the password on a terminal, or `--json` for credentials and the current TOTP code.
   - `cfs account list`, `add`, `edit`, `rm`, `totp <name>`.
   - `cfs run` accepts `--account <name>[:env[:role]]` and injects `CFS_<NAME>_USER`, `CFS_<NAME>_PASS` and `CFS_<NAME>_TOTP` (names normalised to `[A-Z0-9_]`).
 - **Lookup is client-side.** The CLI fetches the encrypted list, decrypts it, and matches on name, `environment`, and `role`. An ambiguous match is an error that lists the candidates; it never picks one.

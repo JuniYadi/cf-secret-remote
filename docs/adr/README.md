@@ -35,7 +35,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [27](0027-hardening-and-limits.md) | Hardening and rate limits | planned |
 | [28](0028-positioning-qa-credentials.md) | Positioning: credentials and secrets for QA teams | implemented (docs); repository layer follow-up |
 | [29](0029-login-item.md) | Login item | implemented in core and api; CLI in 30, web in 31 |
-| [30](0030-cli-and-sdk-for-logins.md) | CLI and SDK for Logins | accepted |
+| [30](0030-cli-and-sdk-for-logins.md) | CLI and SDK for Logins | implemented; SDK not published yet |
 | [31](0031-web-logins.md) | Web: Logins screen | implemented; import entry points in 33 |
 | [32](0032-chrome-extension.md) | Chrome extension | accepted |
 | [33](0033-import-logins.md) | Import Logins | accepted |

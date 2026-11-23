@@ -71,6 +71,17 @@
         "vitest": "^4.1.12",
       },
     },
+    "packages/sdk": {
+      "name": "@cfs/sdk",
+      "version": "0.0.0",
+      "dependencies": {
+        "@cfs/core": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.6.0",
+      },
+    },
   },
   "overrides": {
     "sharp": "^0.35.5",
@@ -147,6 +158,8 @@
     "@cfs/cli": ["@cfs/cli@workspace:apps/cli"],
 
     "@cfs/core": ["@cfs/core@workspace:packages/core"],
+
+    "@cfs/sdk": ["@cfs/sdk@workspace:packages/sdk"],
 
     "@cfs/web": ["@cfs/web@workspace:apps/web"],
 
