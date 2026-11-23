@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
 import { Link, useLocation } from "wouter-preact";
+import { RecoveryKeyDownload } from "../components/RecoveryKeyDownload.tsx";
 import { Icon, PageTitle, Standalone } from "../components/shared.tsx";
 import { ApiError, api } from "../lib/api.ts";
 import { useLang } from "../lib/hooks.ts";
@@ -101,6 +102,9 @@ export function RecoverPage() {
               </li>
             ))}
           </ol>
+          <div class="row-actions">
+            <RecoveryKeyDownload phrase={newPhrase} />
+          </div>
           <div class="warn-box">
             <Icon name="warning" size={18} />
             <span>

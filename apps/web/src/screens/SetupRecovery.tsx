@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { useLocation } from "wouter-preact";
+import { RecoveryKeyDownload } from "../components/RecoveryKeyDownload.tsx";
 import { Stepper } from "../components/Stepper.tsx";
 import { BrandRow, Icon, LangToggle, PageTitle } from "../components/shared.tsx";
 import { api } from "../lib/api.ts";
@@ -114,6 +115,7 @@ export function SetupRecoveryPage() {
             <button type="button" class="btn ghost sm" onClick={onCopy} disabled={!recovery}>
               {copied ? t("Copied", "Tersalin") : t("Copy", "Salin")}
             </button>
+            <RecoveryKeyDownload phrase={recovery?.phrase ?? null} />
           </div>
 
           <div class="warn-box">
