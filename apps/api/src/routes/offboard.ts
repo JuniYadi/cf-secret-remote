@@ -1,6 +1,18 @@
 import { type Context, Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
+import {
+  activeAppsOf,
+  findNextOwner,
+  findOwnedApp,
+  findPerson,
+  finishOffboard,
+  groupsOf,
+  type Person,
+  planData,
+  reassignApp,
+  secretNames,
+} from "../repository/offboard.ts";
 import type { AppEnv } from "../types.ts";
 import { now } from "../util.ts";
 import { countAdminsWithVault } from "./membership.ts";
@@ -14,56 +26,13 @@ export const OPEN_WINDOW = 90 * 86400;
 export const offboard = new Hono<AppEnv>();
 offboard.use("/offboard/*", requireAdmin);
 
-interface Person {
-  id: string;
-  kind: string;
-  name: string;
-  role: string;
-  status: string;
-  publicKey: string | null;
-}
-
 /** Loads the person to offboard. Apps are offboarded with `cfs app disable` (ADR 15). */
 async function personOf(c: Context<AppEnv>): Promise<Person | Response> {
-  const row = await c.env.DB.prepare(
-    "SELECT id, kind, name, role, status, public_key AS publicKey FROM identity WHERE id = ?",
-  )
-    .bind(c.req.param("id"))
-    .first<Person>();
+  const row = await findPerson(c.env.DB, c.req.param("id"));
   if (!row) return c.json({ error: "unknown identity" }, 404);
   if (row.kind !== "user")
     return c.json({ error: "apps are offboarded with cfs app disable" }, 400);
   return row;
-}
-
-/** Groups the person still belongs to: current-version members (not lapsed) and staged members of a rotation. */
-async function groupsOf(db: D1Database, id: string, at: number): Promise<string[]> {
-  const current = await db
-    .prepare(
-      `SELECT k.prefix AS prefix FROM keyring_member m JOIN keyring k ON k.id = m.keyring_id
-       WHERE m.identity_id = ? AND m.version = k.version AND (m.expires_at IS NULL OR m.expires_at > ?)`,
-    )
-    .bind(id, at)
-    .all<{ prefix: string }>();
-  const staged = await db
-    .prepare(
-      `SELECT DISTINCT k.prefix AS prefix FROM keyring_member_staged s JOIN keyring k ON k.id = s.keyring_id
-       WHERE s.identity_id = ?`,
-    )
-    .bind(id)
-    .all<{ prefix: string }>();
-  return [...new Set([...current.results, ...staged.results].map((r) => r.prefix))].sort();
-}
-
-/** Active apps the person owns. Disabled apps do not block (ADR 15). */
-async function activeAppsOf(db: D1Database, id: string) {
-  const rows = await db
-    .prepare(
-      "SELECT id, name, status FROM identity WHERE kind = 'app' AND owner_id = ? AND status = 'active' ORDER BY name",
-    )
-    .bind(id)
-    .all<{ id: string; name: string; status: string }>();
-  return rows.results;
 }
 
 /** ADR 20: disabling this person would leave fewer than two admins with a vault. */
@@ -89,29 +58,7 @@ offboard.get("/offboard/:id/plan", async (c) => {
   if (p instanceof Response) return p;
   const at = now();
 
-  const sessions = await db
-    .prepare(
-      "SELECT substr(token_hash, 1, 16) AS id, kind, device, created_at AS createdAt, expires_at AS expiresAt FROM session WHERE identity_id = ? AND expires_at > ? ORDER BY created_at DESC",
-    )
-    .bind(p.id, at)
-    .all();
-  const apps = await db
-    .prepare(
-      "SELECT id, name, status FROM identity WHERE kind = 'app' AND owner_id = ? ORDER BY name",
-    )
-    .bind(p.id)
-    .all<{ id: string; name: string; status: string }>();
-
-  const reads = await db
-    .prepare(
-      `SELECT json_extract(entry, '$.path') AS path, json_extract(entry, '$.version') AS version, at
-       FROM audit
-       WHERE who = ? AND json_extract(entry, '$.action') = 'secret.read'
-         AND json_extract(entry, '$.result') = 'ok' AND at >= ?
-       ORDER BY at DESC, seq DESC`,
-    )
-    .bind(p.name, at - OPEN_WINDOW)
-    .all<{ path: string; version: number; at: number }>();
+  const { sessions, apps, reads } = await planData(db, p.id, p.name, at - OPEN_WINDOW, at);
 
   const byPath = new Map<string, { versions: Set<number>; opens: number; lastOpened: number }>();
   for (const r of reads.results) {
@@ -124,12 +71,7 @@ offboard.get("/offboard/:id/plan", async (c) => {
   const secrets = [];
   for (const [path, agg] of [...byPath].sort(([a], [b]) => a.localeCompare(b))) {
     // Key names come from the stored version rows (names are not secret). A purged secret has none.
-    const rows = await db
-      .prepare(
-        "SELECT v.version AS version, v.names AS names FROM secret s JOIN secret_version v ON v.secret_id = s.id WHERE s.path = ?",
-      )
-      .bind(path)
-      .all<{ version: number; names: string }>();
+    const rows = await secretNames(db, path);
     const names = new Set<string>();
     for (const r of rows.results)
       if (agg.versions.has(r.version))
@@ -164,25 +106,16 @@ offboard.post("/offboard/:id/apps/:appId/reassign", async (c) => {
     return c.json({ error: "bad request" }, 400);
   const p = await personOf(c);
   if (p instanceof Response) return p;
-  const app = await db
-    .prepare("SELECT id, name, owner_id AS ownerId FROM identity WHERE id = ? AND kind = 'app'")
-    .bind(c.req.param("appId"))
-    .first<{ id: string; name: string; ownerId: string | null }>();
+  const app = await findOwnedApp(db, c.req.param("appId"));
   if (!app) return c.json({ error: "unknown app" }, 404);
 
-  const next = await db
-    .prepare("SELECT id, name, kind, status FROM identity WHERE id = ?")
-    .bind(b.ownerId)
-    .first<{ id: string; name: string; kind: string; status: string }>();
+  const next = await findNextOwner(db, b.ownerId);
   if (next?.kind !== "user" || next.status !== "active" || next.id === p.id)
     return c.json({ error: "new owner must be another active person" }, 400);
   if (app.ownerId === next.id) return c.json({ id: app.id, ownerId: next.id, changed: false });
   if (app.ownerId !== p.id) return c.json({ error: "this person does not own the app" }, 409);
 
-  const res = await db
-    .prepare("UPDATE identity SET owner_id = ? WHERE id = ? AND owner_id = ?")
-    .bind(next.id, app.id, p.id)
-    .run();
+  const res = await reassignApp(db, next.id, app.id, p.id);
   if (!res.meta.changes) return c.json({ error: "owner changed, reload and retry" }, 409);
   await audit(db, {
     who: who.name,
@@ -225,25 +158,7 @@ offboard.post("/offboard/:id/finish", async (c) => {
 
   // The disable is conditional on the person still being in no group, so a group add that landed after the
   // check above cannot slip through; the cleanup only runs once they are disabled.
-  const results = await db.batch([
-    db
-      .prepare(
-        `UPDATE identity SET status = 'disabled' WHERE id = ? AND status <> 'disabled'
-         AND NOT EXISTS (SELECT 1 FROM keyring_member WHERE identity_id = ?)
-         AND NOT EXISTS (SELECT 1 FROM keyring_member_staged WHERE identity_id = ?)`,
-      )
-      .bind(p.id, p.id, p.id),
-    db
-      .prepare(
-        "DELETE FROM session WHERE identity_id = ? AND EXISTS (SELECT 1 FROM identity WHERE id = ? AND status = 'disabled')",
-      )
-      .bind(p.id, p.id),
-    db
-      .prepare(
-        "DELETE FROM identity_policy WHERE identity_id = ? AND EXISTS (SELECT 1 FROM identity WHERE id = ? AND status = 'disabled')",
-      )
-      .bind(p.id, p.id),
-  ]);
+  const results = await finishOffboard(db, p.id);
   if (p.status !== "disabled" && !results[0]?.meta.changes)
     return c.json({ error: "the person changed while finishing, reload and retry" }, 409);
   const flipped = p.status !== "disabled";
