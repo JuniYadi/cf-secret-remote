@@ -1,4 +1,13 @@
 import { audit } from "./audit.ts";
+import {
+  deleteExpiredGrant,
+  deleteExpiredMembership,
+  deleteRequestPolicy,
+  expireRequest,
+  listExpiredGrants,
+  listExpiredMemberships,
+  listStaleRequests,
+} from "./repository/requests.ts";
 
 // ADR 16. The daily sweep, called from runDaily (cron.ts). It ends lapsed grants and pending requests.
 // Audit rows name identities, groups and paths only.
@@ -16,21 +25,9 @@ export interface SweepResult {
 export async function sweepExpiredRequests(db: D1Database, t: number): Promise<SweepResult> {
   const result: SweepResult = { requests: 0, grants: 0, memberships: 0 };
 
-  const stale = await db
-    .prepare(
-      `SELECT r.id, r.path_glob AS path, i.name AS requester FROM access_request r
-       JOIN identity i ON i.id = r.requester_id
-       WHERE r.status = 'pending' AND r.created_at <= ?`,
-    )
-    .bind(t - REQUEST_TTL)
-    .all<{ id: string; path: string; requester: string }>();
+  const stale = await listStaleRequests(db, t - REQUEST_TTL);
   for (const r of stale.results) {
-    const done = await db
-      .prepare(
-        "UPDATE access_request SET status = 'expired', decided_at = ? WHERE id = ? AND status = 'pending'",
-      )
-      .bind(t, r.id)
-      .run();
+    const done = await expireRequest(db, t, r.id);
     if (done.meta.changes !== 1) continue;
     result.requests++;
     await audit(db, {
@@ -42,30 +39,11 @@ export async function sweepExpiredRequests(db: D1Database, t: number): Promise<S
     });
   }
 
-  const grants = await db
-    .prepare(
-      `SELECT ip.identity_id AS identityId, ip.policy_id AS policyId, p.name AS policyName,
-              i.name AS identity FROM identity_policy ip
-       JOIN policy p ON p.id = ip.policy_id JOIN identity i ON i.id = ip.identity_id
-       WHERE ip.expires_at IS NOT NULL AND ip.expires_at <= ?`,
-    )
-    .bind(t)
-    .all<{ identityId: string; policyId: string; policyName: string; identity: string }>();
+  const grants = await listExpiredGrants(db, t);
   for (const g of grants.results) {
-    await db
-      .prepare(
-        "DELETE FROM identity_policy WHERE identity_id = ? AND policy_id = ? AND expires_at <= ?",
-      )
-      .bind(g.identityId, g.policyId, t)
-      .run();
+    await deleteExpiredGrant(db, g.identityId, g.policyId, t);
     // Only a policy this module made for a request goes with its grant.
-    await db
-      .prepare(
-        `DELETE FROM policy WHERE id = ? AND name LIKE 'request:%'
-         AND NOT EXISTS (SELECT 1 FROM identity_policy WHERE policy_id = ?)`,
-      )
-      .bind(g.policyId, g.policyId)
-      .run();
+    await deleteRequestPolicy(db, g.policyId);
     result.grants++;
     await audit(db, {
       who: "system",
@@ -75,29 +53,9 @@ export async function sweepExpiredRequests(db: D1Database, t: number): Promise<S
     });
   }
 
-  const keys = await db
-    .prepare(
-      `SELECT k.prefix AS prefix, i.name AS identity, m.identity_id AS identityId,
-              m.keyring_id AS keyringId, m.version AS version
-       FROM keyring_member m JOIN keyring k ON k.id = m.keyring_id
-       JOIN identity i ON i.id = m.identity_id
-       WHERE m.expires_at IS NOT NULL AND m.expires_at <= ?`,
-    )
-    .bind(t)
-    .all<{
-      prefix: string;
-      identity: string;
-      identityId: string;
-      keyringId: string;
-      version: number;
-    }>();
+  const keys = await listExpiredMemberships(db, t);
   for (const k of keys.results) {
-    await db
-      .prepare(
-        "DELETE FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND version = ? AND expires_at <= ?",
-      )
-      .bind(k.keyringId, k.identityId, k.version, t)
-      .run();
+    await deleteExpiredMembership(db, k.keyringId, k.identityId, k.version, t);
     result.memberships++;
     await audit(db, {
       who: "system",
