@@ -32,6 +32,7 @@ export interface Plan {
       path: string;
       versions: number[];
       names: string[];
+      namesUnavailable?: boolean;
       opens: number;
       lastOpened: number;
     }[];
@@ -62,7 +63,10 @@ export function reportLines(plan: Plan): string[] {
   ];
   if (plan.opened.secrets.length === 0) lines.push("(none)");
   for (const s of plan.opened.secrets) {
-    const names = s.names.length ? s.names.join(", ") : "(names no longer stored)";
+    const names = [
+      ...s.names,
+      ...(s.namesUnavailable || !s.names.length ? ["(some key names no longer stored)"] : []),
+    ].join(", ");
     lines.push(`${s.path}\t${names}\tversions ${s.versions.join(", ")}`);
   }
   return lines;

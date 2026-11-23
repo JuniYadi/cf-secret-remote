@@ -401,6 +401,18 @@ describe("ADR 21: plan and report text", () => {
     const full = reportLines(planOf(world()));
     expect(full[1]).toContain("Names only");
     expect(full).toContain("pay/prod\tAPI_KEY, DB_PASS\tversions 3");
+    const secret = p.opened.secrets;
+    secret.push({
+      path: "pay/purged",
+      names: [],
+      namesUnavailable: true,
+      versions: [1, 2],
+      opens: 1,
+      lastOpened: 1,
+    });
+    expect(reportLines(p)).toContain(
+      "pay/purged\t(some key names no longer stored)\tversions 1, 2",
+    );
   });
 
   test("the reminder about the identity provider is printed", () => {

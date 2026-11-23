@@ -60,13 +60,31 @@ offboard.get("/offboard/:id/plan", async (c) => {
 
   const { sessions, apps, reads } = await planData(db, p.id, p.name, at - OPEN_WINDOW, at);
 
-  const byPath = new Map<string, { versions: Set<number>; opens: number; lastOpened: number }>();
+  const byPath = new Map<
+    string,
+    {
+      versions: Set<number>;
+      available: Set<number>;
+      namesUnavailable: boolean;
+      opens: number;
+      lastOpened: number;
+    }
+  >();
   for (const r of reads.results) {
     const agg = byPath.get(r.path);
     if (agg) {
       agg.versions.add(r.version);
+      if (r.purged) agg.namesUnavailable = true;
+      else agg.available.add(r.version);
       agg.opens++;
-    } else byPath.set(r.path, { versions: new Set([r.version]), opens: 1, lastOpened: r.at });
+    } else
+      byPath.set(r.path, {
+        versions: new Set([r.version]),
+        available: new Set(r.purged ? [] : [r.version]),
+        namesUnavailable: !!r.purged,
+        opens: 1,
+        lastOpened: r.at,
+      });
   }
   const secrets = [];
   for (const [path, agg] of [...byPath].sort(([a], [b]) => a.localeCompare(b))) {
@@ -74,12 +92,15 @@ offboard.get("/offboard/:id/plan", async (c) => {
     const rows = await secretNames(db, path);
     const names = new Set<string>();
     for (const r of rows.results)
-      if (agg.versions.has(r.version))
+      if (agg.available.has(r.version))
         for (const n of JSON.parse(r.names) as string[]) names.add(n);
     secrets.push({
       path,
       versions: [...agg.versions].sort((x, y) => x - y),
       names: [...names].sort(),
+      namesUnavailable:
+        agg.namesUnavailable ||
+        [...agg.available].some((version) => !rows.results.some((row) => row.version === version)),
       opens: agg.opens,
       lastOpened: agg.lastOpened,
     });
