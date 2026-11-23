@@ -215,3 +215,7 @@ Setiap layar aplikasi punya dua tombol di sidebar, di bawah kotak pengguna:
 - `apps/cli` jalan (diuji lokal): `login` (device code), `unlock`, `lock`, `whoami`, `list`, `get`, `set`, `run`, `group create`, dan mode `CFS_KIT`. Keputusan di ADR 10 sampai 13.
 - Belum ada di CLI: `group add-member` (tanpa ini app tidak bisa diberi kunci grup), `cfs init`, `cfs proxy`, `audit verify`, `deploy`. Layar web `/cli/authorize` belum ada, jadi persetujuan login sementara lewat `POST /api/v1/cli/approve`.
 - Pada 2026-11-21 semua fitur sisa dipecah menjadi ADR 14 sampai 27 (`docs/adr/`). Implementasi mengikuti ADR; urutan kerja ada di `docs/adr/README.md`. Perbedaan dari desain di atas yang diputuskan di ADR: kode sidik jari menjadi empat kata BIP-39 (ADR 20), dan penyimpanan kunci CLI pindah ke keychain OS (ADR 25).
+
+
+## Batas akses dan retensi
+Admin dapat mengatur durasi maksimum permintaan (default 24 jam, maksimum 30 hari), durasi bawaan persetujuan (default 1 jam, tidak melebihi maksimum), dan retensi audit (default 365 hari, minimum 90 hari). Jika belum ada pengaturan, retensi memakai `AUDIT_RETENTION_DAYS` bila tersedia. Opsi kunci ulang setelah akses berakhir dicatat sebagai permintaan; rotasi belum otomatis.

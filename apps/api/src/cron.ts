@@ -3,6 +3,7 @@ import { currentHead, pruneAudit, pruneUsage, saveCheckpoint } from "./repositor
 import { sweepExpiredRequests } from "./requests-sweep.ts";
 import { backupDaily } from "./routes/backup.ts";
 import { purgeDeletedLogins } from "./routes/logins.ts";
+import { loadLimits } from "./settings.ts";
 import type { Env } from "./types.ts";
 
 const DAY = 86400;
@@ -51,7 +52,7 @@ export async function runDaily(
       `cfs audit checkpoint ${day}: ${head.rows} rows, head ${head.hash}`,
     );
 
-  const pruned = await pruneAudit(db, t, retentionDays(env));
+  const pruned = await pruneAudit(db, t, (await loadLimits(env)).auditRetentionDays);
   await backupDaily(env, t);
 
   await pruneUsage(db, t - LOGIN_WINDOW_KEEP_SEC, dayOf(t - USAGE_KEEP_DAYS * DAY));

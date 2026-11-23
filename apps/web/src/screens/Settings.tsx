@@ -1,3 +1,4 @@
+import { useEffect, useState } from "preact/hooks";
 import { Link } from "wouter-preact";
 import { ErrorNote, KeyRow, Meter, SettingsTabs } from "../components/parts.tsx";
 import { PageTitle } from "../components/shared.tsx";
@@ -104,6 +105,7 @@ export function SettingsPage() {
         </p>
       </section>
 
+      {isAdmin && <LimitsForm />}
       <section class="card settings-card" aria-labelledby="log-title">
         <h2 id="log-title" class="card-title">
           {t("Activity log", "Log aktivitas")}
@@ -152,5 +154,85 @@ function UsageBlock({ usage }: { usage: Usage }) {
         <Link href={PATHS.quota}>{t("What this means for you", "Artinya untukmu")}</Link>
       </p>
     </>
+  );
+}
+
+function LimitsForm() {
+  const [value, setValue] = useState<Awaited<ReturnType<typeof api.limits>> | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    void api.limits().then(setValue).catch(setError);
+  }, []);
+  async function save(e: Event) {
+    e.preventDefault();
+    if (!value) return;
+    try {
+      setValue(await api.saveLimits(value));
+      setError(null);
+      setSaved(true);
+    } catch (err) {
+      setError(err);
+      setSaved(false);
+    }
+  }
+  return (
+    <form class="card settings-card form-stack" onSubmit={save}>
+      <h2>{t("Access and retention limits", "Batas akses dan retensi")}</h2>
+      <ErrorNote error={error} />
+      {value && (
+        <>
+          <label>
+            {t(
+              "Maximum request duration (seconds; 1–2592000)",
+              "Durasi maksimum permintaan (detik; 1–2592000)",
+            )}
+            <input
+              type="number"
+              min="1"
+              max="2592000"
+              required
+              value={value.maxRequestDuration}
+              onInput={(e) =>
+                setValue({ ...value, maxRequestDuration: Number(e.currentTarget.value) })
+              }
+            />
+          </label>
+          <label>
+            {t(
+              "Each approval lasts by default (seconds)",
+              "Durasi bawaan setiap persetujuan (detik)",
+            )}
+            <input
+              type="number"
+              min="1"
+              max={value.maxRequestDuration}
+              required
+              value={value.defaultApprovalDuration}
+              onInput={(e) =>
+                setValue({ ...value, defaultApprovalDuration: Number(e.currentTarget.value) })
+              }
+            />
+          </label>
+          <label>
+            {t("Activity retention (days; 90–36500)", "Retensi aktivitas (hari; 90–36500)")}
+            <input
+              type="number"
+              min="90"
+              max="36500"
+              required
+              value={value.auditRetentionDays}
+              onInput={(e) =>
+                setValue({ ...value, auditRetentionDays: Number(e.currentTarget.value) })
+              }
+            />
+          </label>
+          <button class="btn" type="submit">
+            {t("Save limits", "Simpan batas")}
+          </button>
+          {saved && <p role="status">{t("Saved.", "Tersimpan.")}</p>}
+        </>
+      )}
+    </form>
   );
 }

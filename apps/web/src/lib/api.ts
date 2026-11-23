@@ -659,8 +659,28 @@ export const api = {
   // Access requests (ADR 16)
   requests: (status?: RequestStatus) =>
     request<AccessRequest[]>("GET", `/requests${queryString({ status })}`),
-  createRequest: (input: { path: string; reason: string; duration: number }) =>
-    request<AccessRequest>("POST", "/requests", input),
+  limits: () =>
+    request<{
+      maxRequestDuration: number;
+      defaultApprovalDuration: number;
+      auditRetentionDays: number;
+    }>("GET", "/settings/limits"),
+  saveLimits: (value: {
+    maxRequestDuration: number;
+    defaultApprovalDuration: number;
+    auditRetentionDays: number;
+  }) =>
+    request<{
+      maxRequestDuration: number;
+      defaultApprovalDuration: number;
+      auditRetentionDays: number;
+    }>("PUT", "/settings/limits", value),
+  createRequest: (input: {
+    path: string;
+    reason: string;
+    duration: number;
+    rekeyAfter?: boolean;
+  }) => request<AccessRequest>("POST", "/requests", input),
   cancelRequest: (id: string) => request<AccessRequest>("POST", `/requests/${id}/cancel`),
   denyRequest: (id: string) => request<AccessRequest>("POST", `/requests/${id}/deny`),
   approveRequest: (id: string, wrappedKey: string, version: number) =>
