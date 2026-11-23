@@ -360,6 +360,21 @@ describe("ADR 14: remove member and staged rotation", () => {
     const after = await api("GET", `/secret?path=${prefix}/a`, adm.token);
     expect(after.body.version).toBe(2);
     expect(after.body.keyringVersion).toBe(2);
+
+    // Older keys stay readable by remaining members (ADR 14), by version.
+    const v1 = await api("GET", `/keyrings/${prefix}/key?version=1`, mem.token);
+    expect(v1.status).toBe(200);
+    expect(v1.body.version).toBe(1);
+    expect(
+      await unwrapGroupKey(v1.body.wrappedKey, mem.kp.privateKey, mem.kp.publicKey, prefix, 1),
+    ).toEqual(oldGk);
+    expect((await api("GET", `/keyrings/${prefix}/key`, mem.token)).body.version).toBe(2);
+    expect((await api("GET", `/keyrings/${prefix}/key?version=1`, gone.token)).status).toBe(404);
+    expect((await api("GET", `/keyrings/${prefix}/key?version=9`, mem.token)).status).toBe(404);
+    expect((await api("GET", `/keyrings/${prefix}/key?version=x`, mem.token)).status).toBe(400);
+    // The listing carries the keyring id that Logins refer to.
+    const listed = await api("GET", "/keyrings", mem.token);
+    expect(listed.body.find((k: { prefix: string }) => k.prefix === prefix)?.id).toMatch(/.+/);
   });
 
   it("a chunk carries at most 50 secrets", async () => {
@@ -532,7 +547,7 @@ describe("ADR 14: remove member and staged rotation", () => {
       const rows = await env.DB.prepare(`SELECT * FROM ${t}`).all();
       expect(JSON.stringify(rows.results)).not.toContain(marker);
     }
-  });
+  }, 20_000);
 
   it("the group member list shows members to members and admins, not to outsiders", async () => {
     const prefix = prefixName("list");

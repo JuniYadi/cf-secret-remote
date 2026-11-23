@@ -160,7 +160,7 @@ describe("Unlock", () => {
     vi.stubGlobal("fetch", fetch);
     await mount(<UnlockPage />);
     await submitPassword("password");
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch.mock.calls[0]?.[0]).toBe("/api/v1/me/unlocked");
     expect(fetch.mock.calls[0]?.[1]?.method).toBe("POST");
     expect(getStatus().unlocked).toBe(true);
@@ -182,7 +182,7 @@ describe("Unlock", () => {
     expect(text()).toContain("That password didn't work.");
     await submitPassword("correct");
     expect(decrypt).toHaveBeenCalledTimes(2);
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(getStatus().unlocked).toBe(true);
   });
 });

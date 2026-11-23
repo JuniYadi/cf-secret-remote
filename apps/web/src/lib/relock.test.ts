@@ -39,6 +39,8 @@ async function fixtures(count: number) {
 
 function client(store: Map<string, SecretVersion>, failCommit = false) {
   return {
+    rotateLogins: async () => [],
+    rotateLoginChunk: async () => ({ staged: 0 }),
     rotateStart: async () => ({ version: 4, secrets: store.size }),
     secretVersion: async (path: string) => store.get(path) as SecretVersion,
     rotateChunk: async (_p: string, _v: number, batch: unknown[]) => ({ staged: batch.length }),

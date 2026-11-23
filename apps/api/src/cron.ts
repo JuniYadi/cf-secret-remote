@@ -2,6 +2,7 @@ import { GENESIS } from "@cfs/core";
 import { dayOf } from "./quota.ts";
 import { sweepExpiredRequests } from "./requests-sweep.ts";
 import { backupDaily } from "./routes/backup.ts";
+import { purgeDeletedLogins } from "./routes/logins.ts";
 import type { Env } from "./types.ts";
 
 const DAY = 86400;
@@ -94,6 +95,7 @@ export async function runDaily(
     db.prepare("DELETE FROM usage_day WHERE day < ?").bind(dayOf(t - USAGE_KEEP_DAYS * DAY)),
   ]);
 
+  await purgeDeletedLogins(db, t);
   await sweepExpiredRequests(db, t); // ADR 16: lapsed grants and pending requests
 
   return { day, head: head.hash, pruned };

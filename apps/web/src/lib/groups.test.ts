@@ -89,6 +89,8 @@ function fakeClient(opts: FakeOptions = {}) {
   let chunkNumber = 0;
   const record = (name: string, args: unknown[]) => calls.push({ name, args });
   const client = {
+    rotateLogins: async () => [],
+    rotateLoginChunk: async () => ({ staged: 0 }),
     rotateStart: async (...args: unknown[]) => {
       record("rotateStart", args);
       if (opts.failStart) throw new Error("server said no");

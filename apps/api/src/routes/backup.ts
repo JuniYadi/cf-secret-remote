@@ -20,7 +20,7 @@ import { now, sha256Hex } from "../util.ts";
 // Values stay encrypted. Names, paths, emails and dates are in clear.
 
 /** The number of the latest migration. A file must match it to restore. */
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 16;
 
 /** Tables in dependency order: parents first. Restore deletes in the reverse order. */
 export const BACKUP_TABLES = [
@@ -35,6 +35,8 @@ export const BACKUP_TABLES = [
   "access_request",
   "secret",
   "secret_version",
+  "login",
+  "login_version",
   "setting",
   "alert_state",
   "audit",
@@ -90,7 +92,7 @@ export const COLUMNS: Record<BackupTable, readonly string[]> = {
     "last_login_at",
     "last_ip",
   ],
-  keyring: ["id", "prefix", "version", "created_at", "status"],
+  keyring: ["id", "prefix", "version", "created_at", "status", "personal_owner"],
   keyring_member: ["keyring_id", "identity_id", "version", "wrapped_key", "expires_at"],
   keyring_member_staged: ["keyring_id", "identity_id", "version", "wrapped_key"],
   policy: ["id", "name", "rules"],
@@ -117,6 +119,18 @@ export const COLUMNS: Record<BackupTable, readonly string[]> = {
     "created_by",
     "created_at",
     "fps",
+  ],
+  login: ["id", "keyring_id", "current", "created_at", "deleted_at"],
+  login_version: [
+    "login_id",
+    "version",
+    "keyring_id",
+    "keyring_version",
+    "wrapped_dek",
+    "ciphertext",
+    "fps",
+    "created_by",
+    "created_at",
   ],
   audit: ["seq", "at", "entry", "prev", "hash", "who"],
   access_request: [

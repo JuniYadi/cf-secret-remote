@@ -5,11 +5,15 @@ import {
   fingerprints,
   fingerprintWords,
   GENESIS,
+  type Login,
+  loginFingerprints,
   openBackup,
+  openLogin,
   openSecret,
   openText,
   recoveryEntropy,
   recoveryPhrase,
+  totp,
   unwrapDek,
   unwrapGroupKey,
   verifyChain,
@@ -57,6 +61,16 @@ export interface Vectors {
     valuesJson: string;
     wrappedDek: string;
     ciphertext: string;
+  };
+  login: {
+    groupKeyHex: string;
+    id: string;
+    version: number;
+    login: Login;
+    wrappedDek: string;
+    ciphertext: string;
+    fps: Record<string, string>;
+    totp: { uri: string; time: number; code: string }[];
   };
   backupSeal: { passphrase: string; sealed: string; plaintext: string };
 }
@@ -206,6 +220,17 @@ export async function runVectorChecks(v: Vectors): Promise<CheckResult[]> {
       "wrong version",
     );
   });
+
+  await check("login", "open and fingerprints", async () => {
+    const l = v.login;
+    const key = hexBytes(l.groupKeyHex);
+    same(await openLogin(key, l.id, l.version, l.wrappedDek, l.ciphertext), l.login, "login");
+    same(await loginFingerprints(key, l.id, l.login), l.fps, "fps");
+    await rejects(openLogin(key, l.id, l.version + 1, l.wrappedDek, l.ciphertext), "wrong version");
+  });
+  for (const [i, c] of v.login.totp.entries()) {
+    await check("login", `TOTP #${i}`, async () => same(await totp(c.uri, c.time), c.code, "TOTP"));
+  }
 
   await check("backup-seal", "opens sealed backup", async () => {
     const plain = await openBackup(hexBytes(v.backupSeal.sealed), v.backupSeal.passphrase);

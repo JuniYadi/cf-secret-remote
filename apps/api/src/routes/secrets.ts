@@ -119,6 +119,7 @@ secrets.get("/secrets", async (c) => {
   const rows = await c.env.DB.prepare(
     `SELECT s.path, s.current AS version, v.names, v.created_at AS updatedAt, s.meta
      FROM secret s JOIN secret_version v ON v.secret_id = s.id AND v.version = s.current
+     JOIN keyring k ON k.id = s.keyring_id AND k.personal_owner IS NULL
      WHERE s.deleted_at IS NULL ORDER BY s.path`,
   ).all<{ path: string; version: number; names: string; updatedAt: number; meta: string | null }>();
   return c.json(
@@ -168,6 +169,7 @@ secrets.get("/secret", async (c) => {
   const row = await c.env.DB.prepare(
     `SELECT v.version, v.keyring_version AS keyringVersion, v.names, v.wrapped_dek AS wrappedDek, v.ciphertext, v.created_at AS createdAt
      FROM secret s JOIN secret_version v ON v.secret_id = s.id AND v.version = COALESCE(?, s.current)
+     JOIN keyring k ON k.id = s.keyring_id AND k.personal_owner IS NULL
      WHERE s.path = ? AND s.deleted_at IS NULL AND v.version <= s.current`,
   )
     .bind(want ? Number(want) : null, path)
@@ -221,7 +223,9 @@ secrets.put("/secret", async (c) => {
     if (typeof metaPatch.owner === "string" && !(await ownerExists(c.env.DB, metaPatch.owner)))
       return c.json({ error: "owner is not a known identity" }, 400);
   }
-  const keyring = await c.env.DB.prepare("SELECT id, version, status FROM keyring WHERE prefix = ?")
+  const keyring = await c.env.DB.prepare(
+    "SELECT id, version, status FROM keyring WHERE prefix = ? AND personal_owner IS NULL",
+  )
     .bind(prefixOf(path))
     .first<{ id: string; version: number; status: string }>();
   if (!keyring) return c.json({ error: "create the group first" }, 409);

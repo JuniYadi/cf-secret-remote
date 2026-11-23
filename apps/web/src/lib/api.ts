@@ -621,6 +621,16 @@ export const api = {
   recordUnlock: () => request<{ ok: true }>("POST", "/me/unlocked"),
   createVault: (publicKey: string, lockedKey: string) =>
     request<{ ok: true }>("POST", "/vault", { publicKey, lockedKey }),
+  personalKeyring: () =>
+    request<{ id: string; prefix: string; version: number; wrappedKey: string } | null>(
+      "GET",
+      "/me/personal-keyring",
+    ),
+  createPersonalKeyring: (prefix: string, wrappedKey: string) =>
+    request<{ id: string; prefix: string; version: number }>("POST", "/me/personal-keyring", {
+      prefix,
+      wrappedKey,
+    }),
   setRecoveryKey: (lockedKey: string) =>
     request<{ ok: true }>("PUT", "/me/recovery", { lockedKey }),
 
@@ -721,6 +731,26 @@ export const api = {
       `/keyrings/${encodeURIComponent(prefix)}/rotate/start`,
       { removeIdentityId, members },
     ),
+  rotateLogins: (prefix: string) =>
+    request<{ id: string; version: number; wrappedDek: string; ciphertext: string }[]>(
+      "GET",
+      `/keyrings/${encodeURIComponent(prefix)}/rotate/logins`,
+    ),
+  rotateLoginChunk: (
+    prefix: string,
+    keyringVersion: number,
+    logins: {
+      id: string;
+      version: number;
+      wrappedDek: string;
+      ciphertext: string;
+      fps: Record<string, string>;
+    }[],
+  ) =>
+    request<{ staged: number }>("POST", `/keyrings/${encodeURIComponent(prefix)}/rotate/chunk`, {
+      keyringVersion,
+      logins,
+    }),
   rotateChunk: (prefix: string, keyringVersion: number, secrets: RotateSecret[]) =>
     request<{ staged: number }>("POST", `/keyrings/${encodeURIComponent(prefix)}/rotate/chunk`, {
       keyringVersion,

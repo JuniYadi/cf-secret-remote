@@ -13,7 +13,7 @@ import {
   recordFailure,
   triesLeft,
 } from "../lib/unlock-attempts.ts";
-import { unlockVault } from "../lib/vault.ts";
+import { ensurePersonalKeyring, unlockVault } from "../lib/vault.ts";
 import { PATHS, pageCrumbs } from "../routes.ts";
 
 // Kept at module level so a wrong password is still counted after the route changes (ADR 20).
@@ -62,6 +62,7 @@ export function UnlockPage() {
       unlock({ publicKey: me?.publicKey ?? "", privateKey });
       // Recording is best-effort: neither latency nor an API failure should block the vault.
       void api.recordUnlock().catch(() => {});
+      void ensurePersonalKeyring(me?.publicKey ?? "").catch(() => {});
       navigate(PATHS.secrets);
     } catch {
       const at = Date.now();

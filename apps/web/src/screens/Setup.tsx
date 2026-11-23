@@ -13,7 +13,7 @@ import {
   type Strength,
 } from "../lib/password.ts";
 import { markVaultReady } from "../lib/session.ts";
-import { createVault } from "../lib/vault.ts";
+import { createVault, ensurePersonalKeyring } from "../lib/vault.ts";
 import { PATHS, pageCrumbs } from "../routes.ts";
 
 const HINT: Record<Strength, () => string> = {
@@ -51,6 +51,8 @@ export function SetupPage() {
       // The password and the unlocked key stay in this function. Only the public key and the locked key go out.
       const vault = await createVault(password);
       await api.createVault(vault.publicKey, vault.lockedKey);
+      // Retry on the next unlock if the group could not be created during setup.
+      await ensurePersonalKeyring(vault.publicKey).catch(() => {});
       unlock({ publicKey: vault.publicKey, privateKey: vault.privateKey });
       markVaultReady(vault.publicKey, vault.lockedKey);
       setPassword("");

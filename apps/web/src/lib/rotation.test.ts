@@ -102,6 +102,8 @@ async function fixture(admin: Person, member: Person, values: Record<string, str
       if (!v) throw new Error("no version");
       return v;
     },
+    rotateLogins: async () => [],
+    rotateLoginChunk: async () => ({ staged: 0 }),
     rotateStart: async (
       p: string,
       removeId: string,

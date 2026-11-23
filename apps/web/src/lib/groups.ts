@@ -3,8 +3,11 @@
 // Group keys and values are kept in local variables for the duration of one call and never stored.
 
 import {
+  loginFingerprints,
   newGroupKey,
+  openLogin,
   openSecret,
+  sealLogin,
   sealSecret,
   unwrapGroupKey,
   type Values,
@@ -218,6 +221,27 @@ export async function runRotation(input: RotationInput, api = realApi): Promise<
       await api.rotateChunk(input.prefix, next, batch);
       for (const item of batch) progress = setState(progress, item.path, "done");
       input.onProgress?.(progress);
+    }
+    const logins = await api.rotateLogins(input.prefix);
+    for (const part of chunk(logins)) {
+      const batch = await Promise.all(
+        part.map(async (row) => {
+          const value = await openLogin(
+            input.oldKey,
+            row.id,
+            row.version,
+            row.wrappedDek,
+            row.ciphertext,
+          );
+          return {
+            id: row.id,
+            version: row.version + 1,
+            ...(await sealLogin(newKey, row.id, row.version + 1, value)),
+            fps: await loginFingerprints(newKey, row.id, value),
+          };
+        }),
+      );
+      await api.rotateLoginChunk(input.prefix, next, batch);
     }
   } catch (err) {
     await abortQuietly(input.prefix, api);

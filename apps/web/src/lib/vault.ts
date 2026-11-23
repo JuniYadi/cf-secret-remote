@@ -2,6 +2,7 @@
 // the calls. Passwords and private keys are returned to the caller and never stored here.
 
 import {
+  createPersonalKeyring,
   generateKeyPair,
   lockPrivateKey,
   lockWithRecoveryKey,
@@ -67,4 +68,13 @@ export async function relockWithNewPassword(
 ): Promise<{ privateKey: string; lockedKey: string }> {
   const privateKey = await unlockPrivateKey(lockedKey, oldPassword);
   return { privateKey, lockedKey: await lockPrivateKey(privateKey, newPassword) };
+}
+
+/** Create the personal group on setup or the first unlock of an existing vault. */
+export async function ensurePersonalKeyring(publicKey: string): Promise<void> {
+  const { api } = await import("./api.ts");
+  if (await api.personalKeyring()) return;
+  const prefix = `personal-${crypto.randomUUID()}`;
+  const { wrappedKey } = await createPersonalKeyring(publicKey, prefix);
+  await api.createPersonalKeyring(prefix, wrappedKey);
 }

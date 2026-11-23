@@ -5,6 +5,7 @@ import backupSeal from "../test-vectors/backup-seal.json";
 import envelope from "../test-vectors/envelope.json";
 import fingerprint from "../test-vectors/fingerprint.json";
 import kit from "../test-vectors/kit.json";
+import login from "../test-vectors/login.json";
 import recovery from "../test-vectors/recovery.json";
 import secret from "../test-vectors/secret.json";
 import wrappedKey from "../test-vectors/wrapped-key.json";
@@ -19,6 +20,7 @@ const vectors = {
   auditChain: audit,
   secret,
   backupSeal,
+  login,
 } as unknown as Vectors;
 
 describe("shared test vectors", () => {
