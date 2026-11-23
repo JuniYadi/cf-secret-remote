@@ -1,5 +1,6 @@
 import { PROTOCOL_VERSION } from "@cfs/core";
 import { Hono } from "hono";
+import { VERSION } from "../../../version.ts";
 import { withAlertContext } from "./alerts.ts";
 import { authenticate } from "./auth.ts";
 import { runDaily } from "./cron.ts";
@@ -32,11 +33,8 @@ const app = new Hono<AppEnv>();
 app.use("/api/*", bodyLimit);
 app.use("/api/*", blockDuringMaintenance); // ADR 23: writes return 503 while a restore runs
 
-// Read by `cfs` before it talks to the server (ADR 25). Keep in step with the release version.
-const SERVER_VERSION = "0.0.0";
-app.get("/api/health", (c) =>
-  c.json({ ok: true, protocol: PROTOCOL_VERSION, version: SERVER_VERSION }),
-);
+// Read by `cfs` before it talks to the server (ADR 25).
+app.get("/api/health", (c) => c.json({ ok: true, protocol: PROTOCOL_VERSION, version: VERSION }));
 app.route("/api/v1", approle as unknown as Hono<AppEnv>);
 app.route("/api/v1", cliPublic as unknown as Hono<AppEnv>);
 

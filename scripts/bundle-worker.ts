@@ -172,7 +172,22 @@ async function main(): Promise<void> {
     throw new Error("apps/web/dist/index.html is missing");
 
   const api = join(root, "apps/api");
-  await run(["bun", "x", "wrangler", "deploy", "--dry-run", "--outdir", scratch], api);
+  await run(
+    [
+      "bun",
+      "x",
+      "wrangler",
+      "deploy",
+      "--config",
+      "wrangler.example.jsonc",
+      "--dry-run",
+      "--outdir",
+      scratch,
+      "--define",
+      `__CFS_VERSION__:${JSON.stringify(version)}`,
+    ],
+    api,
+  );
   const entry = join(scratch, "index.js");
   if (!existsSync(entry)) throw new Error("wrangler did not produce index.js");
 
