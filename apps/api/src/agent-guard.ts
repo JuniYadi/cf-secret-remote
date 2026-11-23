@@ -1,5 +1,6 @@
 import { audit } from "./audit.ts";
 import { globMatch } from "./policy.ts";
+import { approvedRequests, rulesForPath } from "./repository/agent.ts";
 import { hit } from "./throttle.ts";
 import type { Who } from "./types.ts";
 import { now } from "./util.ts";
@@ -14,21 +15,7 @@ export const BUDGET_WINDOW = 3600;
 export const PROD_GLOB = "*/prod";
 const MAX_REASON_NOTE = 200;
 
-/** A rule as read from agent_rule, with SQL aliases in camelCase. Column list shared by the routes. */
-export const RULE_COLS = `alias, secret_path AS secretPath, name, upstream, inject,
-  max_reads_per_hour AS maxReadsPerHour, require_reason AS requireReason,
-  require_approval AS requireApproval`;
-
-export interface StoredRule {
-  alias: string;
-  secretPath: string;
-  name: string;
-  upstream: string;
-  inject: string;
-  maxReadsPerHour: number;
-  requireReason: number;
-  requireApproval: number;
-}
+export { RULE_COLS, type StoredRule } from "./repository/agent.ts";
 
 /** True when this rule asks for approval on this path. The default is on for paths under PROD_GLOB (ADR 17). */
 export const needsApproval = (rule: { requireApproval: number }, path: string): boolean =>
@@ -53,13 +40,7 @@ async function approvedRequestFor(
   identityId: string,
   path: string,
 ): Promise<string | null> {
-  const rows = await db
-    .prepare(
-      `SELECT id, path_glob AS glob FROM access_request
-       WHERE requester_id = ? AND status = 'approved' AND expires_at > ?`,
-    )
-    .bind(identityId, now())
-    .all<{ id: string; glob: string }>();
+  const rows = await approvedRequests(db, identityId, now());
   return rows.results.find((r) => globMatch(r.glob, path))?.id ?? null;
 }
 
@@ -96,12 +77,7 @@ export async function agentGuard(
   reasonHeader: string | undefined,
   ip: string | undefined,
 ): Promise<GuardResult> {
-  const found = await db
-    .prepare(
-      `SELECT ${RULE_COLS} FROM agent_rule WHERE identity_id = ? AND secret_path = ? ORDER BY alias`,
-    )
-    .bind(who.id, path)
-    .all<StoredRule>();
+  const found = await rulesForPath(db, who.id, path);
   const rules = found.results;
   if (rules.length === 0) return { ok: true };
 
