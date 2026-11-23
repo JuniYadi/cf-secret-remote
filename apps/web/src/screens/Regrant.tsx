@@ -89,6 +89,7 @@ function RegrantOne({ id }: { id: string }) {
   useLang();
   const [, navigate] = useLocation();
   const detail = useLoad(() => api.recoveryDetail(id), id);
+  const allGroups = useLoad(() => api.keyrings(), "regrant-groups");
   const [typed, setTyped] = useState("");
   const [codeOk, setCodeOk] = useState(false);
   const [unchecked, setUnchecked] = useState<Set<string>>(() => new Set());
@@ -153,7 +154,11 @@ function RegrantOne({ id }: { id: string }) {
         { privateKey, publicKey },
       );
       const out = await submitWords(re.keys);
-      setDone({ granted: out.groups, notRewrapped: re.notRewrapped });
+      setDone({
+        granted: out.groups,
+        // Groups this admin chose but could not give; groups they unticked are left out on purpose.
+        notRewrapped: selected.filter((g) => !out.groups.includes(g)),
+      });
     } catch (err) {
       setError(err);
       if (err instanceof ApiError) detail.reload();
@@ -176,8 +181,8 @@ function RegrantOne({ id }: { id: string }) {
           {done.notRewrapped.length > 0 ? (
             <p class="note">
               {t(
-                `Not given (you are not in them): ${done.notRewrapped.join(", ")}. Another admin must give access to those.`,
-                `Tidak diberikan (kamu tidak ada di dalamnya): ${done.notRewrapped.join(", ")}. Admin lain harus memberi akses untuk grup itu.`,
+                `Not given: ${done.notRewrapped.join(", ")}. Another admin who holds these groups must give access to them.`,
+                `Tidak diberikan: ${done.notRewrapped.join(", ")}. Admin lain yang memiliki grup ini harus memberi akses untuk grup tersebut.`,
               )}
             </p>
           ) : null}
@@ -272,33 +277,41 @@ function RegrantOne({ id }: { id: string }) {
             <h2 id="groups-title" class="card-title">
               {t("Which groups should they get back?", "Grup mana yang dikembalikan?")}
             </h2>
-            {req.groups.length === 0 ? (
+            <ErrorNote error={allGroups.error} />
+            {req.groups.length === 0 && (allGroups.data?.length ?? 0) === 0 ? (
               <p class="sub">
                 {t("They were not in any group.", "Mereka tidak ada di grup mana pun.")}
               </p>
             ) : (
               <ul class="plain-list">
-                {req.groups.map((g) => (
-                  <li key={g}>
-                    <label class="check">
-                      <input
-                        type="checkbox"
-                        checked={!unchecked.has(g)}
-                        disabled={busy}
-                        onChange={(e) => {
-                          const on = e.currentTarget.checked;
-                          setUnchecked((s) => {
-                            const next = new Set(s);
-                            if (on) next.delete(g);
-                            else next.add(g);
-                            return next;
-                          });
-                        }}
-                      />
-                      {g} <span class="note">{t("They were a member", "Mereka dulu anggota")}</span>
-                    </label>
-                  </li>
-                ))}
+                {[...new Set([...req.groups, ...(allGroups.data ?? []).map((g) => g.prefix)])].map(
+                  (g) => (
+                    <li key={g}>
+                      <label class="check">
+                        <input
+                          type="checkbox"
+                          checked={req.groups.includes(g) && !unchecked.has(g)}
+                          disabled={busy || !req.groups.includes(g)}
+                          onChange={(e) => {
+                            const on = e.currentTarget.checked;
+                            setUnchecked((s) => {
+                              const next = new Set(s);
+                              if (on) next.delete(g);
+                              else next.add(g);
+                              return next;
+                            });
+                          }}
+                        />
+                        {g}{" "}
+                        <span class="note">
+                          {req.groups.includes(g)
+                            ? t("They were a member", "Mereka dulu anggota")
+                            : t("They were not a member", "Mereka bukan anggota")}
+                        </span>
+                      </label>
+                    </li>
+                  ),
+                )}
               </ul>
             )}
             <p class="note">
