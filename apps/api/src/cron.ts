@@ -3,6 +3,7 @@ import { currentHead, pruneAudit, pruneUsage, saveCheckpoint } from "./repositor
 import { sweepExpiredRequests } from "./requests-sweep.ts";
 import { backupDaily } from "./routes/backup.ts";
 import { purgeDeletedLogins } from "./routes/logins.ts";
+import { purgeDeletedSecrets } from "./routes/versions.ts";
 import { loadLimits } from "./settings.ts";
 import type { Env } from "./types.ts";
 
@@ -58,6 +59,7 @@ export async function runDaily(
   await pruneUsage(db, t - LOGIN_WINDOW_KEEP_SEC, dayOf(t - USAGE_KEEP_DAYS * DAY));
 
   await purgeDeletedLogins(db, t);
+  await purgeDeletedSecrets(db, t);
   await sweepExpiredRequests(db, t); // ADR 16: lapsed grants and pending requests
 
   return { day, head: head.hash, pruned };

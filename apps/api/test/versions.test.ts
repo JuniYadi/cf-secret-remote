@@ -10,7 +10,8 @@ import {
   wrapGroupKey,
 } from "@cfs/core";
 import { describe, expect, it } from "vitest";
-import { purgeDeletedSecrets } from "../src/routes/versions.ts";
+import { runDaily } from "../src/cron.ts";
+import type { Env } from "../src/types.ts";
 import { admin, api, makeIdentity } from "./helpers.ts";
 
 // ADR 22 tests. Every test uses its own group prefix so tests do not share paths.
@@ -483,7 +484,7 @@ describe("soft delete and restore (ADR 22)", () => {
     );
     expect(await readValues(t.adm.token, t.gk, edge)).toEqual({ A: "2" });
 
-    await purgeDeletedSecrets(env.DB);
+    await runDaily(env as unknown as Env, Math.floor(Date.now() / 1000));
     const left = (path: string) =>
       env.DB.prepare(
         `SELECT (SELECT COUNT(*) FROM secret WHERE path = ?) AS secrets,
