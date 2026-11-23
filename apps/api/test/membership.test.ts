@@ -9,6 +9,7 @@ import {
   wrapGroupKey,
 } from "@cfs/core";
 import { describe, expect, it } from "vitest";
+import { startRotation } from "../src/repository/membership.ts";
 import { countAdminsWithVault } from "../src/routes/membership.ts";
 import { api, makeIdentity } from "./helpers.ts";
 
@@ -239,6 +240,69 @@ describe("ADR 14: add member", () => {
 });
 
 describe("ADR 14: remove member and staged rotation", () => {
+  it("only one concurrent rotation start acquires the group and removes its target", async () => {
+    const prefix = prefixName("race");
+    const first = await person({ role: "admin" });
+    const second = await person({ role: "admin" });
+    const targetA = await person();
+    const targetB = await person();
+    await makeGroup(prefix, first, [second, targetA, targetB]);
+    const group = await groupRow(prefix);
+    if (!group) throw new Error("group missing");
+
+    // Both starts use the same previously read version, forcing contention at the D1 update.
+    const results = await Promise.all([
+      startRotation(env.DB, group.id, [{ identityId: first.id, wrappedKey: "a" }], 2, targetA.id),
+      startRotation(env.DB, group.id, [{ identityId: second.id, wrappedKey: "b" }], 2, targetB.id),
+    ]);
+    const changes = results.map((result) => result[0]?.meta.changes);
+    expect([...changes].sort()).toEqual([0, 1]);
+    const winner = changes[0] === 1 ? targetA : targetB;
+    const loser = changes[0] === 1 ? targetB : targetA;
+    expect((await groupRow(prefix))?.status).toBe("rotating");
+    expect(
+      await countRows(
+        "SELECT 1 FROM keyring_member WHERE keyring_id = ? AND identity_id = ?",
+        group.id,
+        winner.id,
+      ),
+    ).toBe(0);
+    expect(
+      await countRows(
+        "SELECT 1 FROM keyring_member WHERE keyring_id = ? AND identity_id = ?",
+        group.id,
+        loser.id,
+      ),
+    ).toBe(1);
+    expect((await stagedRows(prefix)).members).toBe(1);
+  });
+
+  it("returns a rotation conflict to one of two admins starting removal concurrently", async () => {
+    const prefix = prefixName("httpRace");
+    const first = await person({ role: "admin" });
+    const second = await person({ role: "admin" });
+    const target = await person();
+    await makeGroup(prefix, first, [second, target]);
+    const key = await newGroupKey();
+    const members = await Promise.all(
+      [first, second].map(async (p) => ({
+        identityId: p.id,
+        wrappedKey: await wrapGroupKey(key, p.kp.publicKey, prefix, 2),
+      })),
+    );
+    const body = { removeIdentityId: target.id, members };
+    const results = await Promise.all([
+      api("POST", `/keyrings/${prefix}/rotate/start`, first.token, body),
+      api("POST", `/keyrings/${prefix}/rotate/start`, second.token, body),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(results.find((r) => r.status === 409)?.body.code).toBe("group_rotating");
+    expect((await stagedRows(prefix)).members).toBe(2);
+    expect(await countRows("SELECT 1 FROM keyring_member WHERE identity_id = ?", target.id)).toBe(
+      0,
+    );
+  });
+
   it("removal ends the removed member's access at once and blocks writes while rotating", async () => {
     const prefix = prefixName("rm");
     const adm = await person({ role: "admin" });
