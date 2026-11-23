@@ -1,3 +1,5 @@
+import { globMatch } from "../policy.ts";
+
 /** A rule as read from agent_rule, with SQL aliases in camelCase. Column list shared by the routes. */
 export const RULE_COLS = `alias, secret_path AS secretPath, name, upstream, inject,
   max_reads_per_hour AS maxReadsPerHour, require_reason AS requireReason,
@@ -102,11 +104,7 @@ export function approvedRequests(db: D1Database, identityId: string, at: number)
     .all<{ id: string; glob: string }>();
 }
 
-export function rulesForPath(db: D1Database, identityId: string, path: string) {
-  return db
-    .prepare(
-      `SELECT ${RULE_COLS} FROM agent_rule WHERE identity_id = ? AND secret_path = ? ORDER BY alias`,
-    )
-    .bind(identityId, path)
-    .all<StoredRule>();
+export async function rulesForPath(db: D1Database, identityId: string, path: string) {
+  const rows = await listRules(db, identityId);
+  return rows.results.filter((rule) => globMatch(rule.secretPath, path));
 }

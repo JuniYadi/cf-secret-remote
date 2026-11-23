@@ -338,12 +338,7 @@ async function serve(
     throw new ProxyError(502, "upstream unreachable");
   }
 
-  // Redaction works on the bytes, so an encoded body cannot be checked. Refuse it rather than leak.
-  const encoding = upstream.headers.get("content-encoding");
-  if (encoding && encoding.trim().toLowerCase() !== "identity")
-    throw new ProxyError(502, "upstream sent an encoded body the proxy cannot redact");
-  const raw = new Uint8Array(await upstream.arrayBuffer());
-  if (raw.byteLength > MAX_RESPONSE) throw new ProxyError(502, "upstream body is too large");
+  const raw = await readResponse(upstream);
 
   // ADR 17: the value is redacted from the body and from every header, names included.
   const out = redactBytes(raw, value);
@@ -354,6 +349,48 @@ async function serve(
   });
   outHeaders.push(["content-length", String(out.byteLength)]);
   return { status: upstream.status, headers: outHeaders, body: out };
+}
+
+/** Buffer decoded bytes up to the limit so matches spanning upstream chunks are redacted together. */
+async function readResponse(upstream: Response): Promise<Uint8Array> {
+  const encoding = (upstream.headers.get("content-encoding") ?? "identity").trim().toLowerCase();
+  let stream = upstream.body;
+  if (encoding !== "identity") {
+    if (!["gzip", "deflate", "br"].includes(encoding))
+      throw new ProxyError(502, "upstream sent an encoding the proxy cannot decode");
+    try {
+      const decoder = new DecompressionStream(encoding as CompressionFormat);
+      if (stream) stream = stream.pipeThrough(decoder);
+    } catch {
+      throw new ProxyError(502, "upstream sent an encoding the proxy cannot decode");
+    }
+  }
+  if (!stream) return new Uint8Array();
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_RESPONSE) {
+        void reader.cancel().catch(() => {});
+        throw new ProxyError(502, "upstream body exceeds the 16 MiB decoded limit");
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error instanceof ProxyError) throw error;
+    throw new ProxyError(502, "upstream body could not be decoded");
+  }
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
 }
 
 /** Caches values per alias for `ttlMs` (5 minutes by default). Concurrent calls share one fetch. */
@@ -424,7 +461,9 @@ export const fetchUpstreamReal = (url: string, init: UpstreamInit): Promise<Resp
     headers: init.headers,
     body: init.body as unknown as BodyInit | undefined,
     redirect: "manual",
-  });
+    // Bun otherwise transparently decompresses while retaining Content-Encoding.
+    decompress: false,
+  } as RequestInit & { decompress: boolean });
 
 /** Starts the HTTP listener on loopback. Browser requests (Origin set) and other Host headers are refused. */
 export async function startProxy(

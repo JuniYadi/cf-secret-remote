@@ -4,7 +4,7 @@ import { PROD_GLOB, type StoredRule } from "../agent-guard.ts";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { NAME_RE } from "../limits.ts";
-import { globMatch, validPath } from "../policy.ts";
+import { globMatch } from "../policy.ts";
 import {
   deleteRule,
   findRule,
@@ -86,9 +86,11 @@ export function parseInject(raw: unknown): Check<string> {
 }
 
 function checkSecretPath(raw: unknown): Check<string> {
-  return typeof raw === "string" && validPath(raw) && !raw.includes("*")
+  return typeof raw === "string" &&
+    raw.length <= 200 &&
+    /^[a-z0-9*][a-z0-9._*-]*(\/[a-z0-9*][a-z0-9._*-]*)*$/i.test(raw)
     ? { value: raw }
-    : { error: "secretPath is not a valid secret path" };
+    : { error: "secretPath is not a valid secret path glob" };
 }
 
 function checkName(raw: unknown): Check<string> {
@@ -108,7 +110,8 @@ function checkBool(raw: unknown, field: string): Check<boolean> {
 }
 
 // Approval is on for prod paths unless the admin says otherwise (ADR 17).
-const defaultApproval = (secretPath: string) => globMatch(PROD_GLOB, secretPath);
+const defaultApproval = (secretPath: string) =>
+  secretPath.includes("*") || globMatch(PROD_GLOB, secretPath);
 
 export const agent_rules = new Hono<AppEnv>();
 

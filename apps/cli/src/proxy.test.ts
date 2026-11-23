@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { request as httpRequest } from "node:http";
+import { brotliCompressSync, deflateSync, gzipSync } from "node:zlib";
 import { CliError } from "./client.ts";
 import {
   type AgentRule,
@@ -244,7 +245,85 @@ describe("ADR 17: redaction in bodies and headers", () => {
     expect(dec(r.body)).toBe("a=[redacted] b=[redacted]");
   });
 
-  test("an encoded upstream body is refused, since it cannot be checked for the value", async () => {
+  test("decodes compressed bodies and redacts before returning them", async () => {
+    for (const [encoding, compress] of [
+      ["gzip", gzipSync],
+      ["deflate", deflateSync],
+      ["br", brotliCompressSync],
+    ] as const) {
+      if (encoding === "br") {
+        try {
+          new DecompressionStream("br" as CompressionFormat);
+        } catch {
+          continue; // Runtime support is optional.
+        }
+      }
+      const h = harness({
+        upstream: async () =>
+          new Response(new Uint8Array(compress(`echo ${VALUE}`)), {
+            headers: { "content-encoding": encoding, "content-length": "1" },
+          }),
+      });
+      const r = await send(h.deps, "/github/x");
+      expect(r.status).toBe(200);
+      expect(dec(r.body)).toBe("echo [redacted]");
+      expect(Object.fromEntries(r.headers)["content-encoding"]).toBeUndefined();
+      expect(Object.fromEntries(r.headers)["content-length"]).toBe(String(r.body.length));
+    }
+  });
+
+  test("the real fetch preserves compressed bytes for proxy decoding", async () => {
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: () =>
+        new Response(new Uint8Array(gzipSync(`echo ${VALUE}`)), {
+          headers: { "content-encoding": "gzip" },
+        }),
+    });
+    try {
+      const h = harness({
+        upstream: (_url, init) => fetchUpstreamReal(`http://127.0.0.1:${server.port}/`, init),
+      });
+      const result = await send(h.deps, "/github/x");
+      expect(result.status).toBe(200);
+      expect(dec(result.body)).toBe("echo [redacted]");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("buffers values split across chunks and refuses oversized decoded bodies", async () => {
+    const encoder = new TextEncoder();
+    const h = harness({
+      upstream: async () =>
+        new Response(
+          new ReadableStream({
+            start(c) {
+              c.enqueue(encoder.encode(`echo ${VALUE.slice(0, 5)}`));
+              c.enqueue(encoder.encode(VALUE.slice(5)));
+              c.close();
+            },
+          }),
+        ),
+    });
+    expect(dec((await send(h.deps, "/github/x")).body)).toBe("echo [redacted]");
+    const large = harness({
+      upstream: async () =>
+        new Response(new Uint8Array(gzipSync(new Uint8Array(16 * 1024 * 1024 + 1))), {
+          headers: { "content-encoding": "gzip" },
+        }),
+    });
+    const result = await send(large.deps, "/github/x");
+    expect(result.status).toBe(502);
+    expect(dec(result.body)).toContain("16 MiB");
+  });
+
+  test("unsupported and malformed encodings are refused", async () => {
+    const unsupported = harness({
+      upstream: async () => new Response("body", { headers: { "content-encoding": "unknown" } }),
+    });
+    expect((await send(unsupported.deps, "/github/x")).status).toBe(502);
     const h = harness({
       upstream: async () => new Response("gzip-bytes", { headers: { "content-encoding": "gzip" } }),
     });
