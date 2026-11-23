@@ -1,3 +1,4 @@
+import { ConflictCode } from "@cfs/core";
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
@@ -88,7 +89,7 @@ apps.post("/apps", async (c) => {
       cidr,
     });
   } catch {
-    return c.json({ error: "name already used" }, 409);
+    return c.json({ error: "name already used", code: ConflictCode.name_exists }, 409);
   }
   await audit(c.env.DB, {
     who: who.name,

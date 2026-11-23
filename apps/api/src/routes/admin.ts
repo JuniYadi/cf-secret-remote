@@ -1,4 +1,4 @@
-import { GENESIS, verifyChain } from "@cfs/core";
+import { ConflictCode, GENESIS, verifyChain } from "@cfs/core";
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
@@ -41,7 +41,7 @@ admin.post("/policies", async (c) => {
   try {
     await repo.createPolicy(c.env.DB, id, b.name, JSON.stringify(b.rules));
   } catch {
-    return c.json({ error: "name already used" }, 409);
+    return c.json({ error: "name already used", code: ConflictCode.name_exists }, 409);
   }
   await audit(c.env.DB, {
     who: c.get("who").name,

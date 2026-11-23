@@ -1,4 +1,4 @@
-import { b64uDecode, LOGIN_CIPHERTEXT_LIMIT } from "@cfs/core";
+import { b64uDecode, ConflictCode, LOGIN_CIPHERTEXT_LIMIT } from "@cfs/core";
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import {
@@ -128,7 +128,7 @@ async function write(
   const old = mode === "create" ? null : await item(c.env.DB, id, who.id);
   if (mode !== "create" && !old) return c.json({ error: "not found" }, 404);
   if (old && (await member(c.env.DB, old.keyringId, who.id))?.status !== "active")
-    return c.json({ error: "keyring rotating" }, 409);
+    return c.json({ error: "keyring rotating", code: ConflictCode.group_rotating }, 409);
   if (old && mode !== "move" && old.keyringId !== b.keyringId)
     return c.json({ error: "wrong keyring" }, 400);
   if (old && mode === "move" && old.keyringId === b.keyringId)
@@ -136,16 +136,23 @@ async function write(
   const group = await member(c.env.DB, b.keyringId as string, who.id);
   if (!group) return c.json({ error: "not found" }, 404);
   if (group.status !== "active" || group.version !== b.keyringVersion)
-    return c.json({ error: "keyring changed or rotating" }, 409);
+    return c.json(
+      { error: "keyring changed or rotating", code: ConflictCode.group_changed_or_rotating },
+      409,
+    );
   const version = (old?.current ?? 0) + 1;
-  if (b.version !== version) return c.json({ error: "version changed, reload and retry" }, 409);
+  if (b.version !== version)
+    return c.json(
+      { error: "version changed, reload and retry", code: ConflictCode.version_conflict },
+      409,
+    );
   if (mode === "restore") {
     const target = Number(c.req.param("version"));
     const source = await findRestoreSource(c.env.DB, id, target, who.id, now());
     if (!source) return c.json({ error: "not found" }, 404);
   }
   if (mode === "create" && (await loginExists(c.env.DB, id)))
-    return c.json({ error: "already exists" }, 409);
+    return c.json({ error: "already exists", code: ConflictCode.already_exists }, 409);
   const written = await writeLogin(c.env.DB, {
     id,
     version,
@@ -157,7 +164,11 @@ async function write(
     identityId: who.id,
     oldCurrent: old?.current,
   });
-  if (!written[0]?.meta.changes) return c.json({ error: "keyring or version changed" }, 409);
+  if (!written[0]?.meta.changes)
+    return c.json(
+      { error: "keyring or version changed", code: ConflictCode.group_or_version_changed },
+      409,
+    );
   await audit(c.env.DB, {
     who: who.name,
     actor: who,

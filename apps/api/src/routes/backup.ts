@@ -1,3 +1,4 @@
+import { ConflictCode } from "@cfs/core";
 import {
   BACKUP_TABLES,
   backupHistory,
@@ -444,7 +445,10 @@ backup.post("/restore", async (c) => {
 
 /** Known refusals become their status and message. Anything else is a real error for the global handler. */
 function failure(c: Context<AppEnv>, e: unknown): Response {
-  if (e instanceof BackupError) return c.json({ error: e.message }, e.status);
+  if (e instanceof BackupError)
+    return e.status === 409
+      ? c.json({ error: e.message, code: ConflictCode.backup_schema_mismatch }, 409)
+      : c.json({ error: e.message }, e.status);
   throw e;
 }
 

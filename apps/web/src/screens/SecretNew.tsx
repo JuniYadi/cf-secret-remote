@@ -9,7 +9,13 @@ import { api } from "../lib/api.ts";
 import { useLang } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
 import { setImportHint } from "../lib/import-draft.ts";
-import { groupKeyFor, isConflict, isNoKey, saveValues } from "../lib/secret-store.ts";
+import {
+  groupKeyFor,
+  isConflict,
+  isNoKey,
+  saveValues,
+  secretConflictMessage,
+} from "../lib/secret-store.ts";
 import { groupOf, validSecretPath } from "../lib/secrets.ts";
 import { PATHS, pageCrumbs, SECRET_TABS, secretHref } from "../routes.ts";
 
@@ -75,6 +81,8 @@ export function SecretNewPage() {
             `Kamu tidak punya kunci untuk grup ${group}. Minta anggota grup memberimu akses dulu.`,
           ),
         );
+      } else if (secretConflictMessage(err)) {
+        setError(secretConflictMessage(err) as string);
       } else if (isConflict(err)) {
         setError(
           t(

@@ -1,3 +1,4 @@
+import { ConflictCode } from "@cfs/core";
 import { Hono } from "hono";
 import { PROD_GLOB, type StoredRule } from "../agent-guard.ts";
 import { audit } from "../audit.ts";
@@ -136,7 +137,10 @@ agent_rules.post("/apps/:id/rules", requireAdmin, async (c) => {
   const input = checked.value;
 
   if (await findRule(db, app.id, alias))
-    return c.json({ error: "alias already used for this app" }, 409);
+    return c.json(
+      { error: "alias already used for this app", code: ConflictCode.alias_exists },
+      409,
+    );
   await insertRule(db, app.id, alias, input);
   await audit(db, {
     who: who.name,

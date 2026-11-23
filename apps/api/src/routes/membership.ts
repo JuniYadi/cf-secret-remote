@@ -1,4 +1,4 @@
-import { LOGIN_CIPHERTEXT_LIMIT } from "@cfs/core";
+import { ConflictCode, LOGIN_CIPHERTEXT_LIMIT } from "@cfs/core";
 import { type Context, Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
@@ -70,17 +70,26 @@ membership.post("/keyrings/:prefix/members", requireAdmin, async (c) => {
   if (!isStr(b.identityId) || !isStr(b.wrappedKey)) return c.json({ error: "bad request" }, 400);
   const g = await memberGate(c, prefix, "group.member.add");
   if (g instanceof Response) return g;
-  if (g.status !== "active") return c.json({ error: "group is rotating, try again later" }, 409);
+  if (g.status !== "active")
+    return c.json(
+      { error: "group is rotating, try again later", code: ConflictCode.group_rotating },
+      409,
+    );
 
   const target = await membershipRepo.findTarget(db, b.identityId);
   if (!target) return c.json({ error: "unknown identity" }, 404);
-  if (target.status !== "active") return c.json({ error: "identity is disabled" }, 409);
-  if (!target.publicKey) return c.json({ error: "this person has not set up a vault yet" }, 409);
+  if (target.status !== "active")
+    return c.json({ error: "identity is disabled", code: ConflictCode.identity_disabled }, 409);
+  if (!target.publicKey)
+    return c.json(
+      { error: "this person has not set up a vault yet", code: ConflictCode.vault_required },
+      409,
+    );
 
   try {
     await membershipRepo.addMember(db, g.id, b.identityId, g.version, b.wrappedKey);
   } catch {
-    return c.json({ error: "already in this group" }, 409);
+    return c.json({ error: "already in this group", code: ConflictCode.already_in_group }, 409);
   }
   await audit(db, {
     who: who.name,
@@ -117,7 +126,8 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
 
   const g = await memberGate(c, prefix, "group.rotate.start");
   if (g instanceof Response) return g;
-  if (g.status !== "active") return c.json({ error: "group is already rotating" }, 409);
+  if (g.status !== "active")
+    return c.json({ error: "group is already rotating", code: ConflictCode.group_rotating }, 409);
 
   // The rotating admin needs the old key until commit, so it must stay a member.
   if (removeId === who.id)
@@ -140,9 +150,16 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   const next = g.version + 1;
   try {
     const started = await membershipRepo.startRotation(db, g.id, members, next, removeId);
-    if (!started[0]?.meta.changes) return c.json({ error: "group changed, reload and retry" }, 409);
+    if (!started[0]?.meta.changes)
+      return c.json(
+        { error: "group changed, reload and retry", code: ConflictCode.group_changed },
+        409,
+      );
   } catch {
-    return c.json({ error: "group changed, reload and retry" }, 409);
+    return c.json(
+      { error: "group changed, reload and retry", code: ConflictCode.group_changed },
+      409,
+    );
   }
   const live = await membershipRepo.liveSecrets(db, g.id);
   await audit(db, {
@@ -162,7 +179,8 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
 membership.get("/keyrings/:prefix/rotate/logins", requireAdmin, async (c) => {
   const g = await memberGate(c, c.req.param("prefix"), "group.rotate.logins");
   if (g instanceof Response) return g;
-  if (g.status !== "rotating") return c.json({ error: "group is not rotating" }, 409);
+  if (g.status !== "rotating")
+    return c.json({ error: "group is not rotating", code: ConflictCode.group_not_rotating }, 409);
   const rows = await membershipRepo.rotationLogins(c.env.DB, g.id);
   return c.json(rows.results.map((r) => ({ ...r, fps: JSON.parse(r.fps) })));
 });
@@ -229,7 +247,8 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
 
   const g = await memberGate(c, prefix, "group.rotate.chunk");
   if (g instanceof Response) return g;
-  if (g.status !== "rotating") return c.json({ error: "group is not rotating" }, 409);
+  if (g.status !== "rotating")
+    return c.json({ error: "group is not rotating", code: ConflictCode.group_not_rotating }, 409);
   const next = g.version + 1;
   if (b.keyringVersion !== next)
     return c.json({ error: "keyringVersion must be the new version" }, 400);
@@ -249,23 +268,43 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
     loginIds.add(l.id);
     const row = await membershipRepo.loginCurrent(db, l.id, g.id);
     if (!row || l.version !== row.current + 1)
-      return c.json({ error: "login or version changed" }, 409);
+      return c.json(
+        { error: "login or version changed", code: ConflictCode.login_or_version_changed },
+        409,
+      );
   }
 
   const rows: { secretId: string; version: number }[] = [];
   for (const s of secrets) {
     const row = await membershipRepo.secretCurrent(db, s.path, g.id);
     if (!row || row.deletedAt)
-      return c.json({ error: "secret is not live in this group", path: s.path }, 409);
+      return c.json(
+        {
+          error: "secret is not live in this group",
+          code: ConflictCode.secret_not_live,
+          path: s.path,
+        },
+        409,
+      );
     if (s.version !== row.current + 1)
-      return c.json({ error: "version changed, reload and retry", path: s.path }, 409);
+      return c.json(
+        {
+          error: "version changed, reload and retry",
+          code: ConflictCode.version_conflict,
+          path: s.path,
+        },
+        409,
+      );
     rows.push({ secretId: row.id, version: s.version });
   }
 
   try {
     await membershipRepo.stageRotation(db, secrets, rows, loginItems, g.id, next, who.id);
   } catch {
-    return c.json({ error: "group changed, reload and retry" }, 409);
+    return c.json(
+      { error: "group changed, reload and retry", code: ConflictCode.group_changed },
+      409,
+    );
   }
   for (const s of secrets)
     await audit(db, {
@@ -288,7 +327,8 @@ membership.post("/keyrings/:prefix/rotate/commit", requireAdmin, async (c) => {
   const prefix = c.req.param("prefix");
   const g = await memberGate(c, prefix, "group.rotate.commit");
   if (g instanceof Response) return g;
-  if (g.status !== "rotating") return c.json({ error: "group is not rotating" }, 409);
+  if (g.status !== "rotating")
+    return c.json({ error: "group is not rotating", code: ConflictCode.group_not_rotating }, 409);
   const next = g.version + 1;
 
   const missing = await membershipRepo.missingSecrets(db, g.id, next);
@@ -296,6 +336,7 @@ membership.post("/keyrings/:prefix/rotate/commit", requireAdmin, async (c) => {
     return c.json(
       {
         error: "some secrets have no new version yet",
+        code: ConflictCode.rotation_secrets_missing,
         missing: missing.results.map((r) => r.path),
       },
       409,
@@ -306,6 +347,7 @@ membership.post("/keyrings/:prefix/rotate/commit", requireAdmin, async (c) => {
     return c.json(
       {
         error: "some logins have no new version yet",
+        code: ConflictCode.rotation_logins_missing,
         missing: missingLogins.results.map((r) => r.id),
       },
       409,
@@ -314,11 +356,17 @@ membership.post("/keyrings/:prefix/rotate/commit", requireAdmin, async (c) => {
   try {
     await membershipRepo.commitRotation(db, g.id, next);
   } catch {
-    return c.json({ error: "group changed, reload and retry" }, 409);
+    return c.json(
+      { error: "group changed, reload and retry", code: ConflictCode.group_changed },
+      409,
+    );
   }
   const after = await loadGroup(db, prefix);
   if (after?.version !== next || after.status !== "active")
-    return c.json({ error: "group changed, reload and retry" }, 409);
+    return c.json(
+      { error: "group changed, reload and retry", code: ConflictCode.group_changed },
+      409,
+    );
   await audit(db, {
     who: who.name,
     actor: who,
@@ -338,12 +386,16 @@ membership.post("/keyrings/:prefix/rotate/abort", requireAdmin, async (c) => {
   const prefix = c.req.param("prefix");
   const g = await memberGate(c, prefix, "group.rotate.abort");
   if (g instanceof Response) return g;
-  if (g.status !== "rotating") return c.json({ error: "group is not rotating" }, 409);
+  if (g.status !== "rotating")
+    return c.json({ error: "group is not rotating", code: ConflictCode.group_not_rotating }, 409);
   const next = g.version + 1;
   try {
     await membershipRepo.abortRotation(db, g.id, next);
   } catch {
-    return c.json({ error: "group changed, reload and retry" }, 409);
+    return c.json(
+      { error: "group changed, reload and retry", code: ConflictCode.group_changed },
+      409,
+    );
   }
   await audit(db, {
     who: who.name,
@@ -382,7 +434,10 @@ membership.patch("/identities/:id", requireAdmin, async (c) => {
     !counts(role, status) &&
     (await countAdminsWithVault(db, t.id)) < 2
   )
-    return c.json({ error: "at least two admins must hold a vault" }, 409);
+    return c.json(
+      { error: "at least two admins must hold a vault", code: ConflictCode.two_admins_required },
+      409,
+    );
 
   await membershipRepo.updateIdentity(db, role, status, t.id);
 

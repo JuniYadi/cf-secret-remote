@@ -1,3 +1,4 @@
+import { ConflictCode } from "@cfs/core";
 import { type Context, Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
@@ -112,10 +113,18 @@ offboard.post("/offboard/:id/apps/:appId/reassign", async (c) => {
   if (next?.kind !== "user" || next.status !== "active" || next.id === p.id)
     return c.json({ error: "new owner must be another active person" }, 400);
   if (app.ownerId === next.id) return c.json({ id: app.id, ownerId: next.id, changed: false });
-  if (app.ownerId !== p.id) return c.json({ error: "this person does not own the app" }, 409);
+  if (app.ownerId !== p.id)
+    return c.json(
+      { error: "this person does not own the app", code: ConflictCode.not_app_owner },
+      409,
+    );
 
   const res = await reassignApp(db, next.id, app.id, p.id);
-  if (!res.meta.changes) return c.json({ error: "owner changed, reload and retry" }, 409);
+  if (!res.meta.changes)
+    return c.json(
+      { error: "owner changed, reload and retry", code: ConflictCode.owner_changed },
+      409,
+    );
   await audit(db, {
     who: who.name,
     actor: who,
@@ -151,6 +160,7 @@ offboard.post("/offboard/:id/finish", async (c) => {
       {
         error:
           "offboarding is not finished: remove the person from groups and reassign or disable their apps first",
+        code: ConflictCode.offboarding_incomplete,
         blockers,
       },
       409,
@@ -161,7 +171,13 @@ offboard.post("/offboard/:id/finish", async (c) => {
   // check above cannot slip through; the cleanup only runs once they are disabled.
   const results = await finishOffboard(db, p.id);
   if (p.status !== "disabled" && !results[0]?.meta.changes)
-    return c.json({ error: "the person changed while finishing, reload and retry" }, 409);
+    return c.json(
+      {
+        error: "the person changed while finishing, reload and retry",
+        code: ConflictCode.identity_changed,
+      },
+      409,
+    );
   const flipped = p.status !== "disabled";
   const ended = results[1]?.meta.changes ?? 0;
   const removed = results[2]?.meta.changes ?? 0;

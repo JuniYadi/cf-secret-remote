@@ -219,3 +219,6 @@ Setiap layar aplikasi punya dua tombol di sidebar, di bawah kotak pengguna:
 
 ## Batas akses dan retensi
 Admin dapat mengatur durasi maksimum permintaan (default 24 jam, maksimum 30 hari), durasi bawaan persetujuan (default 1 jam, tidak melebihi maksimum), dan retensi audit (default 365 hari, minimum 90 hari). Jika belum ada pengaturan, retensi memakai `AUDIT_RETENTION_DAYS` bila tersedia. Opsi kunci ulang setelah akses berakhir dicatat sebagai permintaan; rotasi belum otomatis.
+
+## Bentuk konflik API
+Respons HTTP 409 memuat `error` untuk manusia dan `code` stabil untuk klien, misalnya `version_conflict`, `group_rotating`, `group_key_changed`, dan `secret_deleted`. Daftar kode bersama tersedia di `packages/core`; klien harus menangani kode yang belum dikenal. Field tambahan seperti `current` atau `missing` tetap tersedia bila relevan.

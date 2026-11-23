@@ -1,3 +1,4 @@
+import { ConflictCode } from "@cfs/core";
 import { Hono } from "hono";
 import { agentGuard } from "../agent-guard.ts";
 import { audit } from "../audit.ts";
@@ -208,26 +209,40 @@ secrets.put("/secret", async (c) => {
       return c.json({ error: "owner is not a known identity" }, 400);
   }
   const keyring = await loadGroup(c.env.DB, prefixOf(path));
-  if (!keyring) return c.json({ error: "create the group first" }, 409);
+  if (!keyring)
+    return c.json({ error: "create the group first", code: ConflictCode.group_required }, 409);
   // ADR 14: no writes while the group is rotating.
   if (keyring.status === "rotating")
-    return c.json({ error: "group is rotating, writes are paused" }, 409);
+    return c.json(
+      { error: "group is rotating, writes are paused", code: ConflictCode.group_rotating },
+      409,
+    );
   if (keyringVersion !== keyring.version)
-    return c.json({ error: "group key changed, reload and retry" }, 409);
+    return c.json(
+      { error: "group key changed, reload and retry", code: ConflictCode.group_key_changed },
+      409,
+    );
 
   const existing = await repository.findSecret(c.env.DB, path);
   const cap: Cap = existing ? "update" : "create";
   if (!(await check(c, path, cap))) return c.json({ error: "denied" }, 403);
   // ADR 22: a deleted secret comes back only through an admin restore, not by a new write.
   if (existing?.deletedAt)
-    return c.json({ error: "secret is deleted, an admin can restore it" }, 409);
+    return c.json(
+      { error: "secret is deleted, an admin can restore it", code: ConflictCode.secret_deleted },
+      409,
+    );
 
   const id = existing?.id ?? newId();
   const version = (existing?.current ?? 0) + 1;
   // ADR 10: the client sealed for this exact version, so it must be the next one.
   if (b.version !== version)
     return c.json(
-      { error: "version changed, reload and retry", current: existing?.current ?? 0 },
+      {
+        error: "version changed, reload and retry",
+        code: ConflictCode.version_conflict,
+        current: existing?.current ?? 0,
+      },
       409,
     );
   const metaJson = metaPatch
@@ -270,7 +285,10 @@ secrets.delete("/secret", async (c) => {
   // ADR 14: no writes while the group is rotating.
   const grp = await repository.secretGroup(c.env.DB, path);
   if (grp?.status === "rotating")
-    return c.json({ error: "group is rotating, writes are paused" }, 409);
+    return c.json(
+      { error: "group is rotating, writes are paused", code: ConflictCode.group_rotating },
+      409,
+    );
   const res = await repository.deleteSecret(c.env.DB, now(), path);
   if (!res.meta.changes) return c.json({ error: "not found" }, 404);
   await audit(c.env.DB, {

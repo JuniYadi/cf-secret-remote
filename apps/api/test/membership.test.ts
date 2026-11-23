@@ -189,6 +189,7 @@ describe("ADR 14: add member", () => {
       wrappedKey: wrapped,
     });
     expect(again.status).toBe(409);
+    expect(again.body.code).toBe("already_in_group");
   });
 
   it("only a member who is also an admin can add; denials are audited", async () => {
@@ -227,11 +228,13 @@ describe("ADR 14: add member", () => {
       wrappedKey: "x.y",
     });
     expect(r1.status).toBe(409);
+    expect(r1.body.code).toBe("vault_required");
     const r2 = await api("POST", `/keyrings/${prefix}/members`, adm.token, {
       identityId: off.id,
       wrappedKey: "x.y",
     });
     expect(r2.status).toBe(409);
+    expect(r2.body.code).toBe("identity_disabled");
   });
 });
 
@@ -256,7 +259,9 @@ describe("ADR 14: remove member and staged rotation", () => {
     expect((await groupRow(prefix))?.status).toBe("rotating");
 
     // Writes to the rotating group return 409.
-    expect((await write(adm, gk, `${prefix}/one`, { K: "w" }, 1, 2)).status).toBe(409);
+    const rotating = await write(adm, gk, `${prefix}/one`, { K: "w" }, 1, 2);
+    expect(rotating.status).toBe(409);
+    expect(rotating.body.code).toBe("group_rotating");
     expect((await write(adm, gk, `${prefix}/two`, { K: "w" })).status).toBe(409);
     expect((await api("DELETE", `/secret?path=${prefix}/one`, adm.token)).status).toBe(409);
     const newbie = await person();
