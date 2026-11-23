@@ -386,7 +386,7 @@ describe("ADR 23: restore check", () => {
   it("refuses schema 14 on both restore check and restore, even with a valid hash", async () => {
     const { adm } = await seedWorld();
     const f = await plainFile((await download(adm.token)).bytes);
-    expect(f.schema).toBe(16);
+    expect(f.schema).toBe(SCHEMA_VERSION);
     f.schema = 14;
     f.sha256 = await digest(f.schema, f.createdAt, f.tables as unknown as Tables);
     const file = await gzipBytes(JSON.stringify(f));
@@ -394,7 +394,9 @@ describe("ADR 23: restore check", () => {
     for (const path of ["/restore/check", "/restore"]) {
       const r = await post(path, adm.token, restoreBody(file));
       expect(r.status).toBe(409);
-      expect(r.body.error).toContain("file is schema 14; this instance runs schema 16");
+      expect(r.body.error).toContain(
+        `file is schema 14; this instance runs schema ${SCHEMA_VERSION}`,
+      );
     }
     expect(await snapshot()).toEqual(before);
   });

@@ -1,6 +1,6 @@
 # 32. Chrome extension
 
-Status: accepted (not implemented yet)
+Status: implemented; Chrome Web Store listing pending owner
 
 ## Decision
 - **Scope.** Manifest V3, `apps/extension`, built with the same toolchain as the web app. Chrome first (Edge and Brave work with the same build). Firefox later; no Safari or mobile in v1.

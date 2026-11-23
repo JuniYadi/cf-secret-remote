@@ -18,4 +18,6 @@ A Cloudflare admin can delete rows and swap the JavaScript served to users. A co
 
 ## Extension autofill
 
-Autofill can expose credentials to a hostile page or hidden field. The planned extension matches the exact origin, including scheme, host, and port. It fills only after a user action, never on page load or by auto-submit. It does not fill cross-origin iframes or hidden fields. HTTPS is required except for localhost and 127.0.0.1. See [ADR 32](adr/0032-chrome-extension.md).
+Autofill can expose credentials to a hostile page or hidden field. The extension matches the exact origin, including scheme, host, and port. It fills only after a user action, never on page load or by auto-submit. It does not fill cross-origin iframes or hidden fields. HTTPS is required except for localhost and 127.0.0.1. See [ADR 32](adr/0032-chrome-extension.md).
+
+The unlocked key is stored in `chrome.storage.session` with its `lockAt` deadline. An expired key may remain in session storage (memory only, cleared on browser close) until the next extension action, but is never used after `lockAt`. While the popup is open, a timer clears it at the deadline.

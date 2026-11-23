@@ -340,6 +340,7 @@ export interface SignedInDevice {
 export interface CliLoginInfo {
   userCode: string;
   device: string;
+  deviceType?: "cli" | "extension";
   expiresAt: number;
 }
 

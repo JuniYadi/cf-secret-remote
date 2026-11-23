@@ -18,13 +18,23 @@ function userCode(): string {
 export const cliPublic = new Hono<{ Bindings: Env }>();
 
 cliPublic.post("/cli/start", async (c) => {
-  const b = await c.req.json<{ device?: string }>().catch(() => ({}) as { device?: string });
+  const b = await c.req
+    .json<{ device?: string; device_type?: string }>()
+    .catch(() => ({}) as { device?: string; device_type?: string });
+  if (b.device_type !== undefined && b.device_type !== "cli" && b.device_type !== "extension")
+    return c.json({ error: "bad request" }, 400);
   const deviceCode = newToken("cfsdev");
   const code = userCode();
   await c.env.DB.prepare(
-    "INSERT INTO cli_login (device_hash, user_code, device, expires_at) VALUES (?, ?, ?, ?)",
+    "INSERT INTO cli_login (device_hash, user_code, device, expires_at, device_type) VALUES (?, ?, ?, ?, ?)",
   )
-    .bind(await sha256Hex(deviceCode), code, (b.device ?? "").slice(0, 80), now() + CODE_TTL)
+    .bind(
+      await sha256Hex(deviceCode),
+      code,
+      (b.device ?? "").slice(0, 80),
+      now() + CODE_TTL,
+      b.device_type ?? "cli",
+    )
     .run();
   return c.json({ deviceCode, userCode: code, expiresIn: CODE_TTL, interval: 2 });
 });
@@ -98,15 +108,20 @@ cliApprove.get("/cli/login", async (c) => {
     return c.json({ error: "too many attempts" }, 429);
   const code = normalizeUserCode(c.req.query("code") ?? "");
   const row = await c.env.DB.prepare(
-    "SELECT device, expires_at AS expiresAt FROM cli_login WHERE user_code = ? AND status = 'pending' AND expires_at > ?",
+    "SELECT device, device_type AS deviceType, expires_at AS expiresAt FROM cli_login WHERE user_code = ? AND status = 'pending' AND expires_at > ?",
   )
     .bind(code, now())
-    .first<{ device: string; expiresAt: number }>();
+    .first<{ device: string; deviceType: string; expiresAt: number }>();
   if (!row) {
     const left = await attemptsLeft(c.env.DB, key, CODE_LIMIT, CODE_WINDOW);
     return c.json({ error: "code not found or expired", attemptsLeft: Math.max(0, left) }, 404);
   }
-  return c.json({ userCode: code, device: row.device, expiresAt: row.expiresAt });
+  return c.json({
+    userCode: code,
+    device: row.device,
+    deviceType: row.deviceType,
+    expiresAt: row.expiresAt,
+  });
 });
 
 cliApprove.post("/cli/approve", async (c) => {
