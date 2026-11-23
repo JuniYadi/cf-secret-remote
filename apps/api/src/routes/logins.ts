@@ -1,6 +1,20 @@
 import { b64uDecode, LOGIN_CIPHERTEXT_LIMIT } from "@cfs/core";
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
+import {
+  deleteLogin,
+  findCurrentLoginVersion,
+  findLoginVersion,
+  findRestoreSource,
+  item,
+  listLogins,
+  listLoginVersions,
+  loginExists,
+  member,
+  purgeLoginRows,
+  undeleteLogin,
+  writeLogin,
+} from "../repository/logins.ts";
 import type { AppEnv } from "../types.ts";
 import { now, sha256Hex } from "../util.ts";
 import { RESTORE_WINDOW } from "./versions.ts";
@@ -61,35 +75,8 @@ export function ciphertextSize(value: string): number | null {
     return null;
   }
 }
-async function member(db: D1Database, keyringId: string, identityId: string) {
-  return db
-    .prepare(
-      `SELECT k.version, k.status FROM keyring k JOIN keyring_member m ON m.keyring_id = k.id AND m.version = k.version WHERE k.id = ? AND m.identity_id = ? AND (m.expires_at IS NULL OR m.expires_at > ?)`,
-    )
-    .bind(keyringId, identityId, now())
-    .first<{ version: number; status: string }>();
-}
-async function item(db: D1Database, id: string, identityId: string, deleted = false) {
-  return db
-    .prepare(
-      `SELECT l.id, l.keyring_id AS keyringId, l.current, l.created_at AS createdAt, l.deleted_at AS deletedAt FROM login l JOIN keyring k ON k.id = l.keyring_id JOIN keyring_member m ON m.keyring_id = k.id AND m.version = k.version WHERE l.id = ? AND m.identity_id = ? AND (m.expires_at IS NULL OR m.expires_at > ?) AND l.deleted_at IS ${deleted ? "NOT NULL" : "NULL"}`,
-    )
-    .bind(id, identityId, now())
-    .first<{
-      id: string;
-      keyringId: string;
-      current: number;
-      createdAt: number;
-      deletedAt: number | null;
-    }>();
-}
-const selectVersion = `SELECT v.version, v.keyring_id AS keyringId, v.keyring_version AS keyringVersion, v.wrapped_dek AS wrappedDek, v.ciphertext, v.fps, v.created_at AS updatedAt, length(v.ciphertext) AS size FROM login_version v`;
 logins.get("/logins", async (c) => {
-  const snapshot = await c.env.DB.prepare(
-    `SELECT l.id, l.created_at AS createdAt, v.version, v.keyring_id AS keyringId, v.keyring_version AS keyringVersion, v.wrapped_dek AS wrappedDek, v.ciphertext, v.fps, v.created_at AS updatedAt, length(v.ciphertext) AS size FROM login l JOIN login_version v ON v.login_id = l.id AND v.version = l.current JOIN keyring k ON k.id = l.keyring_id JOIN keyring_member m ON m.keyring_id = k.id AND m.version = k.version WHERE m.identity_id = ? AND (m.expires_at IS NULL OR m.expires_at > ?) AND l.deleted_at IS NULL ORDER BY l.id`,
-  )
-    .bind(c.get("who").id, now())
-    .all<{ fps: string }>();
+  const snapshot = await listLogins(c.env.DB, c.get("who").id, now());
   const body = JSON.stringify(snapshot.results.map((r) => ({ ...r, fps: JSON.parse(r.fps) })));
   const etag = `"${await sha256Hex(body)}"`;
   c.header("ETag", etag);
@@ -105,11 +92,7 @@ logins.get("/logins", async (c) => {
 logins.get("/logins/:id/versions", async (c) => {
   const l = await item(c.env.DB, c.req.param("id"), c.get("who").id);
   if (!l) return c.json({ error: "not found" }, 404);
-  const rows = await c.env.DB.prepare(
-    `SELECT v.version, v.keyring_id AS keyringId, v.keyring_version AS keyringVersion, v.fps, v.created_at AS createdAt FROM login_version v JOIN keyring_member m ON m.keyring_id = v.keyring_id AND m.identity_id = ? AND m.version = v.keyring_version WHERE v.login_id = ? AND (m.expires_at IS NULL OR m.expires_at > ?) ORDER BY v.version DESC`,
-  )
-    .bind(c.get("who").id, l.id, now())
-    .all<{ fps: string }>();
+  const rows = await listLoginVersions(c.env.DB, c.get("who").id, l.id, now());
   return c.json(rows.results.map((r) => ({ ...r, fps: JSON.parse(r.fps) })));
 });
 logins.get("/logins/:id/versions/:version", async (c) => {
@@ -117,11 +100,7 @@ logins.get("/logins/:id/versions/:version", async (c) => {
   const version = Number(c.req.param("version"));
   if (!l || !Number.isSafeInteger(version) || version < 1)
     return c.json({ error: "not found" }, 404);
-  const row = await c.env.DB.prepare(
-    `${selectVersion} JOIN keyring_member m ON m.keyring_id = v.keyring_id AND m.version = v.keyring_version AND m.identity_id = ? WHERE v.login_id = ? AND v.version = ? AND (m.expires_at IS NULL OR m.expires_at > ?)`,
-  )
-    .bind(c.get("who").id, l.id, version, now())
-    .first<{ fps: string }>();
+  const row = await findLoginVersion(c.env.DB, c.get("who").id, l.id, version, now());
   return row
     ? c.json({ ...row, id: l.id, createdAt: l.createdAt, fps: JSON.parse(row.fps) })
     : c.json({ error: "not found" }, 404);
@@ -129,9 +108,7 @@ logins.get("/logins/:id/versions/:version", async (c) => {
 logins.get("/logins/:id", async (c) => {
   const l = await item(c.env.DB, c.req.param("id"), c.get("who").id);
   if (!l) return c.json({ error: "not found" }, 404);
-  const row = await c.env.DB.prepare(`${selectVersion} WHERE v.login_id = ? AND v.version = ?`)
-    .bind(l.id, l.current)
-    .first<{ fps: string }>();
+  const row = await findCurrentLoginVersion(c.env.DB, l.id, l.current);
   return row
     ? c.json({ ...row, id: l.id, createdAt: l.createdAt, fps: JSON.parse(row.fps) })
     : c.json({ error: "not found" }, 404);
@@ -164,43 +141,22 @@ async function write(
   if (b.version !== version) return c.json({ error: "version changed, reload and retry" }, 409);
   if (mode === "restore") {
     const target = Number(c.req.param("version"));
-    const source = await c.env.DB.prepare(
-      `SELECT 1 FROM login_version v JOIN keyring_member m ON m.keyring_id = v.keyring_id AND m.version = v.keyring_version WHERE v.login_id = ? AND v.version = ? AND m.identity_id = ? AND (m.expires_at IS NULL OR m.expires_at > ?)`,
-    )
-      .bind(id, target, who.id, now())
-      .first();
+    const source = await findRestoreSource(c.env.DB, id, target, who.id, now());
     if (!source) return c.json({ error: "not found" }, 404);
   }
-  if (
-    mode === "create" &&
-    (await c.env.DB.prepare("SELECT 1 FROM login WHERE id = ?").bind(id).first())
-  )
+  if (mode === "create" && (await loginExists(c.env.DB, id)))
     return c.json({ error: "already exists" }, 409);
-  const written = await c.env.DB.batch([
-    old
-      ? c.env.DB.prepare(
-          "UPDATE login SET current = ?, keyring_id = ? WHERE id = ? AND current = ? AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ? AND status = 'active')",
-        ).bind(version, b.keyringId, id, old.current, b.keyringId, b.keyringVersion)
-      : c.env.DB.prepare(
-          "INSERT INTO login (id, keyring_id, current, created_at) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ? AND status = 'active')",
-        ).bind(id, b.keyringId, version, now(), b.keyringId, b.keyringVersion),
-    c.env.DB.prepare(
-      "INSERT INTO login_version (login_id, version, keyring_id, keyring_version, wrapped_dek, ciphertext, fps, created_by, created_at) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM login WHERE id = ? AND current = ? AND keyring_id = ? AND deleted_at IS NULL)",
-    ).bind(
-      id,
-      version,
-      b.keyringId,
-      b.keyringVersion,
-      b.wrappedDek,
-      b.ciphertext,
-      JSON.stringify(b.fps),
-      who.id,
-      now(),
-      id,
-      version,
-      b.keyringId,
-    ),
-  ]);
+  const written = await writeLogin(c.env.DB, {
+    id,
+    version,
+    keyringId: b.keyringId as string,
+    keyringVersion: b.keyringVersion as number,
+    wrappedDek: b.wrappedDek as string,
+    ciphertext: b.ciphertext as string,
+    fps: JSON.stringify(b.fps),
+    identityId: who.id,
+    oldCurrent: old?.current,
+  });
   if (!written[0]?.meta.changes) return c.json({ error: "keyring or version changed" }, 409);
   await audit(c.env.DB, {
     who: who.name,
@@ -218,9 +174,7 @@ logins.post("/logins/:id/versions/:version/restore", (c) => write(c, "restore"))
 logins.delete("/logins/:id", async (c) => {
   const l = await item(c.env.DB, c.req.param("id"), c.get("who").id);
   if (!l) return c.json({ error: "not found" }, 404);
-  await c.env.DB.prepare("UPDATE login SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL")
-    .bind(now(), l.id)
-    .run();
+  await deleteLogin(c.env.DB, now(), l.id);
   await audit(c.env.DB, {
     who: c.get("who").name,
     action: "login.delete",
@@ -235,7 +189,7 @@ logins.post("/logins/:id/undelete", async (c) => {
   if (!l) return c.json({ error: "not found" }, 404);
   if (now() - (l.deletedAt as number) > RESTORE_WINDOW)
     return c.json({ error: "too old to restore" }, 410);
-  await c.env.DB.prepare("UPDATE login SET deleted_at = NULL WHERE id = ?").bind(l.id).run();
+  await undeleteLogin(c.env.DB, l.id);
   await audit(c.env.DB, {
     who: c.get("who").name,
     action: "login.undelete",
@@ -276,14 +230,5 @@ for (const action of ["reveal", "fill"] as const) {
 
 /** Purge Login versions once their 30-day restore window has expired. */
 export async function purgeDeletedLogins(db: D1Database, at: number = now()): Promise<void> {
-  await db.batch([
-    db
-      .prepare(
-        "DELETE FROM login_version WHERE login_id IN (SELECT id FROM login WHERE deleted_at IS NOT NULL AND deleted_at < ?)",
-      )
-      .bind(at - RESTORE_WINDOW),
-    db
-      .prepare("DELETE FROM login WHERE deleted_at IS NOT NULL AND deleted_at < ?")
-      .bind(at - RESTORE_WINDOW),
-  ]);
+  await purgeLoginRows(db, at - RESTORE_WINDOW);
 }
