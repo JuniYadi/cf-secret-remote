@@ -117,6 +117,21 @@ const audited = async (action: string, result: string, path: string) =>
   (await auditRows()).filter((r) => r.action === action && r.result === result && r.path === path);
 
 describe("ADR 17: managing rules", () => {
+  it("validates path globs on create and update", async () => {
+    const adm = await newAdmin();
+    const app = await newApp(adm);
+    for (const path of ["", "/dev", "a//b", "a/?", "a/[x]", "a/", "a".repeat(201)]) {
+      expect((await addRule(adm, app, ruleBody(path))).status).toBe(400);
+    }
+    expect((await addRule(adm, app, ruleBody("team/*"))).status).toBe(201);
+    expect(
+      (await api("PUT", `/apps/${app.id}/rules/github`, adm.token, { secretPath: "*/prod" }))
+        .status,
+    ).toBe(200);
+    expect(
+      (await api("PUT", `/apps/${app.id}/rules/github`, adm.token, { secretPath: "a//b" })).status,
+    ).toBe(400);
+  });
   it("a member and an app cannot manage rules; only admins can", async () => {
     const adm = await newAdmin();
     const app = await newApp(adm);
@@ -253,6 +268,23 @@ describe("ADR 17: managing rules", () => {
 });
 
 describe("ADR 17: the read path", () => {
+  it("applies every matching glob and ignores rules for other paths and identities", async () => {
+    const adm = await newAdmin();
+    const app = await newApp(adm);
+    const other = await newApp(adm);
+    const prefix = uniq("glob");
+    const gk = await makeGroup(adm, prefix);
+    const path = `${prefix}/dev`;
+    await putSecret(adm, gk, path, { API_KEY: "test" });
+    await grantRead(adm, app, `${prefix}/*`);
+    await addRule(adm, app, ruleBody(`${prefix}/*`, { alias: "a", maxReadsPerHour: 1 }));
+    await addRule(adm, app, ruleBody(`*/dev`, { alias: "b", requireReason: true }));
+    await addRule(adm, app, ruleBody(`${prefix}/other`, { alias: "c", requireReason: true }));
+    await addRule(adm, other, ruleBody(path, { requireReason: true }));
+    expect((await readAs(app, path)).status).toBe(403);
+    expect((await readAs(app, path, "test")).status).toBe(200);
+    expect((await readAs(app, path, "test")).status).toBe(429);
+  });
   it("a read past the per-hour budget gets 429 and is audited, and reads under it still work", async () => {
     const adm = await newAdmin();
     const app = await newApp(adm);

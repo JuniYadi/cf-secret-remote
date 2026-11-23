@@ -78,8 +78,7 @@ export async function agentGuard(
   reasonHeader: string | undefined,
   ip: string | undefined,
 ): Promise<GuardResult> {
-  const found = await rulesForPath(db, who.id, path);
-  const rules = found.results;
+  const rules = await rulesForPath(db, who.id, path);
   if (rules.length === 0) return { ok: true };
 
   const reason = cleanReason(reasonHeader);
