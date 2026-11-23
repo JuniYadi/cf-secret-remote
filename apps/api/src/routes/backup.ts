@@ -1,4 +1,27 @@
 import {
+  BACKUP_TABLES,
+  backupHistory,
+  COLUMNS,
+  currentCounts,
+  endMaintenance,
+  latestAudit,
+  maintenance,
+  readTables,
+  replaceTables,
+  startMaintenance,
+} from "../repository/backup.ts";
+
+export type { BackupTable } from "../repository/backup.ts";
+export {
+  BACKUP_TABLES,
+  COLUMNS,
+  EXCLUDED_TABLES,
+  MASKED_SETTINGS,
+  readTables,
+  replaceTables,
+} from "../repository/backup.ts";
+
+import {
   canonical,
   chainHash,
   GENESIS,
@@ -22,143 +45,11 @@ import { now, sha256Hex } from "../util.ts";
 /** The number of the latest migration. A file must match it to restore. */
 export const SCHEMA_VERSION = 17;
 
-/** Tables in dependency order: parents first. Restore deletes in the reverse order. */
-export const BACKUP_TABLES = [
-  "identity",
-  "app_role",
-  "keyring",
-  "keyring_member",
-  "keyring_member_staged",
-  "policy",
-  "identity_policy",
-  "agent_rule",
-  "access_request",
-  "secret",
-  "secret_version",
-  "login",
-  "login_version",
-  "setting",
-  "alert_state",
-  "audit",
-  "audit_base",
-  "checkpoint",
-  "usage_day",
-] as const;
-export type BackupTable = (typeof BACKUP_TABLES)[number];
-
-/**
- * Tables never exported: sessions and CLI login codes (ADR 23), rate-limit counters, the maintenance flag, and
- * in-flight recovery requests (ADR 20: short-lived, hold cancel-token hashes; restoring a stale one would revive it).
- */
-export const EXCLUDED_TABLES = [
-  "session",
-  "cli_login",
-  "login_attempt",
-  "maintenance",
-  "recovery_request",
-] as const;
-
-/**
- * Settings never written to a backup (ADR 23: the alert webhook is masked out). A webhook URL is a credential,
- * so after a restore the admin sets it again.
- */
-export const MASKED_SETTINGS = ["alerts.webhook_url"] as const;
-
-/** The columns exported and accepted on restore. A file with any other column is refused. */
-export const COLUMNS: Record<BackupTable, readonly string[]> = {
-  identity: [
-    "id",
-    "kind",
-    "name",
-    "role",
-    "public_key",
-    "locked_key",
-    "status",
-    "created_at",
-    "owner_id",
-    "recovery_locked_key",
-    "last_unlocked_at",
-  ],
-  app_role: [
-    "identity_id",
-    "role_id",
-    "secret_hash",
-    "token_ttl",
-    "max_uses",
-    "uses",
-    "cidr",
-    "expires_at",
-    "first_login_at",
-    "last_login_at",
-    "last_ip",
-  ],
-  keyring: ["id", "prefix", "version", "created_at", "status", "personal_owner"],
-  keyring_member: ["keyring_id", "identity_id", "version", "wrapped_key", "expires_at"],
-  keyring_member_staged: ["keyring_id", "identity_id", "version", "wrapped_key"],
-  policy: ["id", "name", "rules"],
-  identity_policy: ["identity_id", "policy_id", "expires_at"],
-  agent_rule: [
-    "identity_id",
-    "alias",
-    "secret_path",
-    "name",
-    "upstream",
-    "inject",
-    "max_reads_per_hour",
-    "require_reason",
-    "require_approval",
-  ],
-  secret: ["id", "path", "keyring_id", "current", "created_at", "deleted_at", "meta"],
-  secret_version: [
-    "secret_id",
-    "version",
-    "keyring_version",
-    "names",
-    "wrapped_dek",
-    "ciphertext",
-    "created_by",
-    "created_at",
-    "fps",
-  ],
-  login: ["id", "keyring_id", "current", "created_at", "deleted_at"],
-  login_version: [
-    "login_id",
-    "version",
-    "keyring_id",
-    "keyring_version",
-    "wrapped_dek",
-    "ciphertext",
-    "fps",
-    "created_by",
-    "created_at",
-  ],
-  audit: ["seq", "at", "entry", "prev", "hash", "who"],
-  access_request: [
-    "id",
-    "requester_id",
-    "path_glob",
-    "group_prefix",
-    "reason",
-    "duration",
-    "rekey_after",
-    "status",
-    "approver_id",
-    "created_at",
-    "decided_at",
-    "expires_at",
-  ],
-  setting: ["key", "value"],
-  alert_state: ["rule", "subject", "last_sent_at"],
-  audit_base: ["id", "seq", "hash", "pruned_at"],
-  checkpoint: ["day", "seq", "head", "created_at"],
-  usage_day: ["day", "writes", "reads_logged"],
-};
-
-/** Statements per D1 batch during restore. Each batch is one transaction. */
-const CHUNK = 100;
 /** Daily R2 copies kept (ADR 23). */
 export const R2_KEEP = 30;
 const R2_PREFIX = "backups/";
+
+import type { BackupTable } from "../repository/backup.ts";
 
 type Value = string | number | null;
 export type Row = Record<string, Value>;
@@ -196,7 +87,7 @@ export const blockDuringMaintenance: MiddlewareHandler<AppEnv> = async (c, next)
   const m = c.req.method;
   if (m === "GET" || m === "HEAD" || m === "OPTIONS" || RESTORE_PATHS.includes(c.req.path))
     return next();
-  const row = await c.env.DB.prepare("SELECT since FROM maintenance WHERE id = 1").first();
+  const row = await maintenance(c.env.DB);
   if (row) {
     c.header("Retry-After", "60");
     return c.json({ error: "maintenance: a restore is running, try again shortly" }, 503);
@@ -205,26 +96,6 @@ export const blockDuringMaintenance: MiddlewareHandler<AppEnv> = async (c, next)
 };
 
 /** Reads every backed-up table in one batch (one D1 transaction, so one consistent snapshot). */
-export async function readTables(db: D1Database): Promise<Tables> {
-  const masked = MASKED_SETTINGS.map(() => "?").join(", ");
-  const results = await db.batch(
-    BACKUP_TABLES.map((t) =>
-      t === "setting"
-        ? db
-            .prepare(
-              `SELECT ${COLUMNS[t].join(", ")} FROM setting WHERE key NOT IN (${masked}) ORDER BY rowid`,
-            )
-            .bind(...MASKED_SETTINGS)
-        : db.prepare(`SELECT ${COLUMNS[t].join(", ")} FROM ${t} ORDER BY rowid`),
-    ),
-  );
-  const tables = {} as Tables;
-  BACKUP_TABLES.forEach((t, i) => {
-    tables[t] = results[i]?.results as Row[];
-  });
-  return tables;
-}
-
 /** SHA-256 over the canonical body. Used on export and to check a file on import. */
 export const digest = (schema: number, createdAt: number, tables: Tables) =>
   sha256Hex(canonical({ schema, createdAt, tables }));
@@ -399,18 +270,6 @@ const counts = (tables: Tables) =>
     number
   >;
 
-async function currentCounts(db: D1Database): Promise<Record<BackupTable, number>> {
-  const results = await db.batch(
-    BACKUP_TABLES.map((t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`)),
-  );
-  return Object.fromEntries(
-    BACKUP_TABLES.map((t, i) => [
-      t,
-      Number((results[i]?.results[0] as { n: number } | undefined)?.n ?? 0),
-    ]),
-  ) as Record<BackupTable, number>;
-}
-
 const requestHost = (c: { req: { url: string } }) => new URL(c.req.url).host;
 
 /** Reads, verifies and chain-checks a file. Used by both /restore/check and /restore. Writes nothing. */
@@ -474,13 +333,11 @@ export async function listAutoBackups(bucket: R2Bucket): Promise<BackupCopy[]> {
 // ADR 24 (Settings, Backup): what the Backup tab lists. Manual downloads come from the audit log (which records
 // the time only, not the size); automatic copies come from R2 when it is connected.
 backup.get("/backup/history", async (c) => {
-  const manual = await c.env.DB.prepare(
-    "SELECT at FROM audit WHERE json_extract(entry, '$.action') = 'backup.export' ORDER BY seq DESC LIMIT 20",
-  ).all<{ at: number }>();
+  const manual = await backupHistory(c.env.DB);
   const auto = c.env.BACKUP ? await listAutoBackups(c.env.BACKUP) : [];
   const copies: BackupCopy[] = [
     ...auto,
-    ...manual.results.map((r) => ({ at: r.at, type: "manual" as const, size: null })),
+    ...manual.map((r) => ({ at: r.at, type: "manual" as const, size: null })),
   ].sort((a, b) => b.at - a.at);
   return c.json({ r2: Boolean(c.env.BACKUP), copies: copies.slice(0, 30) });
 });
@@ -557,14 +414,8 @@ backup.post("/restore", async (c) => {
     const { file: f } = await inspect(bytes, passphraseOf(c));
     const db = c.env.DB;
     const who = c.get("who");
-    const before = await db
-      .prepare("SELECT seq FROM audit ORDER BY seq DESC LIMIT 1")
-      .first<{ seq: number }>();
-
-    await db
-      .prepare("INSERT OR REPLACE INTO maintenance (id, since, by) VALUES (1, ?, ?)")
-      .bind(now(), who.id)
-      .run();
+    const before = await latestAudit(db);
+    await startMaintenance(db, now(), who.id);
     try {
       await replaceTables(db, f);
     } catch {
@@ -575,7 +426,7 @@ backup.post("/restore", async (c) => {
         500,
       );
     }
-    await db.prepare("DELETE FROM maintenance WHERE id = 1").run();
+    await endMaintenance(db);
     await audit(db, {
       who: who.name,
       action: "restore",
@@ -599,39 +450,6 @@ function failure(c: Context<AppEnv>, e: unknown): Response {
  * Deletes every backed-up table, then inserts the file's rows, parents first. Sessions, login codes and attempt
  * counters are cleared, so everyone signs in again. Each CHUNK of statements is one D1 batch (a transaction).
  */
-export async function replaceTables(db: D1Database, f: BackupFile): Promise<void> {
-  const deletes = [
-    "DELETE FROM session",
-    "DELETE FROM cli_login",
-    "DELETE FROM login_attempt",
-    ...[...BACKUP_TABLES].reverse().map((t) => `DELETE FROM ${t}`),
-  ].map((sql) => db.prepare(sql));
-  await runChunks(db, deletes);
-
-  const writes: D1PreparedStatement[] = [];
-  const owners: D1PreparedStatement[] = [];
-  for (const t of BACKUP_TABLES) {
-    const cols = COLUMNS[t];
-    const sql = `INSERT INTO ${t} (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`;
-    for (const row of f.tables[t]) {
-      // Owners can be inserted before their owner; links are set once every identity exists.
-      const vals = cols.map((col) =>
-        t === "identity" && col === "owner_id" ? null : (row[col] ?? null),
-      );
-      writes.push(db.prepare(sql).bind(...vals));
-      if (t === "identity" && row.owner_id != null)
-        owners.push(
-          db.prepare("UPDATE identity SET owner_id = ? WHERE id = ?").bind(row.owner_id, row.id),
-        );
-    }
-  }
-  await runChunks(db, [...writes, ...owners]);
-}
-
-async function runChunks(db: D1Database, stmts: D1PreparedStatement[]): Promise<void> {
-  for (let i = 0; i < stmts.length; i += CHUNK) await db.batch(stmts.slice(i, i + CHUNK));
-}
-
 /**
  * ADR 23 scheduled copy, called from the daily cron (ADR 19). Only runs when the optional R2 binding `BACKUP`
  * exists. Writes a plain (unsealed) file and keeps the newest R2_KEEP. Errors are logged without any content.

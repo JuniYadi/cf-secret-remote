@@ -1,6 +1,7 @@
-import { canonical, chainHash, GENESIS } from "@cfs/core";
+import { canonical, chainHash } from "@cfs/core";
 import { scheduleAlerts } from "./alerts.ts";
 import { dayOf, isQuotaError } from "./quota.ts";
+import { chainHead, insertAuditRow } from "./repository/audit.ts";
 import { now } from "./util.ts";
 
 export interface AuditEntry {
@@ -33,18 +34,6 @@ let gap: { from: number; missed: number } | null = null;
 
 const iso = (t: number) => new Date(t * 1000).toISOString();
 
-/** Hash of the last row, or of the last pruned row (ADR 19) when the table is empty. */
-async function chainHead(db: D1Database): Promise<string> {
-  const last = await db
-    .prepare("SELECT hash FROM audit ORDER BY seq DESC LIMIT 1")
-    .first<{ hash: string }>();
-  if (last) return last.hash;
-  const base = await db
-    .prepare("SELECT hash FROM audit_base WHERE id = 1")
-    .first<{ hash: string }>();
-  return base?.hash ?? GENESIS;
-}
-
 /** Appends one row at time `at` together with its usage meter update, in one D1 batch. Retries if another writer took the same prev. */
 export async function appendRow(
   db: D1Database,
@@ -56,16 +45,16 @@ export async function appendRow(
     const prev = await chainHead(db);
     const hash = await chainHash(prev, row);
     try {
-      await db.batch([
-        db
-          .prepare("INSERT INTO audit (at, entry, prev, hash, who) VALUES (?, ?, ?, ?, ?)")
-          .bind(at, canonical(row), prev, hash, entry.who),
-        db
-          .prepare(
-            "INSERT INTO usage_day (day, writes, reads_logged) VALUES (?, 1, ?) ON CONFLICT (day) DO UPDATE SET writes = writes + 1, reads_logged = reads_logged + excluded.reads_logged",
-          )
-          .bind(dayOf(at), entry.action.startsWith("secret.read") ? 1 : 0),
-      ]);
+      await insertAuditRow(
+        db,
+        at,
+        canonical(row),
+        prev,
+        hash,
+        entry.who,
+        dayOf(at),
+        entry.action.startsWith("secret.read") ? 1 : 0,
+      );
       return { row, hash, prev };
     } catch (e) {
       if (!String(e).includes("UNIQUE")) throw e;

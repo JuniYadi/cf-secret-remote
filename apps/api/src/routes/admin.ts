@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { prefixOf } from "../policy.ts";
+import * as repo from "../repository/admin.ts";
 import type { AppEnv } from "../types.ts";
 import { newId, now } from "../util.ts";
 
@@ -14,28 +15,13 @@ admin.use("/audit", requireAdmin);
 
 // Each policy lists who holds it (identity id, name, kind, and expiry if any), so the web can show roles.
 admin.get("/policies", async (c) => {
-  const db = c.env.DB;
-  const policies = await db
-    .prepare("SELECT id, name, rules FROM policy ORDER BY name")
-    .all<{ id: string; name: string; rules: string }>();
-  const holders = await db
-    .prepare(
-      `SELECT ip.policy_id AS policyId, i.id AS identityId, i.name, i.kind, ip.expires_at AS expiresAt
-       FROM identity_policy ip JOIN identity i ON i.id = ip.identity_id ORDER BY i.name`,
-    )
-    .all<{
-      policyId: string;
-      identityId: string;
-      name: string;
-      kind: string;
-      expiresAt: number | null;
-    }>();
+  const { policies, holders } = await repo.policies(c.env.DB);
   return c.json(
-    policies.results.map((p) => ({
+    policies.map((p) => ({
       id: p.id,
       name: p.name,
       rules: JSON.parse(p.rules),
-      assignees: holders.results
+      assignees: holders
         .filter((h) => h.policyId === p.id)
         .map(({ identityId, name, kind, expiresAt }) => ({ identityId, name, kind, expiresAt })),
     })),
@@ -53,9 +39,7 @@ admin.post("/policies", async (c) => {
     return c.json({ error: "bad request" }, 400);
   const id = newId();
   try {
-    await c.env.DB.prepare("INSERT INTO policy (id, name, rules) VALUES (?, ?, ?)")
-      .bind(id, b.name, JSON.stringify(b.rules))
-      .run();
+    await repo.createPolicy(c.env.DB, id, b.name, JSON.stringify(b.rules));
   } catch {
     return c.json({ error: "name already used" }, 409);
   }
@@ -71,11 +55,7 @@ admin.post("/policies", async (c) => {
 admin.post("/policies/:id/assign", async (c) => {
   const b = await c.req.json<{ identityId?: string; expiresAt?: number }>();
   if (!b.identityId) return c.json({ error: "bad request" }, 400);
-  await c.env.DB.prepare(
-    "INSERT OR REPLACE INTO identity_policy (identity_id, policy_id, expires_at) VALUES (?, ?, ?)",
-  )
-    .bind(b.identityId, c.req.param("id"), b.expiresAt ?? null)
-    .run();
+  await repo.assignPolicy(c.env.DB, b.identityId, c.req.param("id"), b.expiresAt ?? null);
   await audit(c.env.DB, {
     who: c.get("who").name,
     action: "policy.assign",
@@ -163,57 +143,12 @@ function auditFilter(q: Record<string, string>): AuditFilter {
   return { where, binds };
 }
 
-type AuditDbRow = { seq: number; entry: string; hash: string };
-
-async function auditRows(
-  db: D1Database,
-  f: { where: string[]; binds: (string | number)[] },
-  limit: number,
-) {
-  const sql = `SELECT seq, entry, hash FROM audit${f.where.length ? ` WHERE ${f.where.join(" AND ")}` : ""} ORDER BY seq DESC LIMIT ?`;
-  const rows = await db
-    .prepare(sql)
-    .bind(...f.binds, limit)
-    .all<AuditDbRow>();
-  return rows.results.map(
-    (r) =>
-      ({ seq: r.seq, hash: r.hash, ...JSON.parse(r.entry) }) as {
-        seq: number;
-        hash: string;
-        who: string;
-        at: number;
-        action: string;
-        path?: string;
-        version?: number;
-        result: string;
-        ip?: string;
-        note?: string;
-      },
-  );
-}
-
-/** Whether each name is a person or an app, by identity name. A name that is both reads as user; an unknown name is null. */
-async function kindsOf(db: D1Database, names: string[]): Promise<Map<string, "user" | "app">> {
-  const kinds = new Map<string, "user" | "app">();
-  const unique = [...new Set(names)];
-  // D1 allows 100 bound parameters per statement.
-  for (let i = 0; i < unique.length; i += 90) {
-    const chunk = unique.slice(i, i + 90);
-    const found = await db
-      .prepare(`SELECT name, kind FROM identity WHERE name IN (${chunk.map(() => "?").join(",")})`)
-      .bind(...chunk)
-      .all<{ name: string; kind: "user" | "app" }>();
-    for (const r of found.results) if (kinds.get(r.name) !== "user") kinds.set(r.name, r.kind);
-  }
-  return kinds;
-}
-
 admin.get("/audit", async (c) => {
   const f = auditFilter(c.req.query());
   if ("error" in f) return c.json({ error: f.error }, 400);
   const limit = Math.min(Number(c.req.query("limit")) || 100, 500);
-  const rows = await auditRows(c.env.DB, f, limit);
-  const kinds = await kindsOf(
+  const rows = await repo.auditRows(c.env.DB, f, limit);
+  const kinds = await repo.kindsOf(
     c.env.DB,
     rows.map((r) => r.who),
   );
@@ -223,28 +158,7 @@ admin.get("/audit", async (c) => {
 // ADR 24 (Activity stat cards): the last 24 hours. `accesses` are allowed reads, `byApps` the ones made by apps.
 admin.get("/audit/stats", async (c) => {
   const since = now() - 86400;
-  const db = c.env.DB;
-  const one = async (sql: string, ...binds: (string | number)[]) =>
-    (
-      await db
-        .prepare(sql)
-        .bind(...binds)
-        .first<{ n: number }>()
-    )?.n ?? 0;
-  const reads =
-    "at >= ? AND json_extract(entry, '$.action') = 'secret.read' AND json_extract(entry, '$.result') = 'ok'";
-  const [accesses, byApps, blocked, actors] = await Promise.all([
-    one(`SELECT count(*) AS n FROM audit WHERE ${reads}`, since),
-    one(
-      `SELECT count(*) AS n FROM audit WHERE ${reads} AND who IN (SELECT name FROM identity WHERE kind = 'app')`,
-      since,
-    ),
-    one(
-      "SELECT count(*) AS n FROM audit WHERE at >= ? AND json_extract(entry, '$.result') = 'denied'",
-      since,
-    ),
-    one("SELECT count(DISTINCT who) AS n FROM audit WHERE at >= ? AND who != 'system'", since),
-  ]);
+  const { accesses, byApps, blocked, actors } = await repo.auditStats(c.env.DB, since);
   return c.json({ since, accesses, byApps, blocked, actors });
 });
 
@@ -261,8 +175,8 @@ export function csvCell(value: string | number | undefined | null): string {
 admin.get("/audit/export.csv", async (c) => {
   const f = auditFilter(c.req.query());
   if ("error" in f) return c.json({ error: f.error }, 400);
-  const rows = await auditRows(c.env.DB, f, CSV_MAX_ROWS);
-  const kinds = await kindsOf(
+  const rows = await repo.auditRows(c.env.DB, f, CSV_MAX_ROWS);
+  const kinds = await repo.kindsOf(
     c.env.DB,
     rows.map((r) => r.who),
   );
@@ -316,29 +230,21 @@ admin.get("/audit/export.csv", async (c) => {
 // Re-checks the chain from audit_base (or genesis if nothing was pruned), then each stored checkpoint (ADR 19).
 // firstBad is the index into the rows after the base; firstBadSeq is that row's seq.
 admin.get("/audit/verify", async (c) => {
-  const db = c.env.DB;
-  const base = await db
-    .prepare("SELECT seq, hash FROM audit_base WHERE id = 1")
-    .first<{ seq: number; hash: string }>();
+  const { base, rows } = await repo.chainRows(c.env.DB);
   const start = base?.hash ?? GENESIS;
-  const rows = await db
-    .prepare("SELECT seq, entry, hash FROM audit ORDER BY seq")
-    .all<{ seq: number; entry: string; hash: string }>();
   const bad = await verifyChain(
-    rows.results.map((r) => ({ entry: JSON.parse(r.entry), hash: r.hash })),
+    rows.map((r) => ({ entry: JSON.parse(r.entry), hash: r.hash })),
     start,
   );
-  const bySeq = new Map(rows.results.map((r) => [r.seq, r.hash]));
-  const cps = await db
-    .prepare("SELECT day, seq, head FROM checkpoint ORDER BY day")
-    .all<{ day: string; seq: number; head: string }>();
+  const bySeq = new Map(rows.map((r) => [r.seq, r.hash]));
+  const cps = await repo.checkpoints(c.env.DB);
   const checkpoints = {
-    stored: cps.results.length,
+    stored: cps.length,
     verified: 0,
     pruned: 0,
     mismatched: [] as string[],
   };
-  for (const cp of cps.results) {
+  for (const cp of cps) {
     if (cp.seq === 0) {
       // Taken on an empty chain.
       if (cp.head === GENESIS && !base) checkpoints.verified++;
@@ -358,10 +264,10 @@ admin.get("/audit/verify", async (c) => {
   const chainOk = bad === -1;
   return c.json({
     ok: chainOk && checkpoints.mismatched.length === 0,
-    rows: rows.results.length,
+    rows: rows.length,
     firstBad: chainOk ? null : bad,
-    firstBadSeq: chainOk ? null : (rows.results[bad]?.seq ?? null),
-    head: rows.results.at(-1)?.hash ?? start,
+    firstBadSeq: chainOk ? null : (rows[bad]?.seq ?? null),
+    head: rows.at(-1)?.hash ?? start,
     base: base ? { seq: base.seq, hash: base.hash } : null,
     checkpoints,
   });
