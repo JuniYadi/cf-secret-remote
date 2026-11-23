@@ -13,5 +13,6 @@ export * from "./kit.ts";
 export * from "./login.ts";
 
 export * from "./recovery.ts";
+export * from "./route-names.ts";
 export * from "./secret.ts";
 export * from "./words.ts";

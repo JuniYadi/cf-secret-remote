@@ -7,6 +7,7 @@
 // - A name such as myapp/prod is one crumb, never split.
 // - Single-task pages (sign in, vault setup, unlock) have one crumb and no breadcrumb.
 
+import { GROUP_FIXED_NAMES, SECRET_FIXED_NAMES, SECRET_PAGE_SUFFIXES } from "@cfs/core";
 import { t } from "./lib/i18n.ts";
 
 export const PATHS = {
@@ -32,20 +33,20 @@ export const PATHS = {
   devices: "/account/devices",
   cliAuthorize: "/cli/authorize",
   cliDone: "/cli/done",
-  groupNew: "/groups/new",
+  groupNew: `/groups/${GROUP_FIXED_NAMES.new}`,
   invite: "/invite",
   permNew: "/permissions/new",
   roleNew: "/permissions/roles/new",
   appNew: "/apps/new",
-  secretsNew: "/secrets/new",
-  secretsImport: "/secrets/import",
-  secretsImportReview: "/secrets/import/review",
+  secretsNew: `/secrets/${SECRET_FIXED_NAMES.new}`,
+  secretsImport: `/secrets/${SECRET_FIXED_NAMES.import}`,
+  secretsImportReview: `/secrets/${SECRET_FIXED_NAMES.importReview}`,
   // ADR 24 part 5: settings tabs, offboarding, give access again, account, quota, and "Was this you?".
   settingsAdmins: "/settings/admins",
   settingsBackup: "/settings/backup",
   restore: "/settings/backup/restore",
-  offboard: "/groups/offboard",
-  regrant: "/groups/regrant",
+  offboard: `/groups/${GROUP_FIXED_NAMES.offboard}`,
+  regrant: `/groups/${GROUP_FIXED_NAMES.regrant}`,
   password: "/account/password",
   quota: "/quota",
   wasYou: "/was-you",
@@ -53,9 +54,9 @@ export const PATHS = {
 
 /** Suffixes of a secret's own pages. The secret name comes first: /secrets/myapp/dev/versions. */
 export const SECRET_TABS = {
-  edit: "/edit",
-  versions: "/versions",
-  history: "/history",
+  edit: `/${SECRET_PAGE_SUFFIXES.edit}`,
+  versions: `/${SECRET_PAGE_SUFFIXES.versions}`,
+  history: `/${SECRET_PAGE_SUFFIXES.history}`,
 } as const;
 
 /** Paths with a name or id in them. Each is built with encodeURIComponent, so a slash stays inside one segment. */
@@ -242,7 +243,7 @@ export function matchPage(pathname: string): MatchedPage {
     return name ? { id: "denied", name } : { id: "notFound" };
   }
   // Give access again for one request: /groups/regrant/:id (the list is /groups/regrant).
-  const regrant = path.match(/^\/groups\/regrant\/([^/]+)$/);
+  const regrant = path.match(new RegExp(`^/groups/${GROUP_FIXED_NAMES.regrant}/([^/]+)$`));
   if (regrant?.[1] !== undefined) {
     const id = decodeSegment(regrant[1]);
     return id ? { id: "regrant", name: id } : { id: "notFound" };

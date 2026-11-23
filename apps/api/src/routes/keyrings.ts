@@ -1,4 +1,4 @@
-import { ConflictCode } from "@cfs/core";
+import { ConflictCode, isReservedGroupName } from "@cfs/core";
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
@@ -34,6 +34,8 @@ keyrings.post("/keyrings", requireAdmin, async (c) => {
   }>();
   if (!b.prefix || !validPath(b.prefix) || b.prefix.includes("/") || !b.members?.length)
     return c.json({ error: "bad request" }, 400);
+  if (isReservedGroupName(b.prefix))
+    return c.json({ error: "group name is reserved for a web route" }, 400);
   const id = newId();
   try {
     await createKeyring(c.env.DB, id, b.prefix, now(), b.members);

@@ -245,10 +245,15 @@ export function GroupNewPage() {
               <span class="field-error" role="alert">
                 {prefixError === "exists"
                   ? t("A group with this name already exists.", "Grup dengan nama ini sudah ada.")
-                  : t(
-                      "Use letters, numbers, dots, dashes and underscores. No slash in the middle.",
-                      "Pakai huruf, angka, titik, tanda hubung, dan garis bawah. Tanpa / di tengah.",
-                    )}
+                  : prefixError === "reserved"
+                    ? t(
+                        "This name is reserved for a web page.",
+                        "Nama ini dicadangkan untuk halaman web.",
+                      )
+                    : t(
+                        "Use letters, numbers, dots, dashes and underscores. No slash in the middle.",
+                        "Pakai huruf, angka, titik, tanda hubung, dan garis bawah. Tanpa / di tengah.",
+                      )}
               </span>
             )}
           </div>

@@ -1,6 +1,7 @@
 // New secret: a name, and how to start (empty, import a .env file, or paste JSON). The group is the first
 // segment of the name, as on the server (keyring prefix), so it is shown, not chosen.
 
+import { isReservedSecretPath } from "@cfs/core";
 import { useEffect, useState } from "preact/hooks";
 import { Link, useLocation } from "wouter-preact";
 import { InfoBox, WarnBox } from "../components/secrets-ui.tsx";
@@ -54,6 +55,12 @@ export function SecretNewPage() {
           "Use letters, numbers, dots, dashes and underscores, with a slash between parts, such as myapp/dev.",
           "Pakai huruf, angka, titik, tanda hubung, dan garis bawah, dengan garis miring di antara bagian, mis. myapp/dev.",
         ),
+      );
+      return;
+    }
+    if (isReservedSecretPath(path)) {
+      setError(
+        t("This name is reserved for a web page.", "Nama ini dicadangkan untuk halaman web."),
       );
       return;
     }
