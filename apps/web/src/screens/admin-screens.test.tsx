@@ -382,6 +382,42 @@ describe("Apps and bots", () => {
     expect(text()).toContain("This kit was shown once.");
   });
 
+  it("clears the copied kit after 30 seconds only if the clipboard still holds it", async () => {
+    let clip = "";
+    vi.stubGlobal("navigator", {
+      clipboard: {
+        writeText: async (v: string) => {
+          clip = v;
+        },
+        readText: async () => clip,
+      },
+    });
+    const clears: Array<() => void> = [];
+    const realSetTimeout = globalThis.setTimeout;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number) => {
+      if (ms === 30_000) {
+        clears.push(fn);
+        return 0;
+      }
+      return realSetTimeout(fn, ms);
+    }) as typeof setTimeout);
+    serve({ "GET /apps/a1": { waiting: true } });
+    holdKit({ id: "a1", name: "deploy-ci", kit: "cfskit1_COPY", problems: [] });
+    await mount(<AppKitPage id="a1" />, "/apps/a1/kit");
+
+    await click(button("Copy kit"));
+    expect(clip).toBe("cfskit1_COPY");
+    clip = "something the person copied later";
+    for (const fn of clears) fn();
+    await flush();
+    expect(clip).toBe("something the person copied later");
+
+    clip = "cfskit1_COPY";
+    for (const fn of clears) fn();
+    await flush();
+    expect(clip).toBe("");
+  });
+
   it("switches the destination tab and shows that tab's steps", async () => {
     serve({ "GET /apps/a1": { waiting: true } });
     holdKit({ id: "a1", name: "deploy-ci", kit: "cfskit1_X", problems: [] });

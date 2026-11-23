@@ -3,15 +3,13 @@ import { useLocation } from "wouter-preact";
 import { Stepper } from "../components/Stepper.tsx";
 import { BrandRow, Icon, LangToggle, PageTitle } from "../components/shared.tsx";
 import { api } from "../lib/api.ts";
+import { copyWithAutoClear } from "../lib/clipboard.ts";
 import { useKeyStatus, useLang } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
 import { getPrivateKey } from "../lib/keystore.ts";
 import { CHALLENGE_SIZE, checkChallenge, pickChallenge } from "../lib/recovery-check.ts";
 import { createRecoveryKey, lockRecovery, type NewRecoveryKey } from "../lib/vault.ts";
 import { PATHS, pageCrumbs } from "../routes.ts";
-
-/** Clipboard entries with the phrase are cleared after this long, where the browser allows (ADR 24). */
-const CLIPBOARD_CLEAR_MS = 30_000;
 
 /**
  * Step 3 of 4: the optional recovery key. The 24 words are shown once. The person types three random
@@ -64,18 +62,14 @@ export function SetupRecoveryPage() {
 
   async function onCopy() {
     if (!recovery) return;
-    try {
-      await navigator.clipboard.writeText(recovery.phrase);
-      setCopied(true);
-      // Clears the clipboard, which may also drop something the person copied later. Browsers that
-      // refuse the write leave the clipboard alone.
+    // The clipboard is cleared after 30 seconds, but only if it still holds the phrase (ADR 24).
+    const ok = await copyWithAutoClear(recovery.phrase, undefined, (fn, ms) =>
       setTimeout(() => {
-        void navigator.clipboard.writeText("").catch(() => undefined);
+        fn();
         setCopied(false);
-      }, CLIPBOARD_CLEAR_MS);
-    } catch {
-      setCopied(false);
-    }
+      }, ms),
+    );
+    setCopied(ok);
   }
 
   return (

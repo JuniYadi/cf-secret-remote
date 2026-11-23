@@ -4,13 +4,12 @@ import { failureText, LoadStatus, Notice, Pill, useLoad } from "../components/Ad
 import { PageTitle } from "../components/shared.tsx";
 import { api } from "../lib/api.ts";
 import { type HeldKit, kitFileName, takeKit } from "../lib/apps.ts";
+import { copyWithAutoClear } from "../lib/clipboard.ts";
 import { useLang } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
 import { appPath, pageCrumbs } from "../routes.ts";
 import "../styles/admin.css";
 
-/** How long a copied kit stays on the clipboard before it is cleared, where the browser allows (ADR 24). */
-export const CLIPBOARD_CLEAR_MS = 30_000;
 /** How often the page asks whether the bot has signed in yet. */
 export const FIRST_LOGIN_POLL_MS = 5_000;
 
@@ -150,17 +149,10 @@ export function AppKitPage({ id }: { id: string }) {
   async function copy() {
     if (held === null) return;
     setCopyFailed(false);
-    try {
-      await navigator.clipboard.writeText(held.kit);
-      setCopied(true);
-      // Clear it after 30 seconds. Some browsers refuse this, which is fine: the copy is still there.
-      setTimeout(() => {
-        navigator.clipboard?.writeText("").catch(() => undefined);
-      }, CLIPBOARD_CLEAR_MS);
-    } catch {
-      setCopied(false);
-      setCopyFailed(true);
-    }
+    // Cleared after 30 seconds, but only if the clipboard still holds the kit (ADR 24).
+    const ok = await copyWithAutoClear(held.kit);
+    setCopied(ok);
+    setCopyFailed(!ok);
   }
 
   function download() {
