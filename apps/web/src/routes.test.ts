@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { setLang } from "./lib/i18n.ts";
 import {
+  askAccessPath,
+  deniedPath,
   guardTarget,
   matchPage,
   PATHS,
@@ -91,6 +93,24 @@ describe("matchPage", () => {
 
   it("ignores trailing slashes", () => {
     expect(matchPage("/unlock/").id).toBe("unlock");
+  });
+
+  it("matches /denied/ with raw slashes, as the 307 case in #42 used", () => {
+    expect(matchPage("/denied/myapp/prod/db")).toEqual({ id: "denied", name: "myapp/prod/db" });
+    expect(matchPage("/denied/myapp/prod/db/")).toEqual({ id: "denied", name: "myapp/prod/db" });
+    expect(matchPage("/denied/a%20b/c")).toEqual({ id: "denied", name: "a b/c" });
+  });
+
+  it("deniedPath round-trips names and keeps slashes", () => {
+    for (const name of ["myapp/prod/db", "a b/c#d", "plain", "x%y/z?"]) {
+      expect(matchPage(deniedPath(name))).toEqual({ id: "denied", name });
+    }
+    expect(deniedPath("myapp/prod/db")).toBe("/denied/myapp/prod/db");
+  });
+
+  it("askAccessPath points at the requests page with the name", () => {
+    expect(askAccessPath("myapp/prod")).toBe("/permissions/requests?path=myapp%2Fprod");
+    expect(matchPage("/permissions/requests").id).toBe("requests");
   });
 
   it("decodes the name in /denied/:name", () => {
