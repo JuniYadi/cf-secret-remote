@@ -7,6 +7,7 @@ import { useLang } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
 import { unlock } from "../lib/keystore.ts";
 import { isAcceptablePassword, MIN_PASSWORD_LENGTH } from "../lib/password.ts";
+import { checkChallenge, pickChallenge } from "../lib/recovery-check.ts";
 import { validRecoveryPhrase } from "../lib/recovery-code.ts";
 import { markVaultReady } from "../lib/session.ts";
 import { useLoad } from "../lib/use-load.ts";
@@ -35,7 +36,9 @@ export function RecoverPage() {
   const [stage, setStage] = useState<Stage>("form");
   const [error, setError] = useState<"words" | "wrong-words" | "failed" | "network" | null>(null);
   const [newPhrase, setNewPhrase] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [positions] = useState(() => pickChallenge());
+  const [answers, setAnswers] = useState<string[]>(() => positions.map(() => ""));
+  const confirmed = newPhrase !== "" && checkChallenge(newPhrase.split(" "), positions, answers);
 
   const canSubmit =
     words.trim() !== "" && isAcceptablePassword(pw) && pw === again && stage === "form";
@@ -120,18 +123,36 @@ export function RecoverPage() {
               )}
             </span>
           </div>
-          <label class="check">
-            <input
-              type="checkbox"
-              checked={saved}
-              onChange={(e) => setSaved(e.currentTarget.checked)}
-            />
-            {t("I've saved them", "Saya sudah menyimpannya")}
-          </label>
+          <fieldset class="confirm">
+            <legend>{t("Confirm: type these words back", "Konfirmasi: ketik kata berikut")}</legend>
+            {positions.map((pos, i) => (
+              <div class="field" key={pos}>
+                <label for={`recovery-word-${pos}`}>
+                  {t(`Word ${pos + 1}`, `Kata ke-${pos + 1}`)}
+                </label>
+                <input
+                  id={`recovery-word-${pos}`}
+                  type="text"
+                  autocomplete="off"
+                  autocapitalize="none"
+                  spellcheck={false}
+                  value={answers[i] ?? ""}
+                  onInput={(e) => {
+                    const value = e.currentTarget.value;
+                    setAnswers((previous) => {
+                      const next = [...previous];
+                      next[i] = value;
+                      return next;
+                    });
+                  }}
+                />
+              </div>
+            ))}
+          </fieldset>
           <button
             type="button"
             class="btn pri block"
-            disabled={!saved}
+            disabled={!confirmed}
             onClick={() => navigate(PATHS.secrets)}
           >
             {t("Continue", "Lanjut")}

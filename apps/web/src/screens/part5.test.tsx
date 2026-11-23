@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { fingerprintWords, newRecoveryKey, recoveryPhrase } from "@cfs/core";
 import type { VNode } from "preact";
 import { render } from "preact";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +9,7 @@ import { setLang } from "../lib/i18n.ts";
 import { getStatus, lock, unlock } from "../lib/keystore.ts";
 import { markQuotaReached, resetQuotaForTests } from "../lib/quota.ts";
 import { clearPendingRecovery, setPendingRecovery } from "../lib/recovery-flow.ts";
+import * as regrant from "../lib/regrant.ts";
 import { loadSession, resetSessionForTests } from "../lib/session.ts";
 import * as vault from "../lib/vault.ts";
 import { ForgotPage } from "./Forgot.tsx";
@@ -476,6 +478,45 @@ describe("Give access again", () => {
     );
     expect(give?.disabled).toBe(true);
   });
+  it("lists other groups as unavailable and reports every group not granted", async () => {
+    await signIn(ADMIN);
+    const publicKey =
+      "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJ2hEYo9q0x3k7qkIskBE5SDryBZ1dQHhe1gHYR5EE8T9NXUwMHTCmgJ7S0osVvhgh0u-AEJvnNRJxaKdnR4SLQ";
+    const wrap = vi
+      .spyOn(regrant, "regrantKeys")
+      .mockResolvedValue({ keys: [], notRewrapped: ["infra"] });
+    serve({
+      "GET /api/v1/recovery/r1": () =>
+        json({
+          id: "r1",
+          name: "rina",
+          status: "pending",
+          attemptsLeft: 5,
+          publicKey,
+          groups: ["infra", "team"],
+        }),
+      "GET /api/v1/keyrings": () =>
+        json([{ prefix: "infra" }, { prefix: "team" }, { prefix: "other" }]),
+      "POST /api/v1/recovery/r1/grant": () => json({ ok: true, groups: [] }),
+    });
+    await mount(<RegrantPage id="r1" />);
+    const boxes = Array.from(host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+    expect(boxes).toHaveLength(3);
+    expect(boxes[2]?.disabled).toBe(true);
+    expect(text()).toContain("They were not a member");
+    boxes[1]?.click();
+    const code = host.querySelector<HTMLInputElement>("#regrant-code") as HTMLInputElement;
+    code.value = await fingerprintWords(publicKey);
+    code.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    Array.from(host.querySelectorAll("button"))
+      .find((b) => b.textContent === "Give access again")
+      ?.click();
+    await flush();
+    expect(wrap.mock.calls[0]?.[1].groups).toEqual(["infra"]);
+    expect(text()).toContain("Not given: infra, team.");
+    expect(text()).toContain("Another admin who holds these groups");
+  });
 });
 
 describe("Forgot your vault password", () => {
@@ -521,6 +562,56 @@ describe("Use your recovery key", () => {
     await flush();
     expect(host.querySelector("#recover-words")).not.toBeNull();
     expect(host.querySelector("#recover-password")).not.toBeNull();
+  });
+  it("requires the three requested words before continuing after reset", async () => {
+    const phrase = await recoveryPhrase(newRecoveryKey());
+    vi.spyOn(vault, "openWithRecoveryKey").mockResolvedValue("PRIVATE");
+    vi.spyOn(vault, "lockWithPassword").mockResolvedValue("LOCK");
+    vi.spyOn(vault, "createRecoveryKey").mockResolvedValue({ phrase, entropy: new Uint8Array(32) });
+    vi.spyOn(vault, "lockRecovery").mockResolvedValue("RECOVERY");
+    serve({
+      "GET /api/v1/me/recovery": () => json({ set: true, lockedKey: "old" }),
+      "GET /api/v1/whoami": WHOAMI(ADMIN),
+      "PUT /api/v1/me/vault": () => json({ ok: true }),
+      "PUT /api/v1/me/recovery": () => json({ ok: true }),
+    });
+    await mount(<RecoverPage />);
+    for (const [selector, value] of [
+      ["#recover-words", phrase],
+      ["#recover-password", "a-long-enough-password"],
+      ["#recover-again", "a-long-enough-password"],
+    ]) {
+      const input = host.querySelector<HTMLInputElement>(selector as string);
+      expect(input).not.toBeNull();
+      if (input) {
+        input.value = value as string;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+    await flush();
+    host
+      .querySelector("form")
+      ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await flush();
+    const fields = Array.from(host.querySelectorAll<HTMLInputElement>("fieldset.confirm input"));
+    expect(fields).toHaveLength(3);
+    const button = Array.from(host.querySelectorAll("button")).find(
+      (b) => b.textContent === "Continue",
+    );
+    expect(button?.disabled).toBe(true);
+    for (const field of fields) {
+      const pos = Number(field.id.replace("recovery-word-", ""));
+      field.value = phrase.split(" ")[pos] ?? "";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    await flush();
+    expect(button?.disabled).toBe(false);
+    const first = fields[0];
+    if (!first) throw new Error("missing challenge field");
+    first.value = "incorrect";
+    first.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    expect(button?.disabled).toBe(true);
   });
 });
 
