@@ -19,6 +19,14 @@ irm https://raw.githubusercontent.com/JuniYadi/cf-secret-remote/main/install.ps1
 ```
 Both pick the right binary for your OS and CPU, check it against the release `SHA256SUMS`, and install it as `cfs` (`~/.local/bin` or `%LOCALAPPDATA%\cfs\bin`). Pin a version with `sh -s -- v0.0.1`. Later, `cfs upgrade` updates it.
 
+For CI or end-to-end tests without an OS keychain, set `CFS_UNLOCK_STORE=file` to force unlocked keys into `unlock.json` in the cfs config directory (`~/.config/cfs` by default, or `CFS_CONFIG_DIR`). This also avoids touching a real keychain when one is available. The file is mode 0600 and contains the unlocked private key; `cfs lock` removes it, and an expired entry is deleted on the next unlock-store read. Protect the directory and use an isolated config directory for tests.
+
+## Agent proxy and backups
+
+Run `cfs proxy` as a separate OS user or in a separate container from the agent, and keep `CFS_KIT` inaccessible to the agent. An agent that can read the kit on the same machine can use it directly and bypass the proxy.
+
+If the optional R2 backup binding is configured, the scheduled backup is an unsealed gzip copy: secret values remain encrypted, but paths, names, emails and other metadata are readable. Keep the bucket private, disable public access, and restrict API tokens to only the access needed. Manual exports can be sealed with a passphrase; see [ADR 23](docs/adr/0023-backup-and-restore.md).
+
 ## Login accounts
 
 After signing in and unlocking, add an encrypted login with `cfs account add shop --group team --env staging --role admin --username alice`. Enter the password at the hidden prompt, or pipe it on stdin. Omit `--group` for your personal keyring. Optional fields include `--url`, `--totp` (seed or URI), and `--notes`.

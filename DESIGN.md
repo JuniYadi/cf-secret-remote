@@ -206,7 +206,7 @@ Setiap layar aplikasi punya dua tombol di sidebar, di bawah kotak pengguna:
 
 ## Status implementasi (2026-11-21)
 - `packages/core` sudah ada dan teruji (6 tes): envelope AES-256-GCM dengan AAD, pembungkus DEK ECDH P-256 + HKDF (ala ECIES), kunci privat dikunci password vault (PBKDF2-SHA256 600k), format kit `cfskit1_`, rantai hash audit, kode sidik jari.
-- Perubahan dari desain: kode sidik jari sementara berupa 4 grup heksadesimal (`3FA9-81C2-D07B-6E54`), bukan empat kata, karena daftar kata belum dipilih. Ganti bila daftar kata sudah ada.
+- Kode sidik jari untuk pemulihan berupa empat kata dari daftar BIP-39 bahasa Inggris, diturunkan dari public key (ADR 20).
 - Skema D1 awal ada di `apps/api/migrations/0001_init.sql` (identity, app_role, keyring, secret, policy, session, audit). Belum ada tabel untuk access request, alert, dan pengaturan; menyusul bersama fiturnya.
 - Urutan berikutnya: `api` (auth Access + sesi, CRUD secret/keyring, audit), lalu `cli`, lalu `web`.
 - `apps/api` sudah jalan (diuji lokal dengan wrangler + D1): verifikasi JWT Access, token `cfs_…` (login AppRole), sesi, vault setup, grup/keyring, secret (ciphertext saja, versi, daftar, hapus), kebijakan + assign, app/bot, audit berantai + `/audit/verify`.
@@ -219,6 +219,11 @@ Setiap layar aplikasi punya dua tombol di sidebar, di bawah kotak pengguna:
 
 ## Batas akses dan retensi
 Admin dapat mengatur durasi maksimum permintaan (default 24 jam, maksimum 30 hari), durasi bawaan persetujuan (default 1 jam, tidak melebihi maksimum), dan retensi audit (default 365 hari, minimum 90 hari). Jika belum ada pengaturan, retensi memakai `AUDIT_RETENTION_DAYS` bila tersedia. Opsi kunci ulang setelah akses berakhir dicatat sebagai permintaan; rotasi belum otomatis.
+
+## API password vault dan kunci pemulihan
+Semua rute berikut berada di bawah `/api/v1`. `PUT /me/vault` menerima `{ "lockedKey": ... }`, yaitu private key yang dikunci ulang dengan password baru, dan menjawab `{ "ok": true }`; public key dan akses grup tidak berubah. `GET /me/recovery` menjawab `{ "set": boolean, "lockedKey": string | null }`; `PUT /me/recovery` menerima `{ "lockedKey": ... }` dan menjawab `{ "ok": true }`. Server hanya menyimpan private key yang dikunci dengan kunci pemulihan, bukan 24 kata itu. Kedua PUT memerlukan vault yang sudah disiapkan.
+
+Untuk pemulihan lewat admin, `POST /recovery/request` menerima `publicKey` dan `lockedKey` baru setelah login Access yang segar, lalu menjawab `{ id, words, cancelToken }`. Admin memasukkan empat kata dan kunci grup yang dibungkus ulang melalui `POST /recovery/:id/grant`.
 
 ## Bentuk konflik API
 Respons HTTP 409 memuat `error` untuk manusia dan `code` stabil untuk klien, misalnya `version_conflict`, `group_rotating`, `group_key_changed`, dan `secret_deleted`. Daftar kode bersama tersedia di `packages/core`; klien harus menangani kode yang belum dikenal. Field tambahan seperti `current` atau `missing` tetap tersedia bila relevan.
