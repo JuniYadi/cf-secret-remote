@@ -25,6 +25,8 @@ After signing in and unlocking, add an encrypted login with `cfs account add sho
 
 Use `cfs account list`, `cfs account get shop --env staging --role admin`, `cfs account totp shop`, `cfs account edit shop`, or `cfs account rm shop`. Use `--show` to reveal a password on a terminal, or `--json` for a pipe. Add `--purpose` to record why credentials were revealed.
 
+Import logins with `cfs account import passwords.csv [--format csv|chrome|bitwarden] [--group team] [--mode add|skip|overwrite] [--yes]`. The format is detected by default, the personal keyring is used unless `--group` is given, and the default mode skips duplicates. The CLI previews counts and errors and asks for confirmation unless `--yes` is supplied. Parsing and encryption happen locally; delete the plaintext file after importing. Bitwarden exports must be unencrypted. Encrypted backups are available instead of plaintext export.
+
 `cfs run --account shop:staging:admin --purpose ci-run -- command` injects `CFS_SHOP_USER`, `CFS_SHOP_PASS`, and `CFS_SHOP_TOTP` into the child. Repeat `--account` for more accounts. AppRole kits work through `CFS_KIT`. The private [SDK](packages/sdk/README.md) supports test setup; give credentials to the test runner, not to an LLM.
 
 ## Layout

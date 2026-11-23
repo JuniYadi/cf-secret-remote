@@ -1,0 +1,17 @@
+{
+  "encrypted": false,
+  "items": [
+    {
+      "type": 1,
+      "name": "Example",
+      "notes": "example",
+      "login": {
+        "uris": [{ "uri": "https://example.test/login" }],
+        "username": "alice",
+        "password": "fake-password",
+        "totp": "FAKESEED"
+      }
+    },
+    { "type": 2, "name": "ignored" }
+  ]
+}

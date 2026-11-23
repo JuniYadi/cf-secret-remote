@@ -1,15 +1,20 @@
 import {
   createPersonalKeyring,
+  findDuplicates,
+  type ImportFormat,
+  type ImportMode,
   type Login,
   loginFingerprints,
   openLogin,
+  parseLogins,
+  planImport,
   sealLogin,
   totp,
   unwrapGroupKey,
 } from "@cfs/core";
 import { flag } from "../args.ts";
 import { CliError, type Client, connect, groupKey } from "../client.ts";
-import { askHidden } from "../prompt.ts";
+import { askHidden, confirm } from "../prompt.ts";
 import type { Commands } from "./types.ts";
 
 type Row = {
@@ -118,6 +123,65 @@ async function target(c: Client, prefix?: string) {
   }
   return { ring, ...(await ringKey(c, ring, rs.publicKey)) };
 }
+export async function importAccounts(
+  c: Client,
+  text: string,
+  options: { format?: ImportFormat; mode: ImportMode; group?: string; yes: boolean },
+) {
+  const parsed = parseLogins(text, options.format);
+  const [all, rs] = await Promise.all([accounts(c), rings(c)]);
+  const ring = options.group ? rs.groups.find((r) => r.prefix === options.group) : rs.personal;
+  if (options.group && !ring) throw new CliError(`No group "${options.group}".`);
+  const existing = all.filter((item) => item.ring.id === ring?.id);
+  const logins = existing.map((item) => item.login);
+  const duplicates = findDuplicates(logins, parsed.rows);
+  const plan = planImport(logins, parsed.rows, options.mode);
+  const duplicateRows = new Set(duplicates.map((d) => d.incomingIndex));
+  for (let i = 0; i < parsed.rows.length; i++)
+    if (findDuplicates(parsed.rows.slice(0, i), [parsed.rows[i] as Login]).length)
+      duplicateRows.add(i);
+  console.log(
+    `Preview: ${parsed.rows.length} rows, ${duplicateRows.size} duplicates, ${parsed.errors.length} errors. Create ${plan.creates.length}, update ${plan.updates.length}.`,
+  );
+  for (const issue of parsed.errors) console.log(`Line ${issue.line}: ${issue.message}`);
+  if (!options.yes && !(await confirm("Import these logins? [y/N] "))) {
+    console.log("Import cancelled.");
+    return;
+  }
+  if (!plan.creates.length && !plan.updates.length) {
+    console.log("Nothing to import. Delete the plaintext import file when finished.");
+    return;
+  }
+  const t = await target(c, options.group);
+  for (const login of plan.creates) {
+    const id = crypto.randomUUID(),
+      version = 1;
+    const r = await c.call("POST", "/logins", {
+      id,
+      keyringId: t.ring.id,
+      keyringVersion: t.version,
+      version,
+      ...(await sealLogin(t.key, id, version, login)),
+      fps: await loginFingerprints(t.key, id, login),
+    });
+    if (r.status !== 201) error("Import account", r);
+  }
+  for (const update of plan.updates) {
+    const item = existing[update.existingIndex] as Account,
+      version = item.row.version + 1;
+    const r = await c.call("PUT", `/logins/${encodeURIComponent(item.row.id)}`, {
+      keyringId: item.ring.id,
+      keyringVersion: item.ring.version,
+      version,
+      ...(await sealLogin(item.key, item.row.id, version, update.login)),
+      fps: await loginFingerprints(item.key, item.row.id, update.login),
+    });
+    if (r.status !== 200) error("Import account", r);
+  }
+  console.log(
+    `Imported ${plan.creates.length} new and ${plan.updates.length} updated logins. Delete the plaintext import file when finished.`,
+  );
+}
 /** An empty answer on edit keeps the current password. */
 export const keptPassword = (typed: string, current: string) => typed || current;
 function switchFlag(a: string[], name: string) {
@@ -128,13 +192,16 @@ function switchFlag(a: string[], name: string) {
 }
 export const account: Commands = {
   account: {
-    help: "cfs account list|get|add|edit|rm|totp    manage encrypted logins",
+    help: "cfs account list|get|add|edit|rm|totp|import    manage encrypted logins\n      import <file> [--format csv|chrome|bitwarden] [--group <prefix>] [--mode add|skip|overwrite] [--yes]",
     run: async (a, host) => {
       const action = a.shift();
       const env = flag(a, "--env"),
         role = flag(a, "--role"),
         purpose = flag(a, "--purpose"),
         group = flag(a, "--group");
+      const format = flag(a, "--format"),
+        mode = flag(a, "--mode"),
+        yes = switchFlag(a, "--yes");
       const json = switchFlag(a, "--json"),
         show = switchFlag(a, "--show");
       const url = flag(a, "--url"),
@@ -144,14 +211,34 @@ export const account: Commands = {
       const name = a.shift();
       if (
         !action ||
-        !["list", "get", "add", "edit", "rm", "totp"].includes(action) ||
+        !["list", "get", "add", "edit", "rm", "totp", "import"].includes(action) ||
         (action !== "list" && !name) ||
         a.length
       )
         throw new CliError(
-          "Usage: cfs account list | get|add|edit|rm|totp <name> [--env E] [--role R]",
+          "Usage: cfs account list | get|add|edit|rm|totp <name> [--env E] [--role R] | import <file> [--format csv|chrome|bitwarden] [--group <prefix>] [--mode add|skip|overwrite] [--yes]",
         );
+      if (
+        action === "import" &&
+        ((format !== undefined && !["csv", "chrome", "bitwarden"].includes(format)) ||
+          (mode !== undefined && !["add", "skip", "overwrite"].includes(mode)))
+      )
+        throw new CliError(
+          "Import format must be csv, chrome, or bitwarden; mode must be add, skip, or overwrite.",
+        );
+      if (action !== "import" && (format !== undefined || mode !== undefined || yes))
+        throw new CliError("Import flags require cfs account import.");
       const c = await connect(host);
+      if (action === "import") {
+        const text = await Bun.file(name as string).text();
+        await importAccounts(c, text, {
+          format: format as ImportFormat | undefined,
+          mode: (mode ?? "skip") as ImportMode,
+          group,
+          yes,
+        });
+        return;
+      }
       if (action === "list") {
         for (const { login } of await accounts(c))
           console.log(`${login.name}  ${login.environment}  ${login.role}  ${login.username}`);
