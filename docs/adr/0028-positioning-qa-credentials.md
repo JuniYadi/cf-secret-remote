@@ -1,6 +1,6 @@
 # 28. Positioning: credentials and secrets for QA teams
 
-Status: accepted (not implemented yet)
+Status: implemented (docs); repository layer is a follow-up
 
 ## Context
 QA teams test websites, and more and more of that testing is automated. Automated QA needs accounts (admin, plain user, expired trial) as well as keys. Today these live in spreadsheets, chat, and CI variables, so it is unclear who holds which password. General password managers charge per seat and are built for people filling forms, not for test runners and agents.

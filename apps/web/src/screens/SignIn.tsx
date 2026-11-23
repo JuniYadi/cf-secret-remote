@@ -20,7 +20,7 @@ export function SignInPage() {
         </div>
         <div class="hero-body">
           <h2 class="hero-title">
-            {t("Share secrets with your team, safely.", "Bagikan secret ke tim dengan aman.")}
+            {t("A vault for QA credentials and secrets.", "Vault untuk kredensial QA dan secret.")}
           </h2>
           <div class="facts">
             <Fact
