@@ -1,9 +1,15 @@
+import { readFileSync, writeFileSync } from "node:fs";
 import {
   fingerprintWords,
   generateKeyPair,
   lockPrivateKey,
+  lockWithRecoveryKey,
+  newRecoveryKey,
   normalizeWords,
+  recoveryEntropy,
+  recoveryPhrase,
   unlockPrivateKey,
+  unlockWithRecoveryKey,
   unwrapGroupKey,
   wrapGroupKey,
 } from "@cfs/core";
@@ -171,7 +177,56 @@ async function passwd(hostFlag?: string) {
   console.log("Vault password changed. Your group access is unchanged.");
 }
 
+/** Stores the recovery phrase in a new owner-only file before replacing the server lock. */
+export async function setRecoveryKey(c: Client, privateKey: string, file: string) {
+  const entropy = newRecoveryKey();
+  const phrase = await recoveryPhrase(entropy);
+  const lockedKey = await lockWithRecoveryKey(privateKey, entropy);
+  writeFileSync(file, `${phrase}\n`, { mode: 0o600, flag: "wx" });
+  const r = await c.call("PUT", "/me/recovery", { lockedKey });
+  if (r.status !== 200) failWith(r.status, r.body, "set recovery key");
+}
+
+export async function useRecoveryKey(c: Client, phrase: string, password: string, newFile: string) {
+  checkNewPassword(password);
+  const r = await c.call<{ lockedKey: string | null }>("GET", "/me/recovery");
+  if (r.status !== 200) failWith(r.status, r.body, "load recovery key");
+  if (!r.body.lockedKey) throw new CliError("No recovery key is set.");
+  let privateKey: string;
+  try {
+    privateKey = await unlockWithRecoveryKey(r.body.lockedKey, await recoveryEntropy(phrase));
+  } catch {
+    throw new CliError("That recovery key did not work.");
+  }
+  const lockedKey = await lockPrivateKey(privateKey, password);
+  // Save the replacement first; if changing the password fails, the new recovery key still works.
+  await setRecoveryKey(c, privateKey, newFile);
+  const saved = await c.call("PUT", "/me/vault", { lockedKey });
+  if (saved.status !== 200) failWith(saved.status, saved.body, "change password");
+}
+
 export const recovery: Commands = {
+  "recovery-key": {
+    help: "cfs recovery-key set <new-file> | use <old-file> <new-file>",
+    run: async (a, h) => {
+      if (a[0] === "set" && a.length === 2 && a[1]) {
+        const c = await connect(h);
+        if (!c.privateKey) throw new CliError("Your vault is locked. Run: cfs unlock");
+        await setRecoveryKey(c, c.privateKey, a[1]);
+        console.log(`Recovery key saved to ${a[1]}. Store it securely.`);
+      } else if (a[0] === "use" && a.length === 3 && a[1] && a[2]) {
+        const phrase = readFileSync(a[1], "utf8");
+        const pw = await askHidden("New vault password: ", "CFS_NEW_PASSWORD");
+        const again = await askHidden("Repeat it: ", "CFS_NEW_PASSWORD");
+        if (pw !== again) throw new CliError("The two passwords do not match.");
+        await useRecoveryKey(await connect(h), phrase, pw, a[2]);
+        console.log(
+          `Password changed. Replacement recovery key saved to ${a[2]}. Store it securely.`,
+        );
+      } else
+        throw new CliError("Usage: cfs recovery-key set <new-file> | use <old-file> <new-file>");
+    },
+  },
   recover: {
     help: "cfs recover                         forgot your vault password: start recovery\n  cfs recover grant <id>               (admin) give access again after the words are read",
     run: (a, h) => recover(a, h),
