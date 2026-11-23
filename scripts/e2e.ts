@@ -514,6 +514,41 @@ async function run(): Promise<void> {
     return "2 values, version 1 (values not shown)";
   });
 
+  await step("versions: import .env and compare names", async () => {
+    const path = `${GROUP}/history-e2e`;
+    const initial = await cli(people.admin, ["set", path], {
+      stdin: `CHANGED=${secretValue}\nREMOVED=old\n`,
+    });
+    expect(initial.code === 0, `initial set failed: ${lastLine(initial.stderr)}`);
+    const file = join(work, "import.env");
+    writeFileSync(file, `CHANGED=${rotatedValue}\nADDED=new\n`, { mode: 0o600 });
+    const imported = await cli(people.admin, ["import", path, file, "--merge", "replace", "--yes"]);
+    expect(imported.code === 0, `import failed: ${lastLine(imported.stderr)}`);
+    const importedValue = await cli(people.admin, ["get", path, "CHANGED"]);
+    expect(
+      importedValue.code === 0 && importedValue.stdout.trim() === rotatedValue,
+      "imported value differs",
+    );
+    const versions = await cli(people.admin, ["versions", path]);
+    expect(
+      versions.code === 0 && versions.stdout.includes("v1") && versions.stdout.includes("v2"),
+      "versions did not list both versions",
+    );
+    const diff = await cli(people.admin, ["diff", path, "1", "2"]);
+    expect(diff.code === 0, `diff failed: ${lastLine(diff.stderr)}`);
+    expect(
+      diff.stdout.includes("added    ADDED") &&
+        diff.stdout.includes("changed  CHANGED") &&
+        diff.stdout.includes("removed  REMOVED"),
+      "diff did not report all changes",
+    );
+    expect(
+      !diff.stdout.includes(secretValue) && !diff.stdout.includes(rotatedValue),
+      "diff exposed a value",
+    );
+    return "imported version 2 and compared names";
+  });
+
   if (process.env.CFS_BROWSER_SMOKE === "1") {
     await step("browser: sign in, unlock and list secrets", async () => {
       const browserPort = await freePort();
@@ -665,6 +700,92 @@ async function run(): Promise<void> {
     return "app reads the current version";
   });
 
+  await step("proxy: inject the secret into a local upstream and redact its response", async () => {
+    const key = join(work, "upstream.key");
+    const cert = join(work, "upstream.crt");
+    const openssl = Bun.spawn(
+      [
+        "openssl",
+        "req",
+        "-x509",
+        "-newkey",
+        "rsa:2048",
+        "-nodes",
+        "-keyout",
+        key,
+        "-out",
+        cert,
+        "-days",
+        "1",
+        "-subj",
+        "/CN=localhost",
+        "-addext",
+        "subjectAltName=IP:127.0.0.1",
+      ],
+      { stdout: "ignore", stderr: "ignore" },
+    );
+    expect((await openssl.exited) === 0, "could not generate local upstream certificate");
+    let injected = false;
+    const upstream = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      tls: { key: Bun.file(key), cert: Bun.file(cert) },
+      fetch(req) {
+        injected = req.headers.get("authorization") === `Bearer ${secretValue}`;
+        return new Response(`echo ${secretValue}`, { headers: { "x-echo": secretValue } });
+      },
+    });
+    let proxy: Bun.Subprocess | undefined;
+    try {
+      const appId = await identityIdByName(APP_NAME);
+      const rule = await api("POST", `/apps/${appId}/rules`, people.admin.seedToken, {
+        alias: "local",
+        secretPath: SECRET,
+        name: "API_KEY",
+        upstream: `https://127.0.0.1:${upstream.port}`,
+        inject: "header:Authorization:Bearer {value}",
+      });
+      expect(rule.status === 201, `rule creation failed (status ${rule.status})`);
+      const proxyPort = await freePort();
+      proxy = Bun.spawn([process.execPath, CLI, "proxy", "--listen", `127.0.0.1:${proxyPort}`], {
+        cwd: work,
+        env: cliEnv(appConfigDir, { ...kitEnv(), NODE_EXTRA_CA_CERTS: cert }),
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "ignore",
+      });
+      let response: Response | undefined;
+      for (let i = 0; i < 100; i++) {
+        if (proxy.exitCode !== null) throw new Error(`proxy exited early (${proxy.exitCode})`);
+        try {
+          response = await fetch(`http://127.0.0.1:${proxyPort}/local/check`, {
+            headers: { authorization: "caller-supplied" },
+          });
+          break;
+        } catch {
+          await Bun.sleep(100);
+        }
+      }
+      expect(response, "proxy did not start");
+      const body = await response.text();
+      expect(
+        response.status === 200 && injected,
+        `upstream did not receive the injected secret (status ${response.status})`,
+      );
+      expect(
+        body === "echo [redacted]" && response.headers.get("x-echo") === "[redacted]",
+        "proxy did not redact response body and header",
+      );
+      return "injection and response redaction verified";
+    } finally {
+      if (proxy && proxy.exitCode === null) {
+        proxy.kill();
+        await proxy.exited;
+      }
+      upstream.stop(true);
+    }
+  });
+
   await step(`rotate: remove ${BOB_EMAIL}; the next version is unreadable to bob`, async () => {
     const rm = await cli(people.admin, ["group", "remove-member", GROUP, BOB_EMAIL]);
     expect(rm.code === 0, `remove-member failed: ${lastLine(rm.stderr)}`);
@@ -705,6 +826,54 @@ async function run(): Promise<void> {
       "bob cannot read after approval",
     );
     return "approved for 30m, bob reads the current version";
+  });
+
+  await step("requests: deny a second request", async () => {
+    const req = await cli(people.bob, [
+      "request",
+      SECRET,
+      "--reason",
+      "e2e denial",
+      "--for",
+      "30m",
+    ]);
+    expect(req.code === 0, `request failed: ${lastLine(req.stderr)}`);
+    const id = req.stdout.match(/Request (\S+) sent/)?.[1];
+    expect(id, "request did not return an id");
+    const denied = await cli(people.admin, ["deny", id]);
+    expect(denied.code === 0, `deny failed: ${lastLine(denied.stderr)}`);
+    const list = await cli(people.admin, ["requests"]);
+    expect(
+      list.code === 0 &&
+        list.stdout.split("\n").some((line) => line.includes(id) && line.includes("denied")),
+      "request not denied",
+    );
+    return "second request denied";
+  });
+
+  await step(`offboard: remove ${BOB_EMAIL} and rotate the group`, async () => {
+    const report = join(work, "offboard.txt");
+    const result = await cli(people.admin, ["offboard", BOB_EMAIL, "--report", report, "--yes"]);
+    expect(result.code === 0, `offboard failed: ${lastLine(result.stderr)}`);
+    const groups = await cli(people.admin, ["group", "list"]);
+    expect(
+      groups.code === 0 && groups.stdout.includes(`${GROUP}\tkey version 3`),
+      "offboarding did not rotate the group",
+    );
+    const bob = await cli(people.bob, ["get", SECRET, "ROTATED"]);
+    expect(bob.code !== 0 && bob.stdout.trim() !== rotatedValue, "offboarded user can still read");
+    const app = await cli({ configDir: appConfigDir }, ["get", SECRET, "ROTATED"], {
+      env: kitEnv(),
+    });
+    expect(
+      app.code === 0 && app.stdout.trim() === rotatedValue,
+      "app lost access after offboarding",
+    );
+    expect(
+      !readFileSync(report, "utf8").includes(rotatedValue),
+      "offboarding report exposed a value",
+    );
+    return "group rotated, user disabled, app retains access";
   });
 
   await step("audit: cfs audit verify (hash chain)", async () => {
