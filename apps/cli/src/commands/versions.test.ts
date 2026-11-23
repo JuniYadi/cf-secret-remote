@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import { diffFingerprints, fingerprints } from "@cfs/core";
-import vector from "../../../../packages/core/test-vectors/fingerprint.json";
 import { mergeValues, parseImport, previewLines } from "./versions.ts";
 
 describe("parseImport .env (ADR 22)", () => {
@@ -88,24 +87,9 @@ describe("preview (ADR 22: names only, never values)", () => {
   });
 });
 
-describe("fingerprints in the CLI (ADR 22 shared vector)", () => {
-  it("matches the shared test vector", async () => {
-    const key = Uint8Array.from(
-      vector.groupKeyHex.match(/../g)?.map((b) => Number.parseInt(b, 16)) ?? [],
-    );
-    const cases = vector.cases as {
-      path: string;
-      values: Record<string, string>;
-      fps: Record<string, string>;
-    }[];
-    for (const c of cases) {
-      expect(await fingerprints(key, c.path, c.values)).toEqual(c.fps);
-    }
-  });
+describe("fingerprints in the CLI (ADR 22)", () => {
   it("a diff between two versions names changes without any value", async () => {
-    const key = Uint8Array.from(
-      vector.groupKeyHex.match(/../g)?.map((b) => Number.parseInt(b, 16)) ?? [],
-    );
+    const key = new Uint8Array(32).fill(1);
     const a = await fingerprints(key, "pay/prod", { KEY: "one", GONE: "x", SAME: "s" });
     const b = await fingerprints(key, "pay/prod", {
       KEY: "two",

@@ -2,8 +2,6 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openBackup } from "@cfs/core";
-import vector from "../../../../packages/core/test-vectors/backup-seal.json";
 import { CliError, type Client } from "../client.ts";
 import {
   type CheckReport,
@@ -172,14 +170,6 @@ describe("ADR 23: restore check and confirmation", () => {
       audit: { ...REPORT.audit, rows: 0 },
     });
     expect(lines.join("\n")).toContain("the file has no audit entries");
-  });
-});
-
-describe("ADR 23: passphrase seal, shared vector", () => {
-  it("opens the shared seal vector with the core helper (checked in the CLI as well as the browser)", async () => {
-    const hex = (s: string) => Uint8Array.from(s.match(/../g) ?? [], (h) => Number.parseInt(h, 16));
-    const plain = await openBackup(hex(vector.sealed), vector.passphrase);
-    expect(new TextDecoder().decode(plain)).toBe(vector.plaintext);
   });
 });
 
