@@ -6,6 +6,7 @@ import { isReservedSecretPath } from "@cfs/core";
 import type { Values } from "@cfs/core";
 import { useEffect, useState } from "preact/hooks";
 import { Link, useLocation } from "wouter-preact";
+import { ReasonForm } from "../components/reason-form.tsx";
 import {
   MASK,
   Pill,
@@ -197,11 +198,15 @@ function ReviewBody({ initial, onDone }: { initial: ImportDraft; onDone: (path: 
             </Pill>
           </div>
           {merged === null && existing ? (
-            <p class="sub center-line" role="status">
-              {loaded.state.status === "loading" || loaded.state.status === "ready"
-                ? t("Loading the current values...", "Memuat nilai yang ada...")
-                : loadProblem(loaded.state.status)}
-            </p>
+            <div class="sub center-line" role="status">
+              {loaded.state.status === "reason-required" ? (
+                <ReasonForm onSubmit={loaded.submitReason} />
+              ) : loaded.state.status === "loading" || loaded.state.status === "ready" ? (
+                t("Loading the current values...", "Memuat nilai yang ada...")
+              ) : (
+                loadProblem(loaded.state.status)
+              )}
+            </div>
           ) : (
             <table class="tbl">
               <thead>

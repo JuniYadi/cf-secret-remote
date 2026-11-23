@@ -4,6 +4,7 @@
 import type { Values } from "@cfs/core";
 import { useState } from "preact/hooks";
 import { Link, useLocation } from "wouter-preact";
+import { ReasonForm } from "../components/reason-form.tsx";
 import { Pill, typeLabel, WarnBox } from "../components/secrets-ui.tsx";
 import { PageTitle } from "../components/shared.tsx";
 import { useLang } from "../lib/hooks.ts";
@@ -26,7 +27,7 @@ import { NoKeyView, SecretProblem } from "./SecretDetail.tsx";
 /** The edit page: loads the current version, then shows the form for it. */
 export function SecretEditPage({ name }: { name: string }) {
   useLang();
-  const { state, reload } = useSecret(name);
+  const { state, reload, submitReason } = useSecret(name);
   const [notice, setNotice] = useState<string | null>(null);
 
   const onConflict = () => {
@@ -43,7 +44,9 @@ export function SecretEditPage({ name }: { name: string }) {
     return (
       <div class="secrets-page">
         <PageTitle crumbs={pageCrumbs("secretEdit", name)} />
-        {state.status === "nokey" ? (
+        {state.status === "reason-required" ? (
+          <ReasonForm onSubmit={submitReason} />
+        ) : state.status === "nokey" ? (
           <NoKeyView name={name} record={state.record} />
         ) : (
           <SecretProblem name={name} state={state} onRetry={reload} />

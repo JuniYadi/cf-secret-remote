@@ -13,6 +13,7 @@ export const HEALTH_PATH = "/api/health";
 export type ApiErrorKind =
   | "unauthorized"
   | "forbidden"
+  | "reason-required"
   | "not-found"
   | "conflict"
   | "invalid"
@@ -155,7 +156,17 @@ export async function send(
 
   // The 503 message is read only to tell the quota from a restore; the text itself is never kept.
   const message = res.status === 503 ? await res.text().catch(() => "") : "";
-  const kind = kindForFailure(res.status, message);
+  let kind = kindForFailure(res.status, message);
+  // The API has no stable code for this refusal. Inspect only this secret-read response,
+  // and discard its text rather than retaining server messages in errors.
+  if (res.status === 403 && method === "GET" && url.startsWith(`${API_BASE}/secret?`)) {
+    const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+    if (
+      typeof body?.error === "string" &&
+      /^alias .+ needs a reason: send the X-Cfs-Reason header$/.test(body.error)
+    )
+      kind = "reason-required";
+  }
   const retryAfter = retryAfterOf(res);
   if (kind === "quota" && method !== "GET") markQuotaReached(retryAfter);
   const attempts = res.status === 404 ? await attemptsFrom(res) : undefined;
@@ -715,10 +726,13 @@ export const api = {
   // Secrets (ADR 10, 22)
   secrets: () => request<SecretSummary[]>("GET", "/secrets"),
   // The Worker does not echo the path back, and the sealed envelope is bound to it (ADR 22), so it is set here.
-  secret: async (path: string, version?: number): Promise<SecretRecord> => ({
+  secret: async (path: string, version?: number, reason?: string): Promise<SecretRecord> => ({
     ...(await request<Omit<SecretRecord, "path">>(
       "GET",
       `/secret${queryString({ path, version })}`,
+      undefined,
+      undefined,
+      reason?.trim() ? { "X-Cfs-Reason": reason.trim() } : undefined,
     )),
     path,
   }),

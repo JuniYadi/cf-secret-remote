@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "preact/hooks";
 import { Link, useLocation } from "wouter-preact";
+import { ReasonForm } from "../components/reason-form.tsx";
 import {
   CopyButton,
   InfoBox,
@@ -34,7 +35,7 @@ import { deniedPath, PATHS, pageCrumbs, SECRET_TABS, secretHref } from "../route
 export function SecretDetailPage({ name }: { name: string }) {
   useLang();
   const [, navigate] = useLocation();
-  const { state, reload } = useSecret(name);
+  const { state, reload, submitReason } = useSecret(name);
 
   useEffect(() => {
     if (state.status === "denied") navigate(deniedPath(name));
@@ -50,6 +51,15 @@ export function SecretDetailPage({ name }: { name: string }) {
       </div>
     );
   }
+  if (state.status === "reason-required")
+    return (
+      <div class="secrets-page">
+        <PageTitle crumbs={pageCrumbs("secretDetail", name)} />
+        <div class="card">
+          <ReasonForm onSubmit={submitReason} />
+        </div>
+      </div>
+    );
   if (state.status === "nokey") return <NoKeyView name={name} record={state.record} />;
   if (state.status === "ready") {
     return <ValuesView name={name} secret={state.secret} meta={state.record.meta ?? {}} />;

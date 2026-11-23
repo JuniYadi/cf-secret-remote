@@ -59,6 +59,7 @@ interface World {
   puts: Record<string, unknown>[];
   gets: number;
   history: Record<string, unknown> | null;
+  requireReason: boolean;
 }
 
 let world: World;
@@ -100,6 +101,7 @@ async function world0(): Promise<World> {
     puts: [],
     gets: 0,
     history: null,
+    requireReason: false,
   };
 }
 
@@ -119,6 +121,8 @@ function serve() {
     if (p === "/api/v1/secrets" && method === "GET") return json(200, world.list);
     if (p === "/api/v1/secret" && method === "GET") {
       world.gets++;
+      if (world.requireReason && !new Headers(init.headers).get("X-Cfs-Reason"))
+        return json(403, { error: "alias test needs a reason: send the X-Cfs-Reason header" });
       const want = url.searchParams.get("version");
       if (want !== null) {
         const v = world.versions.find((x) => x.version === Number(want));
@@ -279,6 +283,28 @@ describe("secret detail", () => {
     await vi.advanceTimersByTimeAsync(29_000);
     expect(text()).toContain(SECRET);
     await vi.advanceTimersByTimeAsync(1_000);
+    expect(text()).not.toContain(SECRET);
+  });
+
+  it("asks for a required reason and sends it only when entered", async () => {
+    world.requireReason = true;
+    const fetchMock = serve();
+    render(<SecretDetailPage name="myapp/dev" />, host);
+    await flush();
+    const reads = () =>
+      fetchMock.mock.calls.filter(
+        ([url]) => new URL(url, "https://cfs.test").pathname === "/api/v1/secret",
+      );
+    expect(new Headers(reads()[0]?.[1]?.headers).has("X-Cfs-Reason")).toBe(false);
+    expect(text()).toContain("Why do you need to open this secret?");
+    expect(button("Open secret")?.disabled).toBe(true);
+    await type(input("#secret-reason") as HTMLInputElement, "Investigate incident");
+    host
+      .querySelector("form")
+      ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await flush();
+    expect(new Headers(reads()[1]?.[1]?.headers).get("X-Cfs-Reason")).toBe("Investigate incident");
+    expect(text()).toContain("DATABASE_URL");
     expect(text()).not.toContain(SECRET);
   });
 

@@ -28,8 +28,11 @@ export interface OpenedSecret {
 }
 
 /** GET /secret. Throws ApiError for denied (403), not found (404), and network problems. */
-export const fetchSecret = (path: string, version?: number): Promise<SecretRecord> =>
-  api.secret(path, version);
+export const fetchSecret = (
+  path: string,
+  version?: number,
+  reason?: string,
+): Promise<SecretRecord> => api.secret(path, version, reason);
 
 /**
  * The group key for a group, unwrapped with the person's private key. A missing key is an ApiError
@@ -67,8 +70,12 @@ export async function openFetched(record: SecretRecord): Promise<OpenedSecret> {
 }
 
 /** Fetch and open in one step. */
-export async function loadSecret(path: string, version?: number): Promise<OpenedSecret> {
-  return openFetched(await fetchSecret(path, version));
+export async function loadSecret(
+  path: string,
+  version?: number,
+  reason?: string,
+): Promise<OpenedSecret> {
+  return openFetched(await fetchSecret(path, version, reason));
 }
 
 /**

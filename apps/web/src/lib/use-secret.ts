@@ -12,6 +12,7 @@ export type SecretState =
   | { status: "nokey"; record: SecretRecord }
   /** The group key has lapsed (a time-boxed grant, ADR 16). */
   | { status: "expired" }
+  | { status: "reason-required" }
   | { status: "denied" }
   | { status: "missing" }
   | { status: "error" };
@@ -19,6 +20,7 @@ export type SecretState =
 /** Maps a failed load to a state. Exported for tests. */
 export function stateForError(err: unknown): SecretState {
   if (err instanceof ApiError) {
+    if (err.kind === "reason-required") return { status: "reason-required" };
     if (err.kind === "forbidden") return { status: "denied" };
     if (err.kind === "not-found") return { status: "missing" };
   }
@@ -33,8 +35,10 @@ export function useSecret(
   path: string,
   version?: number,
   enabled = true,
-): { state: SecretState; reload: () => void } {
+): { state: SecretState; reload: () => void; submitReason: (reason: string) => void } {
   const [state, setState] = useState<SecretState>({ status: "loading" });
+  const [reason, setReason] = useState<{ path: string; value: string } | null>(null);
+  const submitReason = useCallback((value: string) => setReason({ path, value }), [path]);
   const [token, setToken] = useState(0);
   const reload = useCallback(() => setToken((n) => n + 1), []);
 
@@ -45,7 +49,7 @@ export function useSecret(
     (async () => {
       let record: SecretRecord;
       try {
-        record = await fetchSecret(path, version);
+        record = await fetchSecret(path, version, reason?.path === path ? reason.value : undefined);
       } catch (err) {
         if (live) setState(stateForError(err));
         return;
@@ -67,7 +71,7 @@ export function useSecret(
     return () => {
       live = false;
     };
-  }, [path, version, token, enabled]);
+  }, [path, version, token, enabled, reason]);
 
-  return { state, reload };
+  return { state, reload, submitReason };
 }
