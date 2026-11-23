@@ -1,7 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { generateDek, sealText } from "@cfs/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { flushAlerts, resetAlertSenders, setAlertSenders } from "../src/alerts.ts";
 import { appendRow } from "../src/audit.ts";
 import { runDaily } from "../src/cron.ts";
 import {
@@ -19,6 +18,7 @@ import {
 } from "../src/routes/backup.ts";
 import type { Env } from "../src/types.ts";
 import { now, sha256Hex } from "../src/util.ts";
+import { flushAlerts, resetAlertSenders, setAlertSenders, testFetch } from "./alert-helpers.ts";
 import { admin, api, makeIdentity } from "./helpers.ts";
 
 const DAY = 86400;
@@ -303,7 +303,7 @@ describe("ADR 23: export format", () => {
     expect(new TextDecoder().decode(r.bytes.slice(0, 8))).toBe("CFSSEAL1");
     const webhook = vi.fn(async () => {});
     setAlertSenders({ webhook });
-    expect(await SELF.fetch("http://t.test/api/v1/backup").then((x) => x.status)).toBe(401);
+    expect(await testFetch("http://t.test/api/v1/backup").then((x) => x.status)).toBe(401);
     await flushAlerts();
     expect(webhook).toHaveBeenCalledTimes(1);
     expect((await post("/restore/check", adm.token, restoreBody(r.bytes))).status).toBe(400);
