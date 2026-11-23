@@ -78,6 +78,12 @@
         "vitest": "^5.1.1",
       },
     },
+    "apps/web/e2e": {
+      "name": "@cfs/web-e2e",
+      "devDependencies": {
+        "@playwright/test": "^1.65.1",
+      },
+    },
     "packages/core": {
       "name": "@cfs/core",
       "version": "0.0.0",
@@ -180,6 +186,8 @@
     "@cfs/sdk": ["@cfs/sdk@workspace:packages/sdk"],
 
     "@cfs/web": ["@cfs/web@workspace:apps/web"],
+
+    "@cfs/web-e2e": ["@cfs/web-e2e@workspace:apps/web/e2e"],
 
     "@cloudflare/kv-asset-handler": ["@cloudflare/kv-asset-handler@0.5.1", "", {}, "sha512-48OysfSW3MkQY1XjkhkpPkgrEkOvgfoyHzA2eyX5wpzFpijC02uWigv3hkNdJdT3C7ybW/U17yYHXeR68pLeww=="],
 
