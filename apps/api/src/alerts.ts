@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { chainHash } from "@cfs/core";
 import type { AuditRef, AuditRow } from "./audit.ts";
 import { dayOf, FREE_WRITES_PER_DAY, WARN_AT_WRITES } from "./quota.ts";
+import * as repo from "./repository/alerts.ts";
 import type { Env } from "./types.ts";
 import { now } from "./util.ts";
 
@@ -26,7 +27,6 @@ export type Channel = (typeof CHANNELS)[number];
 export const RECOVERY_ACTION = "recovery.requested";
 export const ACCESS_ACTION = "request.create";
 
-const DEDUPE_SECONDS = 15 * 60;
 const BURST_WINDOW_SECONDS = 5 * 60;
 const BURST_MAX = 20;
 const KEY_WEBHOOK = "alerts.webhook_url";
@@ -86,11 +86,8 @@ export const channelOn = (toggles: Toggles, rule: Rule, ch: Channel): boolean =>
   toggles[rule]?.[ch] !== false;
 
 export async function loadConfig(db: D1Database): Promise<AlertConfig> {
-  const rows = await db
-    .prepare("SELECT key, value FROM setting WHERE key IN (?, ?)")
-    .bind(KEY_WEBHOOK, KEY_RULES)
-    .all<{ key: string; value: string }>();
-  const map = new Map(rows.results.map((r) => [r.key, r.value]));
+  const rows = await repo.configRows(db, KEY_WEBHOOK, KEY_RULES);
+  const map = new Map(rows.map((r) => [r.key, r.value]));
   let toggles: Toggles = {};
   try {
     toggles = parseToggles(JSON.parse(map.get(KEY_RULES) ?? "{}")) ?? {};
@@ -106,13 +103,8 @@ export async function saveConfig(
   patch: { webhookUrl?: string | null; toggles?: Toggles },
 ): Promise<void> {
   if (patch.webhookUrl !== undefined) {
-    if (patch.webhookUrl === null)
-      await db.prepare("DELETE FROM setting WHERE key = ?").bind(KEY_WEBHOOK).run();
-    else
-      await db
-        .prepare("INSERT OR REPLACE INTO setting (key, value) VALUES (?, ?)")
-        .bind(KEY_WEBHOOK, patch.webhookUrl)
-        .run();
+    if (patch.webhookUrl === null) await repo.deleteSetting(db, KEY_WEBHOOK);
+    else await repo.putSetting(db, KEY_WEBHOOK, patch.webhookUrl);
   }
   if (patch.toggles) {
     const cur = await loadConfig(db);
@@ -121,10 +113,7 @@ export async function saveConfig(
       const t = patch.toggles[rule];
       if (t) merged[rule] = { ...merged[rule], ...t };
     }
-    await db
-      .prepare("INSERT OR REPLACE INTO setting (key, value) VALUES (?, ?)")
-      .bind(KEY_RULES, JSON.stringify(merged))
-      .run();
+    await repo.putSetting(db, KEY_RULES, JSON.stringify(merged));
   }
 }
 
@@ -162,14 +151,7 @@ export function maskWebhook(url: string): string {
 }
 
 /** Verified admin addresses (the Access email of each active admin). */
-export async function adminEmails(db: D1Database): Promise<string[]> {
-  const r = await db
-    .prepare(
-      "SELECT name FROM identity WHERE kind = 'user' AND role = 'admin' AND status = 'active' ORDER BY name",
-    )
-    .all<{ name: string }>();
-  return r.results.map((x) => x.name);
-}
+export const adminEmails = repo.adminEmails;
 
 // ---- evaluation -----------------------------------------------------------------------------
 
@@ -227,7 +209,7 @@ async function evaluate(row: AuditRow, ref: AuditRef, env: Env | undefined): Pro
     (email !== undefined && channelOn(cfg.toggles, rule, "email"));
 
   for (const hit of await detect(db, row, ref, on)) {
-    if (!(await claim(db, hit.rule, hit.subject, now()))) continue;
+    if (!(await repo.claim(db, hit.rule, hit.subject, now()))) continue;
     const text = `[cfs] ${hit.title}: ${hit.detail} (${new Date(row.at * 1000).toISOString()})`;
     if (webhook !== null && channelOn(cfg.toggles, hit.rule, "webhook")) {
       await attempt(`webhook ${hit.rule}`, () => (overrides.webhook ?? postWebhook)(webhook, text));
@@ -241,18 +223,6 @@ async function evaluate(row: AuditRow, ref: AuditRef, env: Env | undefined): Pro
 }
 
 /** Atomic claim of the (rule, subject) slot. True only for the caller that opened the window. */
-async function claim(db: D1Database, rule: Rule, subject: string, t: number): Promise<boolean> {
-  const r = await db
-    .prepare(
-      `INSERT INTO alert_state (rule, subject, last_sent_at) VALUES (?, ?, ?)
-       ON CONFLICT (rule, subject) DO UPDATE SET last_sent_at = excluded.last_sent_at
-       WHERE alert_state.last_sent_at <= ?`,
-    )
-    .bind(rule, subject, t, t - DEDUPE_SECONDS)
-    .run();
-  return r.meta.changes > 0;
-}
-
 /** IPv4 is grouped by /24. IPv6 is matched by the exact address. */
 function networkOf(ip: string): { label: string; needle: string } {
   const p = ip.split(".");
@@ -263,29 +233,12 @@ function networkOf(ip: string): { label: string; needle: string } {
   return { label: ip, needle: `"ip":"${ip}"` };
 }
 
-async function isApp(db: D1Database, name: string): Promise<boolean> {
-  const r = await db
-    .prepare("SELECT 1 AS x FROM identity WHERE kind = 'app' AND name = ?")
-    .bind(name)
-    .first<{ x: number }>();
-  return r !== null;
-}
-
-interface ChainRow {
-  seq: number;
-  prev: string;
-  hash: string;
-  entry: string;
-}
-
 /**
  * Checks the new row and the two rows before it: each stored hash must match its entry, and each link must hold.
  * Returns the seq of the first bad row, or null. Older rows are left to `cfs audit verify`.
  */
 async function brokenAt(db: D1Database, ref: AuditRef): Promise<number | null> {
-  const { results } = await db
-    .prepare("SELECT seq, prev, hash, entry FROM audit ORDER BY seq DESC LIMIT 5")
-    .all<ChainRow>();
+  const results = await repo.chainWindow(db);
   const i = results.findIndex((r) => r.hash === ref.hash);
   if (i < 0) return null; // another write landed after ours; that write is checked instead
   const window = results.slice(i, i + 3);
@@ -327,7 +280,7 @@ async function detect(
     row.action === "secret.read" &&
     row.result === "ok" &&
     row.path?.split("/").includes("prod") &&
-    (await isApp(db, who))
+    (await repo.isApp(db, who))
   ) {
     hits.push({
       rule: "agent_prod_read",
@@ -339,14 +292,7 @@ async function detect(
 
   if (on("new_network") && row.action === "login.ok" && row.ip) {
     const net = networkOf(row.ip);
-    const seen = await db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM audit
-         WHERE who = ? AND at <= ? AND hash != ? AND instr(entry, ?) > 0
-           AND json_extract(entry, '$.action') = 'login.ok'`,
-      )
-      .bind(who, row.at, ref.hash, net.needle)
-      .first<{ n: number }>();
+    const seen = await repo.networkCount(db, who, row.at, ref.hash, net.needle);
     if ((seen?.n ?? 0) === 0) {
       hits.push({
         rule: "new_network",
@@ -358,14 +304,7 @@ async function detect(
   }
 
   if (on("read_burst") && row.action.startsWith("secret.read")) {
-    const reads = await db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM audit
-         WHERE who = ? AND at > ? AND at <= ?
-           AND json_extract(entry, '$.action') LIKE 'secret.read%'`,
-      )
-      .bind(who, row.at - BURST_WINDOW_SECONDS, row.at)
-      .first<{ n: number }>();
+    const reads = await repo.readCount(db, who, row.at - BURST_WINDOW_SECONDS, row.at);
     const n = reads?.n ?? 0;
     if (n > BURST_MAX) {
       hits.push({
@@ -379,10 +318,7 @@ async function detect(
 
   if (on("quota_80")) {
     const day = dayOf(row.at);
-    const usage = await db
-      .prepare("SELECT writes FROM usage_day WHERE day = ?")
-      .bind(day)
-      .first<{ writes: number }>();
+    const usage = await repo.usageWrites(db, day);
     const writes = usage?.writes ?? 0;
     if (writes >= WARN_AT_WRITES) {
       hits.push({
@@ -458,15 +394,4 @@ export async function sendTestAlert(
 }
 
 /** The newest alerts that went out: one row per (rule, subject), from the dedupe table. Admin only. */
-export async function recentAlerts(
-  db: D1Database,
-  limit = 20,
-): Promise<{ rule: string; subject: string; at: number }[]> {
-  const rows = await db
-    .prepare(
-      "SELECT rule, subject, last_sent_at AS at FROM alert_state ORDER BY last_sent_at DESC LIMIT ?",
-    )
-    .bind(limit)
-    .all<{ rule: string; subject: string; at: number }>();
-  return rows.results;
-}
+export const recentAlerts = repo.recentAlerts;
