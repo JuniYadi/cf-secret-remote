@@ -222,3 +222,6 @@ Admin dapat mengatur durasi maksimum permintaan (default 24 jam, maksimum 30 har
 
 ## Bentuk konflik API
 Respons HTTP 409 memuat `error` untuk manusia dan `code` stabil untuk klien, misalnya `version_conflict`, `group_rotating`, `group_key_changed`, dan `secret_deleted`. Daftar kode bersama tersedia di `packages/core`; klien harus menangani kode yang belum dikenal. Field tambahan seperti `current` atau `missing` tetap tersedia bila relevan.
+
+## Nama rute yang dicadangkan
+Nama secret baru `new`, `import`, `import/review`, atau dengan segmen terakhir `edit`, `versions`, atau `history`, serta nama grup baru `new`, `offboard`, dan `regrant`, dicadangkan untuk rute web. Data yang sudah ada tidak dimigrasi dan tetap dapat diperbarui. Pencocokan membedakan huruf besar dan kecil.

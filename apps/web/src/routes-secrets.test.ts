@@ -68,3 +68,14 @@ describe("secret routes", () => {
     expect(pageCrumbs("secretsImportReview")[1]?.href).toBe("/secrets/import");
   });
 });
+
+it("uses shared reserved names for static routes and secret tabs", async () => {
+  const { SECRET_FIXED_NAMES, SECRET_PAGE_SUFFIXES, GROUP_FIXED_NAMES } = await import("@cfs/core");
+  expect(matchPage(`/secrets/${SECRET_FIXED_NAMES.new}`).id).toBe("secretsNew");
+  expect(matchPage(`/secrets/${SECRET_FIXED_NAMES.import}`).id).toBe("secretsImport");
+  expect(matchPage(`/secrets/team/${SECRET_PAGE_SUFFIXES.edit}`).id).toBe("secretEdit");
+  expect(matchPage(`/secrets/team/${SECRET_PAGE_SUFFIXES.versions}`).id).toBe("secretVersions");
+  expect(matchPage(`/secrets/team/${SECRET_PAGE_SUFFIXES.history}`).id).toBe("secretHistory");
+  expect(matchPage(`/groups/${GROUP_FIXED_NAMES.offboard}`).id).toBe("offboard");
+  expect(matchPage(`/groups/${GROUP_FIXED_NAMES.regrant}`).id).toBe("regrant");
+});

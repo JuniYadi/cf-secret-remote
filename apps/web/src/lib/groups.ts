@@ -3,6 +3,7 @@
 // Group keys and values are kept in local variables for the duration of one call and never stored.
 
 import {
+  isReservedGroupName,
   loginFingerprints,
   newGroupKey,
   openLogin,
@@ -66,13 +67,14 @@ export function normalizePrefix(raw: string): string {
   return raw.trim().replace(/\/$/, "");
 }
 
-export type PrefixError = "empty" | "shape" | "exists";
+export type PrefixError = "empty" | "shape" | "exists" | "reserved";
 
 /** Checks a group name. `existing` is the list of groups already made, to refuse duplicates early. */
 export function validatePrefix(raw: string, existing: readonly string[] = []): PrefixError | null {
   const value = normalizePrefix(raw);
   if (value === "") return "empty";
   if (value.length > 64 || !PREFIX_RE.test(value)) return "shape";
+  if (isReservedGroupName(value)) return "reserved";
   if (existing.includes(value)) return "exists";
   return null;
 }

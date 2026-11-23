@@ -1,3 +1,4 @@
+import { isReservedSecretPath } from "@cfs/core";
 // Import, step 2 of 2: review on its own screen, full width. Shows names, types and what will happen to each
 // name, without values, until the person presses Show. Pick where it goes and the merge strategy, then
 // save. Only here are the values sealed and written (ADR 22, DESIGN.md "Import").
@@ -111,6 +112,7 @@ function ReviewBody({ initial, onDone }: { initial: ImportDraft; onDone: (path: 
   const canSave =
     !busy &&
     validSecretPath(path) &&
+    (existing || !isReservedSecretPath(path)) &&
     incomingCount > 0 &&
     merged !== null &&
     (!existing || loadedSecret !== null);
@@ -290,6 +292,14 @@ function ReviewBody({ initial, onDone }: { initial: ImportDraft; onDone: (path: 
                   placeholder="myapp/staging"
                   onInput={(e) => setTarget({ mode: "new", path: e.currentTarget.value.trim() })}
                 />
+                {isReservedSecretPath(path) && (
+                  <span class="field-error" role="alert">
+                    {t(
+                      "This name is reserved for a web page.",
+                      "Nama ini dicadangkan untuk halaman web.",
+                    )}
+                  </span>
+                )}
               </div>
             )}
           </div>

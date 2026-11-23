@@ -208,6 +208,9 @@ describe("Groups", () => {
     await type("#group-prefix", "data");
     expect(text()).toContain("A group with this name already exists.");
     expect(submit().disabled).toBe(true);
+    await type("#group-prefix", "offboard");
+    expect(text()).toContain("This name is reserved for a web page.");
+    expect(submit().disabled).toBe(true);
     await type("#group-prefix", "backend");
     expect(text()).not.toContain("already exists");
     expect(submit().disabled).toBe(false);

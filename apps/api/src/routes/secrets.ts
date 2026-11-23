@@ -1,4 +1,4 @@
-import { ConflictCode } from "@cfs/core";
+import { ConflictCode, isReservedSecretPath } from "@cfs/core";
 import { Hono } from "hono";
 import { agentGuard } from "../agent-guard.ts";
 import { audit } from "../audit.ts";
@@ -224,6 +224,8 @@ secrets.put("/secret", async (c) => {
     );
 
   const existing = await repository.findSecret(c.env.DB, path);
+  if (!existing && isReservedSecretPath(path))
+    return c.json({ error: "secret name is reserved for a web route" }, 400);
   const cap: Cap = existing ? "update" : "create";
   if (!(await check(c, path, cap))) return c.json({ error: "denied" }, 403);
   // ADR 22: a deleted secret comes back only through an admin restore, not by a new write.
