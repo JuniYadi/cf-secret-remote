@@ -2,6 +2,17 @@ import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { validPath } from "../policy.ts";
+import {
+  createKeyring,
+  createPersonalKeyring,
+  findKeyringKey,
+  findPersonalKeyring,
+  findPersonalKeyringOwner,
+  findPublicKey,
+  inviteIdentity,
+  listIdentities,
+  listKeyrings,
+} from "../repository/keyrings.ts";
 import type { AppEnv } from "../types.ts";
 import { newId, now } from "../util.ts";
 
@@ -9,13 +20,7 @@ export const keyrings = new Hono<AppEnv>();
 
 keyrings.get("/keyrings", async (c) => {
   const who = c.get("who");
-  const rows = await c.env.DB.prepare(
-    `SELECT k.id, k.prefix, k.version FROM keyring k
-     WHERE k.personal_owner IS NULL AND (?1 = 'admin' OR EXISTS (SELECT 1 FROM keyring_member m WHERE m.keyring_id = k.id AND m.identity_id = ?2))
-     ORDER BY k.prefix`,
-  )
-    .bind(who.role, who.id)
-    .all();
+  const rows = await listKeyrings(c.env.DB, who.role, who.id);
   return c.json(rows.results);
 });
 
@@ -30,18 +35,7 @@ keyrings.post("/keyrings", requireAdmin, async (c) => {
     return c.json({ error: "bad request" }, 400);
   const id = newId();
   try {
-    await c.env.DB.batch([
-      c.env.DB.prepare("INSERT INTO keyring (id, prefix, created_at) VALUES (?, ?, ?)").bind(
-        id,
-        b.prefix,
-        now(),
-      ),
-      ...b.members.map((m) =>
-        c.env.DB.prepare(
-          "INSERT INTO keyring_member (keyring_id, identity_id, version, wrapped_key) VALUES (?, ?, 1, ?)",
-        ).bind(id, m.identityId, m.wrappedKey),
-      ),
-    ]);
+    await createKeyring(c.env.DB, id, b.prefix, now(), b.members);
   } catch {
     return c.json({ error: "group already exists or a member is unknown" }, 409);
   }
@@ -58,13 +52,12 @@ keyrings.get("/keyrings/:prefix/key", async (c) => {
   const want = c.req.query("version");
   if (want !== undefined && !/^[1-9][0-9]{0,8}$/.test(want))
     return c.json({ error: "bad version" }, 400);
-  const row = await c.env.DB.prepare(
-    `SELECT m.wrapped_key, m.version, m.expires_at AS expiresAt FROM keyring_member m JOIN keyring k ON k.id = m.keyring_id
-     WHERE k.prefix = ? AND k.personal_owner IS NULL AND m.identity_id = ? AND (?3 IS NULL OR m.version = ?3)
-     ORDER BY m.version DESC LIMIT 1`,
-  )
-    .bind(prefix, who.id, want === undefined ? null : Number(want))
-    .first<{ wrapped_key: string; version: number; expiresAt: number | null }>();
+  const row = await findKeyringKey(
+    c.env.DB,
+    prefix,
+    who.id,
+    want === undefined ? null : Number(want),
+  );
   if (!row) return c.json({ error: "no key for you in this group" }, 404);
   if (row.expiresAt !== null && row.expiresAt <= now()) {
     await audit(c.env.DB, {
@@ -82,9 +75,7 @@ keyrings.get("/keyrings/:prefix/key", async (c) => {
 });
 
 keyrings.get("/identities", requireAdmin, async (c) => {
-  const rows = await c.env.DB.prepare(
-    "SELECT id, kind, name, role, public_key AS publicKey, status, (recovery_locked_key IS NOT NULL) AS recoverySet, last_unlocked_at FROM identity ORDER BY name",
-  ).all();
+  const rows = await listIdentities(c.env.DB);
   return c.json(rows.results);
 });
 
@@ -94,11 +85,7 @@ keyrings.post("/invites", requireAdmin, async (c) => {
   const email = b.email?.trim().toLowerCase();
   if (!email || !/^[^@\s]+@[^@\s]+$/.test(email)) return c.json({ error: "bad email" }, 400);
   try {
-    await c.env.DB.prepare(
-      "INSERT INTO identity (id, kind, name, role, created_at) VALUES (?, 'user', ?, ?, ?)",
-    )
-      .bind(newId(), email, b.role === "admin" ? "admin" : "member", now())
-      .run();
+    await inviteIdentity(c.env.DB, newId(), email, b.role === "admin" ? "admin" : "member", now());
   } catch {
     return c.json({ error: "already invited" }, 409);
   }
@@ -108,13 +95,7 @@ keyrings.post("/invites", requireAdmin, async (c) => {
 
 // A unique owner and database guards make creation safe across concurrent unlocks and prevent sharing.
 keyrings.get("/me/personal-keyring", async (c) => {
-  const row = await c.env.DB.prepare(
-    `SELECT k.id, k.prefix, k.version, m.wrapped_key AS wrappedKey FROM keyring k
-     JOIN keyring_member m ON m.keyring_id = k.id AND m.identity_id = k.personal_owner AND m.version = k.version
-     WHERE k.personal_owner = ?`,
-  )
-    .bind(c.get("who").id)
-    .first();
+  const row = await findPersonalKeyring(c.env.DB, c.get("who").id);
   return c.json(row ?? null);
 });
 
@@ -132,26 +113,13 @@ keyrings.post("/me/personal-keyring", async (c) => {
     b.wrappedKey.length > 8192
   )
     return c.json({ error: "bad request" }, 400);
-  const identity = await c.env.DB.prepare("SELECT public_key FROM identity WHERE id = ?")
-    .bind(who.id)
-    .first<{ public_key: string | null }>();
+  const identity = await findPublicKey(c.env.DB, who.id);
   if (!identity?.public_key) return c.json({ error: "set up your vault first" }, 409);
   const id = newId();
   try {
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        "INSERT INTO keyring (id, prefix, created_at, personal_owner) VALUES (?, ?, ?, ?)",
-      ).bind(id, b.prefix, now(), who.id),
-      c.env.DB.prepare(
-        "INSERT INTO keyring_member (keyring_id, identity_id, version, wrapped_key) VALUES (?, ?, 1, ?)",
-      ).bind(id, who.id, b.wrappedKey),
-    ]);
+    await createPersonalKeyring(c.env.DB, id, b.prefix, now(), who.id, b.wrappedKey);
   } catch {
-    const existing = await c.env.DB.prepare(
-      "SELECT id, prefix, version FROM keyring WHERE personal_owner = ?",
-    )
-      .bind(who.id)
-      .first();
+    const existing = await findPersonalKeyringOwner(c.env.DB, who.id);
     if (existing) return c.json(existing);
     return c.json({ error: "group already exists" }, 409);
   }
