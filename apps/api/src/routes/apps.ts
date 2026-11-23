@@ -2,6 +2,16 @@ import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { normalizeAllowlist } from "../cidr.ts";
+import {
+  type AppRow,
+  appActivity,
+  appSessions,
+  createApp,
+  disableApp,
+  findApp,
+  listApps,
+  rotateApp,
+} from "../repository/apps.ts";
 import type { AppEnv } from "../types.ts";
 import { newId, newToken, now, sha256Hex } from "../util.ts";
 
@@ -18,39 +28,12 @@ const MAX_USES = 1_000_000_000;
 const NAME_MAX = 80;
 const SHOWN_ACTIVITY = 20;
 
-interface AppRow {
-  id: string;
-  name: string;
-  status: string;
-  createdAt: number;
-  owner: string | null;
-  roleId: string;
-  tokenTtl: number;
-  maxUses: number | null;
-  uses: number;
-  cidr: string | null;
-  expiresAt: number | null;
-  firstLoginAt: number | null;
-  lastLoginAt: number | null;
-  lastIp: string | null;
-}
-
-const APP_SELECT = `SELECT i.id, i.name, i.status, i.created_at AS createdAt, o.name AS owner,
-  a.role_id AS roleId, a.token_ttl AS tokenTtl, a.max_uses AS maxUses, a.uses, a.cidr,
-  a.expires_at AS expiresAt, a.first_login_at AS firstLoginAt, a.last_login_at AS lastLoginAt,
-  a.last_ip AS lastIp
-  FROM identity i JOIN app_role a ON a.identity_id = i.id LEFT JOIN identity o ON o.id = i.owner_id
-  WHERE i.kind = 'app'`;
-
 // The public view. Never includes secret_id or its hash.
 const view = (r: AppRow) => ({
   ...r,
   cidr: r.cidr ? r.cidr.split(",") : null,
   waiting: r.firstLoginAt === null,
 });
-
-const findApp = (db: D1Database, id: string) =>
-  db.prepare(`${APP_SELECT} AND i.id = ?`).bind(id).first<AppRow>();
 
 const isInt = (v: unknown, min: number, max: number): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
@@ -91,14 +74,19 @@ apps.post("/apps", async (c) => {
   const roleId = newId();
   const secretId = newToken("cfssid");
   try {
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        "INSERT INTO identity (id, kind, name, role, public_key, owner_id, created_at) VALUES (?, 'app', ?, 'member', ?, ?, ?)",
-      ).bind(id, name, publicKey, who.id, now()),
-      c.env.DB.prepare(
-        "INSERT INTO app_role (identity_id, role_id, secret_hash, token_ttl, max_uses, expires_at, cidr) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      ).bind(id, roleId, await sha256Hex(secretId), tokenTtl, maxUses, expiresAt, cidr),
-    ]);
+    await createApp(c.env.DB, {
+      id,
+      name,
+      publicKey,
+      owner: who.id,
+      at: now(),
+      roleId,
+      secretHash: await sha256Hex(secretId),
+      tokenTtl,
+      maxUses,
+      expiresAt,
+      cidr,
+    });
   } catch {
     return c.json({ error: "name already used" }, 409);
   }
@@ -107,31 +95,21 @@ apps.post("/apps", async (c) => {
 });
 
 apps.get("/apps", async (c) => {
-  const rows = await c.env.DB.prepare(`${APP_SELECT} ORDER BY i.name`).all<AppRow>();
-  return c.json(rows.results.map(view));
+  const rows = await listApps(c.env.DB);
+  return c.json(rows.map(view));
 });
 
 apps.get("/apps/:id", async (c) => {
   const db = c.env.DB;
   const row = await findApp(db, c.req.param("id"));
   if (!row) return c.json({ error: "not found" }, 404);
-  const sessions = await db
-    .prepare(
-      "SELECT substr(token_hash, 1, 16) AS id, created_at AS createdAt, expires_at AS expiresAt FROM session WHERE identity_id = ? AND expires_at > ? ORDER BY created_at DESC",
-    )
-    .bind(row.id, now())
-    .all();
+  const sessions = await appSessions(db, row.id, now());
   // Activity is the audit trail of this app: its own events, and refused logins under its role_id.
-  const activity = await db
-    .prepare(
-      "SELECT entry FROM audit WHERE json_extract(entry, '$.who') IN (?, ?) ORDER BY seq DESC LIMIT ?",
-    )
-    .bind(row.name, `app:${row.roleId}`, SHOWN_ACTIVITY)
-    .all<{ entry: string }>();
+  const activity = await appActivity(db, row.name, row.roleId, SHOWN_ACTIVITY);
   return c.json({
     ...view(row),
-    sessions: sessions.results,
-    activity: activity.results.map(({ entry }) => {
+    sessions,
+    activity: activity.map(({ entry }) => {
       const e = JSON.parse(entry) as {
         at: number;
         action: string;
@@ -156,9 +134,7 @@ apps.post("/apps/:id/rotate", async (c) => {
   const row = await findApp(c.env.DB, c.req.param("id"));
   if (!row) return c.json({ error: "not found" }, 404);
   const secretId = newToken("cfssid");
-  await c.env.DB.prepare("UPDATE app_role SET secret_hash = ? WHERE identity_id = ?")
-    .bind(await sha256Hex(secretId), row.id)
-    .run();
+  await rotateApp(c.env.DB, await sha256Hex(secretId), row.id);
   await audit(c.env.DB, { who: who.name, action: "app.rotate", note: row.name, result: "ok" });
   return c.json({ roleId: row.roleId, secretId });
 });
@@ -168,10 +144,7 @@ apps.post("/apps/:id/disable", async (c) => {
   const who = c.get("who");
   const row = await findApp(c.env.DB, c.req.param("id"));
   if (!row) return c.json({ error: "not found" }, 404);
-  await c.env.DB.batch([
-    c.env.DB.prepare("UPDATE identity SET status = 'disabled' WHERE id = ?").bind(row.id),
-    c.env.DB.prepare("DELETE FROM session WHERE identity_id = ?").bind(row.id),
-  ]);
+  await disableApp(c.env.DB, row.id);
   await audit(c.env.DB, { who: who.name, action: "app.disable", note: row.name, result: "ok" });
   return c.json({ ok: true });
 });
