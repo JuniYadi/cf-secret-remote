@@ -17,13 +17,14 @@ import {
 } from "../repository/requests.ts";
 import { notifyAccessRequest } from "../requests-notify.ts";
 import { REQUEST_TTL } from "../requests-sweep.ts";
+import { loadLimits } from "../settings.ts";
 import type { AppEnv } from "../types.ts";
 import { newId, now } from "../util.ts";
 
 // ADR 16. Access requests with approval. The server stores the requester's wrapped group key and the
 // time-boxed grant; it never sees a group key or a value in clear. Every state change is audited.
 
-/** Longest grant, in seconds (24 h). The admin setting from ADR 16 is not built yet, so this is fixed. */
+/** Default longest grant in seconds. */
 export const MAX_DURATION = 86400;
 const MAX_REASON = 500;
 const STATUSES = ["pending", "approved", "denied", "cancelled", "expired"] as const;
@@ -61,9 +62,9 @@ requests.post("/requests", async (c) => {
     typeof b.duration !== "number" ||
     !Number.isInteger(b.duration) ||
     b.duration < 1 ||
-    b.duration > MAX_DURATION
+    b.duration > (await loadLimits(c.env)).maxRequestDuration
   )
-    return c.json({ error: "duration must be between 1 second and 24 hours" }, 400);
+    return c.json({ error: "duration exceeds the configured limit or is invalid" }, 400);
   if (b.rekeyAfter !== undefined && typeof b.rekeyAfter !== "boolean")
     return c.json({ error: "rekeyAfter must be true or false" }, 400);
 

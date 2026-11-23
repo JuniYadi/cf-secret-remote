@@ -478,7 +478,17 @@ describe("Access requests", () => {
   it("checks the request form before sending", async () => {
     const stub = await mount(
       MEMBER,
-      { "GET /requests": { body: [] }, "POST /requests": { status: 201, body: waiting } },
+      {
+        "GET /requests": { body: [] },
+        "GET /settings/limits": {
+          body: {
+            maxRequestDuration: 7200,
+            defaultApprovalDuration: 1800,
+            auditRetentionDays: 365,
+          },
+        },
+        "POST /requests": { status: 201, body: waiting },
+      },
       () => <RequestsPage />,
     );
     submit("form.ask-form");
@@ -491,12 +501,25 @@ describe("Access requests", () => {
   it("sends a valid request with the chosen duration", async () => {
     const stub = await mount(
       MEMBER,
-      { "GET /requests": { body: [] }, "POST /requests": { status: 201, body: waiting } },
+      {
+        "GET /requests": { body: [] },
+        "GET /settings/limits": {
+          body: {
+            maxRequestDuration: 7200,
+            defaultApprovalDuration: 1800,
+            auditRetentionDays: 365,
+          },
+        },
+        "POST /requests": { status: 201, body: waiting },
+      },
       () => <RequestsPage />,
     );
     await setInput("#ask-path", "shop/prod");
     await setInput("#ask-reason", "Month-end reconciliation");
+    expect((document.querySelector("#ask-duration") as HTMLSelectElement).value).toBe("1800");
     await setInput("#ask-duration", "7200");
+    (document.querySelector('form.ask-form input[type="checkbox"]') as HTMLInputElement).click();
+    await flush();
     submit("form.ask-form");
     await flush();
     const sent = stub.to("POST /requests")[0]?.body as {
@@ -504,7 +527,12 @@ describe("Access requests", () => {
       reason: string;
       duration: number;
     };
-    expect(sent).toEqual({ path: "shop/prod", reason: "Month-end reconciliation", duration: 7200 });
+    expect(sent).toEqual({
+      path: "shop/prod",
+      reason: "Month-end reconciliation",
+      duration: 7200,
+      rekeyAfter: true,
+    });
   });
 });
 

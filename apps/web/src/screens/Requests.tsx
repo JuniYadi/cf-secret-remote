@@ -19,7 +19,9 @@ import "../styles/activity.css";
 
 /** Duration labels for the form. The value is seconds, as the Worker takes it. */
 function durationLabel(seconds: number): string {
-  if (seconds < 3600) return t(`${seconds / 60} minutes`, `${seconds / 60} menit`);
+  if (seconds < 60 || seconds % 60 !== 0) return t(`${seconds} seconds`, `${seconds} detik`);
+  if (seconds < 3600 || seconds % 3600 !== 0)
+    return t(`${seconds / 60} minutes`, `${seconds / 60} menit`);
   const hours = seconds / 3600;
   return t(hours === 1 ? "1 hour" : `${hours} hours`, hours === 1 ? "1 jam" : `${hours} jam`);
 }
@@ -317,7 +319,7 @@ function ApprovalCard({
   );
 }
 
-/** The request form. The duration is a choice from the allowed lengths, so the Worker's 24 h limit always holds. */
+/** The request form uses the configured default and maximum duration. */
 function AskForm({ onSent }: { onSent: () => void }) {
   useLang();
   const [draft, setDraft] = useState<RequestDraft>({
@@ -325,6 +327,20 @@ function AskForm({ onSent }: { onSent: () => void }) {
     reason: "",
     duration: REQUEST_DURATIONS[1] ?? 3600,
   });
+  const [limits, setLimits] = useState<{
+    maxRequestDuration: number;
+    defaultApprovalDuration: number;
+  } | null>(null);
+  const [rekeyAfter, setRekeyAfter] = useState(false);
+  useEffect(() => {
+    void api
+      .limits()
+      .then((v) => {
+        setLimits(v);
+        setDraft((d) => ({ ...d, duration: v.defaultApprovalDuration }));
+      })
+      .catch((err: unknown) => setError(messageFor(err)));
+  }, []);
   const [errors, setErrors] = useState<RequestErrors>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -332,7 +348,7 @@ function AskForm({ onSent }: { onSent: () => void }) {
 
   async function onSubmit(event: Event) {
     event.preventDefault();
-    const found = checkRequest(draft);
+    const found = checkRequest(draft, limits?.maxRequestDuration);
     setErrors(found);
     setSent(false);
     if (Object.keys(found).length > 0) return;
@@ -343,6 +359,7 @@ function AskForm({ onSent }: { onSent: () => void }) {
         path: draft.path.trim(),
         reason: draft.reason.trim(),
         duration: draft.duration,
+        rekeyAfter,
       });
       setDraft({ ...draft, reason: "" });
       setSent(true);
@@ -392,13 +409,26 @@ function AskForm({ onSent }: { onSent: () => void }) {
           value={String(draft.duration)}
           onChange={(e) => setDraft({ ...draft, duration: Number(e.currentTarget.value) })}
         >
-          {REQUEST_DURATIONS.map((seconds) => (
-            <option key={seconds} value={String(seconds)}>
-              {durationLabel(seconds)}
-            </option>
-          ))}
+          {[
+            ...new Set([
+              ...REQUEST_DURATIONS.filter((n) => n <= (limits?.maxRequestDuration ?? 0)),
+              ...(limits ? [limits.defaultApprovalDuration, limits.maxRequestDuration] : []),
+            ]),
+          ]
+            .sort((a, b) => a - b)
+            .map((seconds) => (
+              <option key={seconds} value={String(seconds)}>
+                {durationLabel(seconds)}
+              </option>
+            ))}
         </select>
-        <span class="note">{t("Up to 24 hours.", "Sampai 24 jam.")}</span>
+        <span class="note">
+          {limits &&
+            t(
+              `Up to ${durationLabel(limits.maxRequestDuration)}.`,
+              `Sampai ${durationLabel(limits.maxRequestDuration)}.`,
+            )}
+        </span>
       </div>
       <div class="field">
         <label for="ask-reason">{t("Why do you need it?", "Kenapa kamu butuh?")}</label>
@@ -427,7 +457,18 @@ function AskForm({ onSent }: { onSent: () => void }) {
           </span>
         )}
       </div>
-      <button type="submit" class="btn" disabled={busy}>
+      <label>
+        <input
+          type="checkbox"
+          checked={rekeyAfter}
+          onChange={(e) => setRekeyAfter(e.currentTarget.checked)}
+        />{" "}
+        {t(
+          "Re-key after expiry (request only; rotation is not automatic)",
+          "Kunci ulang setelah kedaluwarsa (hanya permintaan; rotasi tidak otomatis)",
+        )}
+      </label>
+      <button type="submit" class="btn" disabled={busy || !limits}>
         {busy ? t("Sending...", "Mengirim...") : t("Send request", "Kirim permintaan")}
       </button>
       {sent && (

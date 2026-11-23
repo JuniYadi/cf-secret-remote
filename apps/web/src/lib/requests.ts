@@ -12,8 +12,8 @@ export const REQUEST_DURATIONS: readonly number[] = [1800, 3600, 7200, 14400, 28
 export const MAX_REASON = 500;
 
 /** True for a whole number of seconds from 1 to 24 h, the same bounds the Worker checks. */
-export function validDuration(seconds: number): boolean {
-  return Number.isInteger(seconds) && seconds >= 1 && seconds <= MAX_REQUEST_SECONDS;
+export function validDuration(seconds: number, max = MAX_REQUEST_SECONDS): boolean {
+  return Number.isInteger(seconds) && seconds >= 1 && seconds <= max;
 }
 
 export interface RequestDraft {
@@ -25,7 +25,7 @@ export interface RequestDraft {
 export type RequestErrors = Partial<Record<keyof RequestDraft, "path" | "reason" | "duration">>;
 
 /** Field errors for the request form. An empty object means it can be sent. */
-export function checkRequest(draft: RequestDraft): RequestErrors {
+export function checkRequest(draft: RequestDraft, max = MAX_REQUEST_SECONDS): RequestErrors {
   const errors: RequestErrors = {};
   const path = draft.path.trim();
   if (path === "" || path.startsWith("/") || path.endsWith("/") || path.includes("//")) {
@@ -37,7 +37,7 @@ export function checkRequest(draft: RequestDraft): RequestErrors {
   }
   const reason = draft.reason.trim();
   if (reason === "" || draft.reason.length > MAX_REASON) errors.reason = "reason";
-  if (!validDuration(draft.duration)) errors.duration = "duration";
+  if (!validDuration(draft.duration, max)) errors.duration = "duration";
   return errors;
 }
 
