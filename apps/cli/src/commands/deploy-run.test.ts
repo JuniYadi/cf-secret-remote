@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import * as childProcess from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { type BundleManifest, PROTOCOL_VERSION, parseManifest } from "@cfs/core";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
@@ -18,6 +19,7 @@ import {
   checkWorkerName,
   contentType,
   type DeployRun,
+  deploy,
   deployPlan,
   ensureAccess,
   makeCf,
@@ -517,6 +519,74 @@ describe("the Cloudflare token (ADR 25 security rules)", () => {
     }).catch((e: unknown) => e);
     expect((err as Error).message).not.toContain(TOKEN);
     expect(lines.join("\n")).not.toContain(TOKEN);
+  });
+
+  test("no spawned process gets the token in its argv, and the process title and logs stay clean", async () => {
+    // A real .tgz bundle, so deploy takes its only subprocess path (tar).
+    const src = join(dir, "src");
+    for (const [name, bytes] of makeBundle().files) {
+      mkdirSync(dirname(join(src, name)), { recursive: true });
+      writeFileSync(join(src, name), bytes);
+    }
+    const tgz = join(dir, "worker-bundle.tgz");
+    const made = childProcess.spawnSync("tar", ["-czf", tgz, "-C", src, "."]);
+    expect(made.status).toBe(0);
+
+    const argvs: string[][] = [];
+    const sync = spyOn(childProcess, "spawnSync");
+    const real = sync.getMockImplementation();
+    sync.mockImplementation(((cmd: string, args?: readonly string[], ...rest: unknown[]) => {
+      argvs.push([cmd, ...(args ?? [])]);
+      return (real as (...a: unknown[]) => unknown)(cmd, args, ...rest);
+    }) as never);
+    const bunSpawn = spyOn(Bun, "spawn");
+    const bunSpawnSync = spyOn(Bun, "spawnSync");
+    const logs: string[] = [];
+    const log = spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      logs.push(a.join(" "));
+    });
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({ success: false, errors: [{ code: 10000, message: `bad ${TOKEN}` }] }),
+        { status: 403 },
+      )) as unknown as typeof fetch;
+    const prevToken = process.env.CLOUDFLARE_API_TOKEN;
+    process.env.CLOUDFLARE_API_TOKEN = TOKEN;
+    let err: unknown;
+    try {
+      try {
+        await deploy.deploy?.run(["--bundle", tgz, "--admin", "a@example.com"]);
+      } catch (e) {
+        err = e;
+      }
+    } finally {
+      globalThis.fetch = realFetch;
+      if (prevToken === undefined) delete process.env.CLOUDFLARE_API_TOKEN;
+      else process.env.CLOUDFLARE_API_TOKEN = prevToken;
+      log.mockRestore();
+      sync.mockRestore();
+    }
+    // Only argv is checked. The env may hold the token; that is the intended channel.
+    const argvOf = (c: unknown[]): string[] => {
+      const first = c[0] as string[] | { cmd: string[] };
+      return Array.isArray(first) ? first : first.cmd;
+    };
+    const spawned = [
+      ...argvs,
+      ...bunSpawn.mock.calls.map(argvOf),
+      ...bunSpawnSync.mock.calls.map(argvOf),
+    ];
+    bunSpawn.mockRestore();
+    bunSpawnSync.mockRestore();
+
+    expect(err).toBeInstanceOf(CliError); // the run reached the API and failed there
+    expect(argvs.some((a) => a[0] === "tar")).toBe(true); // the spy sees the subprocess
+    expect(spawned.flat().some((arg) => arg.includes(TOKEN))).toBe(false);
+    expect(process.argv.join(" ")).not.toContain(TOKEN);
+    expect(process.title).not.toContain(TOKEN);
+    expect((err as Error).message).not.toContain(TOKEN);
+    expect(logs.join("\n")).not.toContain(TOKEN);
   });
 
   test("redact replaces every secret it is given", () => {
