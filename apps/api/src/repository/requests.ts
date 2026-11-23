@@ -77,29 +77,6 @@ export function denyRequest(db: D1Database, approver: string, at: number, id: st
     .run();
 }
 
-export function findApprovalGroup(db: D1Database, prefix: string) {
-  return db
-    .prepare("SELECT id, version, status FROM keyring WHERE prefix = ? AND personal_owner IS NULL")
-    .bind(prefix)
-    .first<{ id: string; version: number; status: string }>();
-}
-
-export function findApprovalMembership(
-  db: D1Database,
-  groupId: string,
-  identityId: string,
-  version: number,
-  at: number,
-) {
-  return db
-    .prepare(
-      `SELECT 1 AS ok FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND version = ?
-       AND (expires_at IS NULL OR expires_at > ?)`,
-    )
-    .bind(groupId, identityId, version, at)
-    .first();
-}
-
 export function findRequester(db: D1Database, id: string) {
   return db
     .prepare("SELECT status FROM identity WHERE id = ?")

@@ -33,3 +33,9 @@ export async function insertAuditRow(
       .bind(day, readsLogged),
   ]);
 }
+
+export function findAuditBase(db: D1Database) {
+  return db
+    .prepare("SELECT seq, hash FROM audit_base WHERE id = 1")
+    .first<{ seq: number; hash: string }>();
+}

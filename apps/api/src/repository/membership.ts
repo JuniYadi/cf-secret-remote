@@ -1,11 +1,5 @@
 import { now } from "../util.ts";
 
-export interface Group {
-  id: string;
-  version: number;
-  status: "active" | "rotating";
-}
-
 /**
  * Two-admin guard (ADR 20): active user admins that hold a vault, not counting `exceptId`.
  * Callers refuse a demotion or disable of an admin when this is below 2.
@@ -19,12 +13,6 @@ export async function countAdminsWithVault(db: D1Database, exceptId?: string): P
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
-
-export const loadGroup = (db: D1Database, prefix: string) =>
-  db
-    .prepare("SELECT id, version, status FROM keyring WHERE prefix = ? AND personal_owner IS NULL")
-    .bind(prefix)
-    .first<Group>();
 
 export async function findMembership(
   db: D1Database,
@@ -322,23 +310,6 @@ export async function abortRotation(db: D1Database, groupId: string, next: numbe
       .prepare("UPDATE keyring SET status = 'active' WHERE id = ? AND status = 'rotating'")
       .bind(groupId),
   ]);
-}
-
-export async function findIdentity(db: D1Database, id: string) {
-  const t = await db
-    .prepare(
-      "SELECT id, kind, name, role, status, public_key AS publicKey FROM identity WHERE id = ?",
-    )
-    .bind(id)
-    .first<{
-      id: string;
-      kind: string;
-      name: string;
-      role: string;
-      status: string;
-      publicKey: string | null;
-    }>();
-  return t;
 }
 
 export async function updateIdentity(db: D1Database, role: string, status: string, id: string) {

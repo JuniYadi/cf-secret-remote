@@ -1,3 +1,5 @@
+import { findAuditBase } from "./audit.ts";
+
 export async function policies(db: D1Database) {
   const policies = await db
     .prepare("SELECT id, name, rules FROM policy ORDER BY name")
@@ -108,9 +110,7 @@ export async function auditStats(db: D1Database, since: number) {
   return { accesses, byApps, blocked, actors };
 }
 export async function chainRows(db: D1Database) {
-  const base = await db
-    .prepare("SELECT seq, hash FROM audit_base WHERE id = 1")
-    .first<{ seq: number; hash: string }>();
+  const base = await findAuditBase(db);
   const rows = await db
     .prepare("SELECT seq, entry, hash FROM audit ORDER BY seq")
     .all<{ seq: number; entry: string; hash: string }>();
