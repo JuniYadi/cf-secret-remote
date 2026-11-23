@@ -4,6 +4,8 @@ import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { NAME_RE } from "../limits.ts";
 import { prefixOf, validPath } from "../policy.ts";
+import type { Group } from "../repository/membership.ts";
+import * as membershipRepo from "../repository/membership.ts";
 import type { AppEnv } from "../types.ts";
 import { now } from "../util.ts";
 import { ciphertextSize, validInput } from "./logins.ts";
@@ -13,31 +15,8 @@ import { ciphertextSize, validInput } from "./logins.ts";
 
 export const CHUNK_SIZE = 50;
 
-interface Group {
-  id: string;
-  version: number;
-  status: "active" | "rotating";
-}
-
-/**
- * Two-admin guard (ADR 20): active user admins that hold a vault, not counting `exceptId`.
- * Callers refuse a demotion or disable of an admin when this is below 2.
- */
-export async function countAdminsWithVault(db: D1Database, exceptId?: string): Promise<number> {
-  const row = await db
-    .prepare(
-      "SELECT COUNT(*) AS n FROM identity WHERE kind = 'user' AND role = 'admin' AND status = 'active' AND public_key IS NOT NULL AND id != ?",
-    )
-    .bind(exceptId ?? "")
-    .first<{ n: number }>();
-  return row?.n ?? 0;
-}
-
-const loadGroup = (db: D1Database, prefix: string) =>
-  db
-    .prepare("SELECT id, version, status FROM keyring WHERE prefix = ? AND personal_owner IS NULL")
-    .bind(prefix)
-    .first<Group>();
+export const countAdminsWithVault = membershipRepo.countAdminsWithVault;
+const loadGroup = membershipRepo.loadGroup;
 
 /**
  * Loads the group and checks the caller holds its key at the current version.
@@ -54,13 +33,7 @@ async function memberGate(
   const group = await loadGroup(db, prefix);
   if (!group) return c.json({ error: "no such group" }, 404);
   if (adminMayPass && who.role === "admin") return group;
-  const mine = await db
-    .prepare(
-      `SELECT 1 AS ok FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND version = ?
-       AND (expires_at IS NULL OR expires_at > ?)`,
-    )
-    .bind(group.id, who.id, group.version, now())
-    .first();
+  const mine = await membershipRepo.findMembership(db, group.id, who.id, group.version, now());
   if (!mine) {
     await audit(db, {
       who: who.name,
@@ -83,14 +56,7 @@ membership.get("/keyrings/:prefix/members", async (c) => {
   const prefix = c.req.param("prefix");
   const g = await memberGate(c, prefix, "group.members.list", true);
   if (g instanceof Response) return g;
-  const rows = await c.env.DB.prepare(
-    `SELECT i.id AS identityId, i.name, i.role, i.status FROM keyring_member m
-     JOIN identity i ON i.id = m.identity_id
-     WHERE m.keyring_id = ? AND m.version = ? AND (m.expires_at IS NULL OR m.expires_at > ?)
-     ORDER BY i.name`,
-  )
-    .bind(g.id, g.version, now())
-    .all();
+  const rows = await membershipRepo.listMembers(c.env.DB, g.id, g.version, now());
   return c.json(rows.results);
 });
 
@@ -105,21 +71,13 @@ membership.post("/keyrings/:prefix/members", requireAdmin, async (c) => {
   if (g instanceof Response) return g;
   if (g.status !== "active") return c.json({ error: "group is rotating, try again later" }, 409);
 
-  const target = await db
-    .prepare("SELECT name, public_key AS publicKey, status FROM identity WHERE id = ?")
-    .bind(b.identityId)
-    .first<{ name: string; publicKey: string | null; status: string }>();
+  const target = await membershipRepo.findTarget(db, b.identityId);
   if (!target) return c.json({ error: "unknown identity" }, 404);
   if (target.status !== "active") return c.json({ error: "identity is disabled" }, 409);
   if (!target.publicKey) return c.json({ error: "this person has not set up a vault yet" }, 409);
 
   try {
-    await db
-      .prepare(
-        "INSERT INTO keyring_member (keyring_id, identity_id, version, wrapped_key) VALUES (?, ?, ?, ?)",
-      )
-      .bind(g.id, b.identityId, g.version, b.wrappedKey)
-      .run();
+    await membershipRepo.addMember(db, g.id, b.identityId, g.version, b.wrappedKey);
   } catch {
     return c.json({ error: "already in this group" }, 409);
   }
@@ -163,21 +121,12 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   if (removeId === who.id)
     return c.json({ error: "you cannot remove yourself from the group" }, 400);
 
-  const current = await db
-    .prepare(
-      `SELECT identity_id AS id FROM keyring_member WHERE keyring_id = ? AND version = ?
-       AND (expires_at IS NULL OR expires_at > ?)`,
-    )
-    .bind(g.id, g.version, now())
-    .all<{ id: string }>();
+  const current = await membershipRepo.currentMembers(db, g.id, g.version, now());
   const ids = current.results.map((r) => r.id);
   // A person who is no longer in the group (an earlier attempt removed them, then was aborted) can be
   // removed again: start is idempotent, so a failed rotation can always be retried. An unknown id is refused.
   if (!ids.includes(removeId)) {
-    const known = await db
-      .prepare("SELECT 1 AS ok FROM identity WHERE id = ?")
-      .bind(removeId)
-      .first();
+    const known = await membershipRepo.knownIdentity(db, removeId);
     if (!known) return c.json({ error: "no such person" }, 404);
   }
   const remaining = ids.filter((i) => i !== removeId).sort();
@@ -185,37 +134,15 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   if (given.length !== remaining.length || given.some((id, i) => id !== remaining[i]))
     return c.json({ error: "members must be exactly the remaining members" }, 400);
 
-  const removed = await db
-    .prepare("SELECT name FROM identity WHERE id = ?")
-    .bind(removeId)
-    .first<{ name: string }>();
+  const removed = await membershipRepo.removedIdentity(db, removeId);
   const next = g.version + 1;
   try {
-    const started = await db.batch([
-      db
-        .prepare("UPDATE keyring SET status = 'rotating' WHERE id = ? AND status = 'active'")
-        .bind(g.id),
-      ...members.map((m) =>
-        db
-          .prepare(
-            "INSERT INTO keyring_member_staged (keyring_id, identity_id, version, wrapped_key) SELECT ?, ?, ?, ? WHERE changes() = 1",
-          )
-          .bind(g.id, m.identityId, next, m.wrappedKey),
-      ),
-      db
-        .prepare(
-          "DELETE FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND changes() = 1",
-        )
-        .bind(g.id, removeId),
-    ]);
+    const started = await membershipRepo.startRotation(db, g.id, members, next, removeId);
     if (!started[0]?.meta.changes) return c.json({ error: "group changed, reload and retry" }, 409);
   } catch {
     return c.json({ error: "group changed, reload and retry" }, 409);
   }
-  const live = await db
-    .prepare("SELECT COUNT(*) AS n FROM secret WHERE keyring_id = ? AND deleted_at IS NULL")
-    .bind(g.id)
-    .first<{ n: number }>();
+  const live = await membershipRepo.liveSecrets(db, g.id);
   await audit(db, {
     who: who.name,
     action: "group.rotate.start",
@@ -233,13 +160,7 @@ membership.get("/keyrings/:prefix/rotate/logins", requireAdmin, async (c) => {
   const g = await memberGate(c, c.req.param("prefix"), "group.rotate.logins");
   if (g instanceof Response) return g;
   if (g.status !== "rotating") return c.json({ error: "group is not rotating" }, 409);
-  const rows = await c.env.DB.prepare(
-    `SELECT l.id, v.version, v.wrapped_dek AS wrappedDek, v.ciphertext, v.fps
-     FROM login l JOIN login_version v ON v.login_id = l.id AND v.version = l.current
-     WHERE l.keyring_id = ? ORDER BY l.id`,
-  )
-    .bind(g.id)
-    .all<{ fps: string }>();
+  const rows = await membershipRepo.rotationLogins(c.env.DB, g.id);
   return c.json(rows.results.map((r) => ({ ...r, fps: JSON.parse(r.fps) })));
 });
 
@@ -323,22 +244,14 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
     if (size === null) return c.json({ error: "bad ciphertext" }, 400);
     if (size > LOGIN_CIPHERTEXT_LIMIT) return c.json({ error: "too large" }, 413);
     loginIds.add(l.id);
-    const row = await db
-      .prepare("SELECT current FROM login WHERE id = ? AND keyring_id = ?")
-      .bind(l.id, g.id)
-      .first<{ current: number }>();
+    const row = await membershipRepo.loginCurrent(db, l.id, g.id);
     if (!row || l.version !== row.current + 1)
       return c.json({ error: "login or version changed" }, 409);
   }
 
   const rows: { secretId: string; version: number }[] = [];
   for (const s of secrets) {
-    const row = await db
-      .prepare(
-        "SELECT id, current, deleted_at AS deletedAt FROM secret WHERE path = ? AND keyring_id = ?",
-      )
-      .bind(s.path, g.id)
-      .first<{ id: string; current: number; deletedAt: number | null }>();
+    const row = await membershipRepo.secretCurrent(db, s.path, g.id);
     if (!row || row.deletedAt)
       return c.json({ error: "secret is not live in this group", path: s.path }, 409);
     if (s.version !== row.current + 1)
@@ -347,55 +260,7 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
   }
 
   try {
-    await db.batch([
-      ...secrets.flatMap((s, i) => {
-        const r = rows[i] as { secretId: string; version: number };
-        return [
-          // A retried chunk replaces its own staged rows.
-          db
-            .prepare(
-              "DELETE FROM secret_version WHERE secret_id = ? AND version = ? AND keyring_version = ?",
-            )
-            .bind(r.secretId, r.version, next),
-          db
-            .prepare(
-              "INSERT INTO secret_version (secret_id, version, keyring_version, names, wrapped_dek, ciphertext, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            )
-            .bind(
-              r.secretId,
-              r.version,
-              next,
-              JSON.stringify(s.names),
-              s.wrappedDek,
-              s.ciphertext,
-              who.id,
-              now(),
-            ),
-        ];
-      }),
-      ...loginItems.flatMap((l) => [
-        db
-          .prepare(
-            "DELETE FROM login_version WHERE login_id = ? AND version = ? AND keyring_version = ?",
-          )
-          .bind(l.id, l.version, next),
-        db
-          .prepare(
-            "INSERT INTO login_version (login_id, version, keyring_id, keyring_version, wrapped_dek, ciphertext, fps, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          )
-          .bind(
-            l.id,
-            l.version,
-            g.id,
-            next,
-            l.wrappedDek,
-            l.ciphertext,
-            JSON.stringify(l.fps),
-            who.id,
-            now(),
-          ),
-      ]),
-    ]);
+    await membershipRepo.stageRotation(db, secrets, rows, loginItems, g.id, next, who.id);
   } catch {
     return c.json({ error: "group changed, reload and retry" }, 409);
   }
@@ -422,14 +287,7 @@ membership.post("/keyrings/:prefix/rotate/commit", requireAdmin, async (c) => {
   if (g.status !== "rotating") return c.json({ error: "group is not rotating" }, 409);
   const next = g.version + 1;
 
-  const missing = await db
-    .prepare(
-      `SELECT s.path FROM secret s WHERE s.keyring_id = ? AND s.deleted_at IS NULL
-       AND NOT EXISTS (SELECT 1 FROM secret_version v WHERE v.secret_id = s.id AND v.keyring_version = ?)
-       ORDER BY s.path`,
-    )
-    .bind(g.id, next)
-    .all<{ path: string }>();
+  const missing = await membershipRepo.missingSecrets(db, g.id, next);
   if (missing.results.length)
     return c.json(
       {
@@ -439,13 +297,7 @@ membership.post("/keyrings/:prefix/rotate/commit", requireAdmin, async (c) => {
       409,
     );
 
-  const missingLogins = await db
-    .prepare(
-      `SELECT l.id FROM login l WHERE l.keyring_id = ? AND NOT EXISTS
-     (SELECT 1 FROM login_version v WHERE v.login_id = l.id AND v.version = l.current + 1 AND v.keyring_version = ? AND v.keyring_id = ?)`,
-    )
-    .bind(g.id, next, g.id)
-    .all<{ id: string }>();
+  const missingLogins = await membershipRepo.missingLogins(db, g.id, next);
   if (missingLogins.results.length)
     return c.json(
       {
@@ -456,42 +308,7 @@ membership.post("/keyrings/:prefix/rotate/commit", requireAdmin, async (c) => {
     );
 
   try {
-    await db.batch([
-      db
-        .prepare(
-          `UPDATE keyring SET version = ?, status = 'active' WHERE id = ? AND status = 'rotating'
-           AND NOT EXISTS (SELECT 1 FROM secret s WHERE s.keyring_id = ? AND s.deleted_at IS NULL
-             AND NOT EXISTS (SELECT 1 FROM secret_version v WHERE v.secret_id = s.id AND v.keyring_version = ?))
-           AND NOT EXISTS (SELECT 1 FROM login l WHERE l.keyring_id = ? AND NOT EXISTS
-             (SELECT 1 FROM login_version v WHERE v.login_id = l.id AND v.version = l.current + 1 AND v.keyring_version = ? AND v.keyring_id = ?))`,
-        )
-        .bind(next, g.id, g.id, next, g.id, next, g.id),
-      // The statements below only apply if the keyring flip above happened.
-      db
-        .prepare(
-          `UPDATE secret SET current = current + 1 WHERE keyring_id = ? AND deleted_at IS NULL
-           AND EXISTS (SELECT 1 FROM secret_version v WHERE v.secret_id = secret.id AND v.keyring_version = ?)
-           AND EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ?)`,
-        )
-        .bind(g.id, next, g.id, next),
-      db
-        .prepare(`UPDATE login SET current = current + 1 WHERE keyring_id = ?
-        AND EXISTS (SELECT 1 FROM login_version v WHERE v.login_id = login.id AND v.version = login.current + 1 AND v.keyring_version = ? AND v.keyring_id = ?)
-        AND EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ?)`)
-        .bind(g.id, next, g.id, g.id, next),
-      db
-        .prepare(
-          `INSERT INTO keyring_member (keyring_id, identity_id, version, wrapped_key)
-           SELECT keyring_id, identity_id, version, wrapped_key FROM keyring_member_staged
-           WHERE keyring_id = ? AND version = ? AND EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ?)`,
-        )
-        .bind(g.id, next, g.id, next),
-      db
-        .prepare(
-          "DELETE FROM keyring_member_staged WHERE keyring_id = ? AND EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ?)",
-        )
-        .bind(g.id, g.id, next),
-    ]);
+    await membershipRepo.commitRotation(db, g.id, next);
   } catch {
     return c.json({ error: "group changed, reload and retry" }, 409);
   }
@@ -519,22 +336,7 @@ membership.post("/keyrings/:prefix/rotate/abort", requireAdmin, async (c) => {
   if (g.status !== "rotating") return c.json({ error: "group is not rotating" }, 409);
   const next = g.version + 1;
   try {
-    await db.batch([
-      db
-        .prepare(
-          "DELETE FROM secret_version WHERE keyring_version = ? AND secret_id IN (SELECT id FROM secret WHERE keyring_id = ?)",
-        )
-        .bind(next, g.id),
-      db
-        .prepare(
-          "DELETE FROM login_version WHERE keyring_version = ? AND keyring_id = ? AND login_id IN (SELECT id FROM login WHERE keyring_id = ?)",
-        )
-        .bind(next, g.id, g.id),
-      db.prepare("DELETE FROM keyring_member_staged WHERE keyring_id = ?").bind(g.id),
-      db
-        .prepare("UPDATE keyring SET status = 'active' WHERE id = ? AND status = 'rotating'")
-        .bind(g.id),
-    ]);
+    await membershipRepo.abortRotation(db, g.id, next);
   } catch {
     return c.json({ error: "group changed, reload and retry" }, 409);
   }
@@ -561,19 +363,7 @@ membership.patch("/identities/:id", requireAdmin, async (c) => {
     (b.role !== undefined && b.role !== "admin" && b.role !== "member")
   )
     return c.json({ error: "bad request" }, 400);
-  const t = await db
-    .prepare(
-      "SELECT id, kind, name, role, status, public_key AS publicKey FROM identity WHERE id = ?",
-    )
-    .bind(id)
-    .first<{
-      id: string;
-      kind: string;
-      name: string;
-      role: string;
-      status: string;
-      publicKey: string | null;
-    }>();
+  const t = await membershipRepo.findIdentity(db, id);
   if (!t) return c.json({ error: "unknown identity" }, 404);
 
   const role = b.role ?? t.role;
@@ -588,12 +378,7 @@ membership.patch("/identities/:id", requireAdmin, async (c) => {
   )
     return c.json({ error: "at least two admins must hold a vault" }, 409);
 
-  const statements = [
-    db.prepare("UPDATE identity SET role = ?, status = ? WHERE id = ?").bind(role, status, t.id),
-  ];
-  if (status === "disabled")
-    statements.push(db.prepare("DELETE FROM session WHERE identity_id = ?").bind(t.id));
-  await db.batch(statements);
+  await membershipRepo.updateIdentity(db, role, status, t.id);
 
   const ip = c.req.header("CF-Connecting-IP");
   if (status !== t.status)
