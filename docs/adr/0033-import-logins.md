@@ -1,6 +1,6 @@
 # 33. Import Logins
 
-Status: accepted (not implemented yet)
+Status: core and CLI implemented; web import pending ADR 31
 
 ## Decision
 - **Formats, in this order:** generic CSV (`site, environment, role, username, password, totp, notes`, which is what QA spreadsheets look like), Chrome password CSV, then Bitwarden JSON (unencrypted export only).

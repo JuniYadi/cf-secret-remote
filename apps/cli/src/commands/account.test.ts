@@ -66,3 +66,61 @@ test("edit keeps the current password when none is typed", () => {
   expect(keptPassword("", "old")).toBe("old");
   expect(keptPassword("new", "old")).toBe("new");
 });
+
+test("imports with encrypted request bodies to a fake server", async () => {
+  const { importAccounts } = await import("./account.ts");
+  const pair = await generateKeyPair();
+  const personal = await createPersonalKeyring(pair.publicKey, "personal-test");
+  const raw = await Bun.file(
+    new URL("../../../../packages/core/test-fixtures/import/chrome.csv", import.meta.url),
+  ).text();
+  const ring = { id: "ring", prefix: "personal-test", version: 1, wrappedKey: personal.wrappedKey };
+  const calls: { method: string; path: string; body: unknown }[] = [];
+  const server = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      const path = new URL(req.url).pathname;
+      const body = req.method === "GET" ? undefined : await req.json();
+      calls.push({ method: req.method, path, body });
+      return Response.json(
+        path === "/logins" && req.method === "GET"
+          ? []
+          : path === "/keyrings"
+            ? []
+            : path === "/whoami"
+              ? { publicKey: pair.publicKey }
+              : path === "/me/personal-keyring"
+                ? ring
+                : {},
+        { status: req.method === "POST" ? 201 : 200 },
+      );
+    },
+  });
+  const c = {
+    privateKey: pair.privateKey,
+    call: async (method: string, path: string, body: unknown) => {
+      const response = await fetch(new URL(path, server.url), {
+        method,
+        ...(body === undefined
+          ? {}
+          : { body: JSON.stringify(body), headers: { "content-type": "application/json" } }),
+      });
+      return { status: response.status, body: await response.json() };
+    },
+  } as unknown as Client;
+  try {
+    await importAccounts(c, raw, { mode: "skip", yes: true });
+  } finally {
+    server.stop();
+  }
+  const write = calls.find((call) => call.method === "POST" && call.path === "/logins")!;
+  const sent = JSON.stringify(calls);
+  expect(sent).not.toContain(raw);
+  expect(sent).not.toContain("fake-password");
+  expect(sent).not.toContain("alice");
+  const body = write.body as { id: string; ciphertext: string; wrappedDek: string };
+  const { openLogin } = await import("@cfs/core");
+  expect(
+    (await openLogin(personal.key, body.id, 1, body.wrappedDek, body.ciphertext)).password,
+  ).toBe("fake-password");
+});
