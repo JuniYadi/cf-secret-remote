@@ -1,6 +1,8 @@
 import { env } from "cloudflare:test";
 import { generateKeyPair, newGroupKey, sealSecret, type Values, wrapGroupKey } from "@cfs/core";
 import { describe, expect, it } from "vitest";
+import { finishOffboard } from "../src/repository/offboard.ts";
+import { purgeDeletedSecrets, RESTORE_WINDOW } from "../src/routes/versions.ts";
 import { admin, api, makeIdentity } from "./helpers.ts";
 
 // ADR 21 rules, one test each. Real Workers runtime and D1. Membership removal itself is the client-driven
@@ -210,6 +212,48 @@ describe("ADR 21: the plan", () => {
     expect(text).not.toMatch(/wrappedDek|ciphertext|wrapped_key|token_hash/);
   });
 
+  it("retains purged paths and versions without attributing names from a recreated secret", async () => {
+    const prefix = uniq("purged");
+    const adm = await person({ role: "admin" });
+    const p = await person();
+    const { gk } = await group(prefix, adm, [p]);
+    await grantRead(p, prefix);
+    const path = `${prefix}/secret`;
+    const marker = `PURGED_VALUE_${uniq("v")}`;
+    expect((await put(adm, gk, path, { OLD_KEY: marker })).status).toBe(201);
+    expect((await api("GET", `/secret?path=${path}`, p.token)).status).toBe(200);
+    expect((await api("DELETE", `/secret?path=${path}`, adm.token)).status).toBe(200);
+    expect(
+      await purgeDeletedSecrets(env.DB, Math.floor(Date.now() / 1000) + RESTORE_WINDOW + 1),
+    ).toBeGreaterThanOrEqual(1);
+    let plan = await api("GET", `/offboard/${p.id}/plan`, adm.token);
+    expect(plan.body.opened.secrets[0]).toMatchObject({
+      path,
+      versions: [1],
+      names: [],
+      namesUnavailable: true,
+    });
+
+    expect((await put(adm, gk, path, { NEW_KEY: "new value" })).status).toBe(201);
+    plan = await api("GET", `/offboard/${p.id}/plan`, adm.token);
+    expect(plan.body.opened.secrets[0]).toMatchObject({
+      path,
+      versions: [1],
+      names: [],
+      namesUnavailable: true,
+    });
+    expect((await api("GET", `/secret?path=${path}`, p.token)).status).toBe(200);
+    plan = await api("GET", `/offboard/${p.id}/plan`, adm.token);
+    expect(plan.body.opened.secrets[0]).toMatchObject({
+      path,
+      versions: [1],
+      names: ["NEW_KEY"],
+      namesUnavailable: true,
+    });
+    expect(JSON.stringify(plan.body)).not.toContain(marker);
+    expect(JSON.stringify(plan.body)).not.toContain("new value");
+  });
+
   it("blocks finish while the person is in a group, including a staged rotation membership", async () => {
     const prefix = uniq("staged");
     const adm = await person({ role: "admin" });
@@ -230,6 +274,20 @@ describe("ADR 21: the plan", () => {
 });
 
 describe("ADR 21: finish", () => {
+  it("atomically disables once when two finish batches compete", async () => {
+    const p = await person();
+    const [first, second] = await Promise.all([
+      finishOffboard(env.DB, p.id),
+      finishOffboard(env.DB, p.id),
+    ]);
+    expect([first[0]?.meta.changes, second[0]?.meta.changes].sort()).toEqual([0, 1]);
+    expect((first[1]?.meta.changes ?? 0) + (second[1]?.meta.changes ?? 0)).toBe(1);
+    const row = await env.DB.prepare("SELECT status FROM identity WHERE id = ?")
+      .bind(p.id)
+      .first<{ status: string }>();
+    expect(row?.status).toBe("disabled");
+  });
+
   it("is refused while the person owns an active app, but a disabled app does not block", async () => {
     const adm = await admin("pk-own-adm");
     const p = await person();
