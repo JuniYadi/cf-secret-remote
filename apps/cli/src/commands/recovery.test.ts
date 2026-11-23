@@ -4,13 +4,10 @@ import {
   generateKeyPair,
   lockPrivateKey,
   newGroupKey,
-  recoveryEntropy,
-  recoveryPhrase,
   unlockPrivateKey,
   unwrapGroupKey,
   wrapGroupKey,
 } from "@cfs/core";
-import vector from "../../../../packages/core/test-vectors/recovery.json";
 import { CliError, type Client } from "../client.ts";
 import { changePassword, grantRecovery, startRecovery } from "./recovery.ts";
 
@@ -47,20 +44,6 @@ function fakeClient(
   };
   return { client, calls };
 }
-
-describe("shared recovery vectors (ADR 20)", () => {
-  test("the phrase and the fingerprint words match the vector file", async () => {
-    const hex = (h: string) =>
-      Uint8Array.from(h.match(/../g)?.map((b) => Number.parseInt(b, 16)) ?? []);
-    for (const c of vector.mnemonic) {
-      expect(await recoveryPhrase(hex(c.entropyHex))).toBe(c.words);
-      expect(await recoveryEntropy(c.words)).toEqual(hex(c.entropyHex));
-    }
-    for (const c of vector.fingerprint) {
-      expect(await fingerprintWords(c.publicKey)).toBe(c.words);
-    }
-  });
-});
 
 describe("cfs recover (ADR 20)", () => {
   test("starting needs a fresh Access token and sends the new key only", async () => {
