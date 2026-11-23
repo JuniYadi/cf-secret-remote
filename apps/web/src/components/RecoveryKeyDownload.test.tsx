@@ -22,7 +22,9 @@ it("downloads the recovery key in a text file and revokes its URL", async () => 
     "URL",
     Object.assign(class extends URL {}, { createObjectURL: create, revokeObjectURL: revoke }),
   );
-  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+    this: HTMLAnchorElement,
+  ) {
     expect(this.download).toMatch(/^cfs-recovery-key-\d{4}-\d{2}-\d{2}\.txt$/);
     expect(this.href).toBe("blob:recovery");
   });
