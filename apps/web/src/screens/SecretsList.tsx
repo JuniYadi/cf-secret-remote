@@ -168,6 +168,7 @@ export function SecretsListPage() {
                     <th scope="col">{t("Items", "Isi")}</th>
                     <th scope="col">{t("Group", "Grup")}</th>
                     <th scope="col">{t("Updated", "Diubah")}</th>
+                    <th scope="col">{t("Last opened by", "Terakhir dibuka oleh")}</th>
                     <th scope="col">{t("Owner and rotation", "Pemilik dan rotasi")}</th>
                   </tr>
                 </thead>
@@ -186,6 +187,11 @@ export function SecretsListPage() {
                           <Pill tone="acc">{groupOf(s.path)}</Pill>
                         </td>
                         <td>{relativeTime(s.updatedAt, now, lang)}</td>
+                        <td>
+                          {s.lastOpenedBy && s.lastOpenedAt
+                            ? `${s.lastOpenedBy}, ${relativeTime(s.lastOpenedAt, now, lang)}`
+                            : "-"}
+                        </td>
                         <td class="badges">
                           {s.meta.owner && (
                             <Pill>
