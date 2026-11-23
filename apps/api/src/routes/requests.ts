@@ -2,6 +2,19 @@ import { type Context, Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
 import { prefixOf, validPath } from "../policy.ts";
+import {
+  approveRequest,
+  cancelRequest,
+  createRequest,
+  denyRequest,
+  findApprovalGroup,
+  findApprovalMembership,
+  findRequester,
+  findRequestGroup,
+  listRequests,
+  loadRequest,
+  type RequestRow,
+} from "../repository/requests.ts";
 import { notifyAccessRequest } from "../requests-notify.ts";
 import { REQUEST_TTL } from "../requests-sweep.ts";
 import type { AppEnv } from "../types.ts";
@@ -13,36 +26,7 @@ import { newId, now } from "../util.ts";
 /** Longest grant, in seconds (24 h). The admin setting from ADR 16 is not built yet, so this is fixed. */
 export const MAX_DURATION = 86400;
 const MAX_REASON = 500;
-const LIST_LIMIT = 200;
 const STATUSES = ["pending", "approved", "denied", "cancelled", "expired"] as const;
-type Status = (typeof STATUSES)[number];
-
-/** The caller can read the request: an admin, or the requester. */
-const RequestCols = `SELECT r.id, r.requester_id AS requesterId, q.name AS requester,
-  r.path_glob AS path, r.group_prefix AS groupPrefix, r.reason, r.duration,
-  r.rekey_after AS rekeyAfter, r.status, a.name AS approver, r.created_at AS createdAt,
-  r.decided_at AS decidedAt, r.expires_at AS expiresAt
-  FROM access_request r JOIN identity q ON q.id = r.requester_id
-  LEFT JOIN identity a ON a.id = r.approver_id`;
-
-interface RequestRow {
-  id: string;
-  requesterId: string;
-  requester: string;
-  path: string;
-  groupPrefix: string;
-  reason: string;
-  duration: number;
-  rekeyAfter: number;
-  status: Status;
-  approver: string | null;
-  createdAt: number;
-  decidedAt: number | null;
-  expiresAt: number | null;
-}
-
-const loadRequest = (db: D1Database, id: string) =>
-  db.prepare(`${RequestCols} WHERE r.id = ?`).bind(id).first<RequestRow>();
 
 /** The view sent to clients. `rekeyAfter` is a flag for the client; the server does not rotate. */
 const view = (r: RequestRow) => ({ ...r, rekeyAfter: r.rekeyAfter === 1 });
@@ -84,20 +68,21 @@ requests.post("/requests", async (c) => {
     return c.json({ error: "rekeyAfter must be true or false" }, 400);
 
   const prefix = prefixOf(b.path);
-  const group = await db
-    .prepare("SELECT id FROM keyring WHERE prefix = ? AND personal_owner IS NULL")
-    .bind(prefix)
-    .first<{ id: string }>();
+  const group = await findRequestGroup(db, prefix);
   if (!group) return c.json({ error: "no such group" }, 404);
 
   const id = newId();
-  await db
-    .prepare(
-      `INSERT INTO access_request (id, requester_id, path_glob, group_prefix, reason, duration,
-         rekey_after, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-    )
-    .bind(id, who.id, b.path, prefix, b.reason, b.duration, b.rekeyAfter === true ? 1 : 0, now())
-    .run();
+  await createRequest(
+    db,
+    id,
+    who.id,
+    b.path,
+    prefix,
+    b.reason,
+    b.duration,
+    b.rekeyAfter === true ? 1 : 0,
+    now(),
+  );
   await audit(db, {
     who: who.name,
     action: "request.create",
@@ -124,21 +109,7 @@ requests.get("/requests", async (c) => {
   const status = c.req.query("status");
   if (status !== undefined && !(STATUSES as readonly string[]).includes(status))
     return c.json({ error: "bad status" }, 400);
-  const where: string[] = [];
-  const binds: unknown[] = [];
-  if (who.role !== "admin") {
-    where.push("r.requester_id = ?");
-    binds.push(who.id);
-  }
-  if (status) {
-    where.push("r.status = ?");
-    binds.push(status);
-  }
-  const sql = `${RequestCols}${where.length ? ` WHERE ${where.join(" AND ")}` : ""}
-    ORDER BY r.created_at DESC LIMIT ${LIST_LIMIT}`;
-  const rows = await c.env.DB.prepare(sql)
-    .bind(...binds)
-    .all<RequestRow>();
+  const rows = await listRequests(c.env.DB, who.role, who.id, status);
   return c.json(rows.results.map(view));
 });
 
@@ -178,12 +149,7 @@ requests.post("/requests/:id/cancel", async (c) => {
   }
   if (row.status !== "pending") return c.json({ error: `already ${row.status}` }, 409);
   if (overdue(row, now())) return c.json({ error: "request has expired" }, 409);
-  const done = await db
-    .prepare(
-      "UPDATE access_request SET status = 'cancelled', decided_at = ? WHERE id = ? AND status = 'pending'",
-    )
-    .bind(now(), row.id)
-    .run();
+  const done = await cancelRequest(db, now(), row.id);
   if (done.meta.changes !== 1) return c.json({ error: "already decided, reload" }, 409);
   await audit(db, {
     who: who.name,
@@ -208,12 +174,7 @@ requests.post("/requests/:id/deny", requireAdmin, async (c) => {
   if (row.status !== "pending") return c.json({ error: `already ${row.status}` }, 409);
   if (overdue(row, now())) return c.json({ error: "request has expired" }, 409);
   const t = now();
-  const done = await db
-    .prepare(
-      "UPDATE access_request SET status = 'denied', approver_id = ?, decided_at = ? WHERE id = ? AND status = 'pending'",
-    )
-    .bind(who.id, t, row.id)
-    .run();
+  const done = await denyRequest(db, who.id, t, row.id);
   if (done.meta.changes !== 1) return c.json({ error: "already decided, reload" }, 409);
   await audit(db, {
     who: who.name,
@@ -256,22 +217,13 @@ requests.post("/requests/:id/approve", requireAdmin, async (c) => {
   const t = now();
   if (overdue(row, t)) return c.json({ error: "request has expired" }, 409);
 
-  const group = await db
-    .prepare("SELECT id, version, status FROM keyring WHERE prefix = ? AND personal_owner IS NULL")
-    .bind(row.groupPrefix)
-    .first<{ id: string; version: number; status: string }>();
+  const group = await findApprovalGroup(db, row.groupPrefix);
   if (!group) return c.json({ error: "no such group" }, 404);
   if (group.status !== "active")
     return c.json({ error: "group is rotating, try again later" }, 409);
 
   // The approver must hold the group key at the current version, and that grant must not have lapsed.
-  const mine = await db
-    .prepare(
-      `SELECT 1 AS ok FROM keyring_member WHERE keyring_id = ? AND identity_id = ? AND version = ?
-       AND (expires_at IS NULL OR expires_at > ?)`,
-    )
-    .bind(group.id, who.id, group.version, t)
-    .first();
+  const mine = await findApprovalMembership(db, group.id, who.id, group.version, t);
   if (!mine) {
     await audit(db, {
       who: who.name,
@@ -286,49 +238,14 @@ requests.post("/requests/:id/approve", requireAdmin, async (c) => {
   if (b.version !== group.version)
     return c.json({ error: "group key changed, reload and retry" }, 409);
 
-  const requester = await db
-    .prepare("SELECT status FROM identity WHERE id = ?")
-    .bind(row.requesterId)
-    .first<{ status: string }>();
+  const requester = await findRequester(db, row.requesterId);
   if (requester?.status !== "active") return c.json({ error: "requester is disabled" }, 409);
 
   const expiresAt = t + row.duration;
   const policyId = newId();
   // Every statement after the first is guarded by the request now being approved by this approver.
   // The batch is one transaction, so a grant is never written without the approval, or the reverse.
-  const guard = `EXISTS (SELECT 1 FROM access_request WHERE id = ? AND status = 'approved' AND approver_id = ? AND decided_at = ?)`;
-  const guardBinds = [row.id, who.id, t];
-  const rules = JSON.stringify([{ path: row.path, caps: ["read", "list"] }]);
-  const results = await db.batch([
-    db
-      .prepare(
-        `UPDATE access_request SET status = 'approved', approver_id = ?, decided_at = ?, expires_at = ?
-         WHERE id = ? AND status = 'pending'
-         AND EXISTS (SELECT 1 FROM keyring WHERE id = ? AND version = ? AND status = 'active')`,
-      )
-      .bind(who.id, t, expiresAt, row.id, group.id, group.version),
-    db
-      .prepare(`INSERT INTO policy (id, name, rules) SELECT ?, ?, ? WHERE ${guard}`)
-      .bind(policyId, `request:${row.id}`, rules, ...guardBinds),
-    db
-      .prepare(
-        `INSERT INTO identity_policy (identity_id, policy_id, expires_at) SELECT ?, ?, ? WHERE ${guard}`,
-      )
-      .bind(row.requesterId, policyId, expiresAt, ...guardBinds),
-    // A permanent membership is left alone. A lapsed or missing one is replaced by the time-boxed key.
-    db
-      .prepare(
-        `INSERT OR IGNORE INTO keyring_member (keyring_id, identity_id, version, wrapped_key, expires_at)
-         SELECT ?, ?, ?, ?, ? WHERE ${guard}`,
-      )
-      .bind(group.id, row.requesterId, group.version, wrappedKey, expiresAt, ...guardBinds),
-    db
-      .prepare(
-        `UPDATE keyring_member SET wrapped_key = ?, expires_at = ?
-         WHERE keyring_id = ? AND identity_id = ? AND version = ? AND expires_at IS NOT NULL AND ${guard}`,
-      )
-      .bind(wrappedKey, expiresAt, group.id, row.requesterId, group.version, ...guardBinds),
-  ]);
+  const results = await approveRequest(db, row, who.id, t, expiresAt, policyId, group, wrappedKey);
   const applied = results[0]?.meta.changes === 1;
   const after = await loadRequest(db, row.id);
   if (!applied || after?.status !== "approved" || after.approver !== who.name)
