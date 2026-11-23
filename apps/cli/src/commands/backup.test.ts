@@ -10,6 +10,7 @@ import {
   checkBackup,
   formatCheck,
   passphraseFromEnv,
+  RESUME_HINT,
   restoreBackup,
   saveBackup,
 } from "./backup.ts";
@@ -179,5 +180,45 @@ describe("ADR 23: passphrase seal, shared vector", () => {
     const hex = (s: string) => Uint8Array.from(s.match(/../g) ?? [], (h) => Number.parseInt(h, 16));
     const plain = await openBackup(hex(vector.sealed), vector.passphrase);
     expect(new TextDecoder().decode(plain)).toBe(vector.plaintext);
+  });
+});
+
+describe("ADR 23: restore failing part way", () => {
+  const confirm = async (c: CheckReport) => c.host;
+
+  it("tells the admin maintenance is still on and to rerun with the same file", async () => {
+    const { client } = fakeClient({ "/restore": 500 });
+    const err = await restoreBackup(client, new Uint8Array([1]), { confirm }).catch((e) => e);
+    expect(err).toBeInstanceOf(CliError);
+    expect(err.message).toContain("Restore failed");
+    expect(err.message).toContain("maintenance mode");
+    expect(err.message).toContain("same `cfs restore` command");
+    expect(err.message).toContain("must exist in the backup file");
+    expect(err.message).toContain(RESUME_HINT);
+  });
+
+  it("gives the same hint when the connection drops after the restore started", async () => {
+    const { client } = fakeClient();
+    client.send = async (_m: string, path: string) => {
+      if (path === "/restore/check") return { status: 200, body: REPORT } as never;
+      throw new CliError("Cannot reach https://cfs.example.com. Check the host and your network.");
+    };
+    const err = await restoreBackup(client, new Uint8Array([1]), { confirm }).catch((e) => e);
+    expect(err.message).toContain("Cannot reach");
+    expect(err.message).toContain(RESUME_HINT);
+  });
+
+  it("says a previous restore did not finish when the server is already in maintenance", async () => {
+    const { client, calls } = fakeClient({ "/restore/check": 503 });
+    const err = await restoreBackup(client, new Uint8Array([1]), { confirm }).catch((e) => e);
+    expect(err.message).toContain("previous restore did not finish");
+    expect(err.message).toContain("Run `cfs restore` again");
+    expect(calls.some((c) => c.path === "/restore")).toBe(false);
+  });
+
+  it("does not add the hint to refusals that happen before the restore starts", async () => {
+    const { client } = fakeClient({ "/restore": 403 });
+    const err = await restoreBackup(client, new Uint8Array([1]), { confirm }).catch((e) => e);
+    expect(err.message).not.toContain("maintenance");
   });
 });

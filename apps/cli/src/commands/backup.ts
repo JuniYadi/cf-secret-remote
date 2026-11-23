@@ -51,6 +51,18 @@ export async function saveBackup(
   return { file: opts.out, bytes: r.bytes.length, sealed: Boolean(opts.passphrase) };
 }
 
+/** ADR 23: restore is not one transaction. After a failure the server stays in maintenance until a restore finishes. */
+export const RESUME_HINT = [
+  "The server is still in maintenance mode, so writes are blocked.",
+  "Run the same `cfs restore` command again with the same file to finish it.",
+  "The admin who restores must exist in the backup file, or the sign-in after the restore will not work.",
+].join(" ");
+
+const MAINTENANCE_AT_START =
+  "The server is in maintenance mode. A previous restore did not finish. " +
+  "Run `cfs restore` again with the same backup file to resume it. " +
+  "The admin who restores must exist in that file.";
+
 const iso = (t: number) => new Date(t * 1000).toISOString();
 
 /** Plain-text summary of a check. Shown before anything is restored. */
@@ -91,6 +103,7 @@ export async function checkBackup(
     headersFor(passphrase),
   );
   if (r.status === 403) throw new CliError("Only admins can restore a backup.");
+  if (r.status === 503) throw new CliError(MAINTENANCE_AT_START);
   if (r.status !== 200) throw new CliError(`The backup was refused: ${r.body.error ?? r.status}`);
   return r.body;
 }
@@ -108,12 +121,21 @@ export async function restoreBackup(
   const typed = await opts.confirm(check);
   if (typed !== check.host)
     throw new CliError("The host name does not match. Nothing was changed.");
-  const r = await c.send<{ ok?: boolean; restoredAt?: number; error?: string }>(
-    "POST",
-    "/restore",
-    { file: toBase64(bytes), confirmHost: typed },
-    headersFor(opts.passphrase),
-  );
+  let r: Awaited<ReturnType<typeof c.send<{ ok?: boolean; restoredAt?: number; error?: string }>>>;
+  try {
+    r = await c.send<{ ok?: boolean; restoredAt?: number; error?: string }>(
+      "POST",
+      "/restore",
+      { file: toBase64(bytes), confirmHost: typed },
+      headersFor(opts.passphrase),
+    );
+  } catch (e) {
+    // The request may have reached the server and started the restore, so assume maintenance is on.
+    throw new CliError(`${e instanceof Error ? e.message : String(e)} ${RESUME_HINT}`);
+  }
+  if (r.status === 503) throw new CliError(MAINTENANCE_AT_START);
+  if (r.status >= 500)
+    throw new CliError(`Restore failed: ${r.body.error ?? `status ${r.status}`}. ${RESUME_HINT}`);
   if (r.status !== 200)
     throw new CliError(`Restore failed: ${r.body.error ?? `status ${r.status}`}`);
   return { restoredAt: r.body.restoredAt ?? 0 };
