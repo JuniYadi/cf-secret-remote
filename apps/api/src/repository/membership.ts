@@ -103,8 +103,10 @@ export async function startRotation(
 ) {
   const started = await db.batch([
     db
-      .prepare("UPDATE keyring SET status = 'rotating' WHERE id = ? AND status = 'active'")
-      .bind(groupId),
+      .prepare(
+        "UPDATE keyring SET status = 'rotating' WHERE id = ? AND status = 'active' AND version = ?",
+      )
+      .bind(groupId, next - 1),
     ...members.map((m) =>
       db
         .prepare(
