@@ -126,6 +126,28 @@ export async function runOffboard(
     if (!ok) throw new CliError("Cancelled. Nothing was changed.");
   }
 
+  const missing: string[] = [];
+  for (const prefix of plan.groups) {
+    const key = await c.call("GET", `/keyrings/${encodeURIComponent(prefix)}/key`);
+    if (key.status === 404) {
+      const members = await c.call<{ name: string; role: string; status: string }[]>(
+        "GET",
+        `/keyrings/${encodeURIComponent(prefix)}/members`,
+      );
+      if (members.status !== 200)
+        throw new CliError(`Could not list "${prefix}": ${errorOf(members.body, members.status)}`);
+      const admins = members.body
+        .filter((m) => m.role === "admin" && m.status === "active" && m.name !== email)
+        .map((m) => m.name);
+      missing.push(`${prefix}: ${admins.join(", ") || "no other active admin found"}`);
+    } else if (key.status !== 200)
+      throw new CliError(`Could not check "${prefix}": ${errorOf(key.body, key.status)}`);
+  }
+  if (missing.length)
+    throw new CliError(
+      `You lack group keys. Ask another admin holding each key to offboard this person, then rerun:\n${missing.join("\n")}`,
+    );
+
   for (const prefix of plan.groups) {
     await removeMember(c, prefix, email);
     io.log(`Removed ${email} from "${prefix}" (key rotated).`);

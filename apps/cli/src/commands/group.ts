@@ -138,8 +138,6 @@ export async function removeMember(
   const mine = await myGroupKey(c, prefix);
   const target = await identityByEmail(c, email.toLowerCase());
   const members = await groupMembers(c, prefix);
-  if (!members.some((m) => m.identityId === target.id))
-    throw new CliError(`${email} is not in the "${prefix}" group.`);
 
   // Wrap the new key for everyone who stays, before anything changes on the server.
   const keys = new Map((await directory(c)).map((i) => [i.id, i.publicKey]));
@@ -224,6 +222,12 @@ export async function removeMember(
   return { count, newVersion };
 }
 
+export async function abortRotation(c: Client, prefix: string) {
+  const r = await c.call("POST", `/keyrings/${encodeURIComponent(prefix)}/rotate/abort`, {});
+  if (r.status !== 200)
+    throw new CliError(`Could not abort rotation: ${errorOf(r.body, r.status)}`);
+}
+
 async function groupRemove(prefix: string, email: string) {
   const c = await connect();
   const { count, newVersion } = await removeMember(c, prefix, email);
@@ -247,17 +251,23 @@ const USAGE = [
   "Usage: cfs group create <name> [--member <email> ...]",
   "       cfs group add-member <name> <email>",
   "       cfs group remove-member <name> <email>",
+  "       cfs group abort-rotation <name>  (then rerun remove-member to resume)",
   "       cfs group list [<name>]",
 ].join("\n");
 
 export const group: Commands = {
   group: {
-    help: "cfs group create|add-member|remove-member|list ...",
+    help: "cfs group create|add-member|remove-member|abort-rotation|list ...",
     run: async (a) => {
       const sub = a.shift();
       if (sub === "create") return groupCreate(a);
       if (sub === "add-member" && a[0] && a[1]) return groupAdd(a[0], a[1]);
       if (sub === "remove-member" && a[0] && a[1]) return groupRemove(a[0], a[1]);
+      if (sub === "abort-rotation" && a.length === 1 && a[0]) {
+        await abortRotation(await connect(), a[0]);
+        console.log(`Rotation aborted for "${a[0]}". Rerun remove-member to resume removal.`);
+        return;
+      }
       if (sub === "list") return groupList(a[0]);
       throw new CliError(USAGE);
     },

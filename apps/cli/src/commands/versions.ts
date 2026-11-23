@@ -192,6 +192,16 @@ export const versions: Commands = {
       console.log(`Restored v${n} of ${path} as version ${nv}.`);
     },
   },
+  "restore-delete": {
+    help: "cfs restore-delete <secret>             restore a recently deleted secret (admin)",
+    run: async (a, h) => {
+      if (a.length !== 1 || !a[0]) throw usage("cfs restore-delete <secret>");
+      const path = a[0];
+      const c = await connect(h);
+      await restoreDeleted(c, path);
+      console.log(`Restored deleted secret ${path}.`);
+    },
+  },
   import: {
     help: "cfs import <secret> <file> [--format env|json] [--merge add|overwrite|replace] [--yes]",
     run: async (a, h) => {
@@ -269,3 +279,13 @@ export const versions: Commands = {
     },
   },
 };
+
+export async function restoreDeleted(c: Client, path: string) {
+  const r = await c.call<{ error?: string }>(
+    "POST",
+    `/secret/restore-delete?path=${encodeURIComponent(path)}`,
+    {},
+  );
+  if (r.status !== 200)
+    throw new CliError(`Could not restore ${path}: ${r.body?.error ?? `status ${r.status}`}`);
+}

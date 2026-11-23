@@ -143,7 +143,14 @@ function serve(w: World) {
     if (method === "GET" && membersM) {
       const g = w.groups[membersM[1] as string];
       if (!g) return { status: 404, body: { error: "no such group" } };
-      return ok(g.members.map((id) => ({ identityId: id, name: NAMES[id] })));
+      return ok(
+        g.members.map((id) => ({
+          identityId: id,
+          name: NAMES[id],
+          role: id === "keep" || id === "adm" ? "admin" : "member",
+          status: w.people[id],
+        })),
+      );
     }
     if (method === "POST" && rotateM) {
       const g = w.groups[rotateM[1] as string];
@@ -238,6 +245,15 @@ function io(answer = true) {
 const posts = (w: World) => w.calls.filter((c) => c.method === "POST");
 
 describe("ADR 21: offboard flow", () => {
+  test("lists other admins holding missing group keys before changing anything", async () => {
+    const { w, client } = await setup();
+    w.groups.pay!.members = ["tgt", "keep"];
+    await expect(runOffboard(client, "gone@x.test", { yes: true }, io().io)).rejects.toThrow(
+      "pay: keep@x.test",
+    );
+    expect(posts(w)).toHaveLength(0);
+  });
+
   test("removes from each group with the rotation, disables the app, finishes last, and returns the names report", async () => {
     const { w, client } = await setup();
     const { logs, io: ui } = io();
