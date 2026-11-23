@@ -6,6 +6,7 @@ import { now } from "./util.ts";
 
 export interface AuditEntry {
   who: string;
+  actor?: { id: string; kind: "user" | "app" };
   action: string; // e.g. secret.read, secret.write, login.ok, login.denied
   path?: string;
   version?: number;
@@ -15,13 +16,14 @@ export interface AuditEntry {
   purpose?: string;
 }
 
-export type AuditRow = AuditEntry & { at: number };
+export type AuditRow = Omit<AuditEntry, "actor"> & { at: number };
 
 /** Where a row sits in the chain: the database, the previous hash and the row's own hash. */
 export interface AuditRef {
   db: D1Database;
   prev: string;
   hash: string;
+  actor?: AuditEntry["actor"];
 }
 
 /** ADR 18 (alerts). Called after each successful append. Never throws or blocks: evaluation is scheduled in alerts.ts. */
@@ -40,7 +42,8 @@ export async function appendRow(
   entry: AuditEntry,
   at: number,
 ): Promise<{ row: AuditRow; hash: string; prev: string }> {
-  const row: AuditRow = { ...entry, at };
+  const { actor, ...hashedEntry } = entry;
+  const row: AuditRow = { ...hashedEntry, at };
   for (let attempt = 0; attempt < 5; attempt++) {
     const prev = await chainHead(db);
     const hash = await chainHash(prev, row);
@@ -52,6 +55,8 @@ export async function appendRow(
         prev,
         hash,
         entry.who,
+        actor?.id ?? null,
+        actor?.kind ?? null,
         dayOf(at),
         entry.action.startsWith("secret.read") ? 1 : 0,
       );
@@ -84,7 +89,7 @@ export async function audit(db: D1Database, entry: AuditEntry): Promise<void> {
       gap = null;
     }
     const written = await appendRow(db, entry, at);
-    notify(written.row, { db, prev: written.prev, hash: written.hash });
+    notify(written.row, { db, prev: written.prev, hash: written.hash, actor: entry.actor });
   } catch (e) {
     if (!isQuotaError(e)) throw e;
     if (!gap) gap = { from: at, missed: 0 };

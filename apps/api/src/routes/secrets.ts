@@ -32,6 +32,7 @@ export async function check(
   if (!ok)
     await audit(c.env.DB, {
       who: who.name,
+      actor: who,
       action: `secret.${cap}`,
       path,
       result: "denied",
@@ -133,6 +134,7 @@ secrets.get("/secret", async (c) => {
   if (await lapsedGrant(c.env.DB, who.id, prefixOf(path), now())) {
     await audit(c.env.DB, {
       who: who.name,
+      actor: who,
       action: "secret.read",
       path,
       result: "denied",
@@ -158,7 +160,8 @@ secrets.get("/secret", async (c) => {
   if (!row) return c.json({ error: "not found" }, 404);
   await audit(c.env.DB, {
     who: who.name,
-    action: "secret.read",
+    actor: who,
+    action: c.req.query("merge") === "1" ? "secret.merge_read" : "secret.read",
     path,
     version: row.version,
     result: "ok",
@@ -250,6 +253,7 @@ secrets.put("/secret", async (c) => {
   );
   await audit(c.env.DB, {
     who: who.name,
+    actor: who,
     action: "secret.write",
     path,
     version,
@@ -271,6 +275,7 @@ secrets.delete("/secret", async (c) => {
   if (!res.meta.changes) return c.json({ error: "not found" }, 404);
   await audit(c.env.DB, {
     who: c.get("who").name,
+    actor: c.get("who"),
     action: "secret.delete",
     path,
     result: "ok",

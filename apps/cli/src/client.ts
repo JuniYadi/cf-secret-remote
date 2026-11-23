@@ -194,9 +194,12 @@ interface SealedVersion {
 }
 
 /** Fetches one version (the current one if omitted). Each fetch is audited as an open (ADR 22). */
-async function fetchVersion(c: Client, path: string, version?: number) {
+async function fetchVersion(c: Client, path: string, version?: number, merge = false) {
   const q = version ? `&version=${version}` : "";
-  return c.call<SealedVersion>("GET", `/secret?path=${encodeURIComponent(path)}${q}`);
+  return c.call<SealedVersion>(
+    "GET",
+    `/secret?path=${encodeURIComponent(path)}${q}${merge ? "&merge=1" : ""}`,
+  );
 }
 
 export async function readSecret(
@@ -227,7 +230,7 @@ export async function saveVersion(
 ): Promise<number> {
   const prefix = path.split("/")[0] as string;
   const { key, version: keyringVersion } = await groupKey(c, prefix);
-  const probe = await fetchVersion(c, path);
+  const probe = await fetchVersion(c, path, undefined, true);
   let current: { values: Values; version: number } = { values: {}, version: 0 };
   if (probe.status === 200)
     current = {

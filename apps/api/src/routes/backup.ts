@@ -43,7 +43,7 @@ import { now, sha256Hex } from "../util.ts";
 // Values stay encrypted. Names, paths, emails and dates are in clear.
 
 /** The number of the latest migration. A file must match it to restore. */
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 /** Daily R2 copies kept (ADR 23). */
 export const R2_KEEP = 30;
@@ -361,6 +361,7 @@ backup.get("/backup", async (c) => {
   const total = BACKUP_TABLES.reduce((n, k) => n + f.tables[k].length, 0);
   await audit(c.env.DB, {
     who: c.get("who").name,
+    actor: c.get("who"),
     action: "backup.export",
     result: "ok",
     note: `schema ${SCHEMA_VERSION}, ${pass ? "sealed" : "plain"}, ${total} rows`,
@@ -429,6 +430,7 @@ backup.post("/restore", async (c) => {
     await endMaintenance(db);
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "restore",
       result: "ok",
       note: `schema ${f.schema}, file ${f.sha256.slice(0, 16)}, replaced audit up to seq ${before?.seq ?? 0}`,

@@ -60,6 +60,12 @@ approle.post("/auth/approle/login", async (c) => {
     await sha256Hex(token),
     at + r.token_ttl,
   );
-  await audit(c.env.DB, { who: r.name, action: "login.ok", result: "ok", ip });
+  await audit(c.env.DB, {
+    who: r.name,
+    actor: { id: r.identity_id, kind: "app" },
+    action: "login.ok",
+    result: "ok",
+    ip,
+  });
   return c.json({ token, expiresIn: r.token_ttl });
 });

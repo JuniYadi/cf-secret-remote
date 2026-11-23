@@ -72,6 +72,7 @@ recovery.post("/recovery/request", async (c) => {
   if (!fresh || who.kind !== "user") {
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "recovery.request",
       result: "denied",
       ip: ip(c),
@@ -98,6 +99,7 @@ recovery.post("/recovery/request", async (c) => {
   // RECOVERY_ACTION is the exact name the ADR 18 "recovery_requested" alert watches.
   await audit(db, {
     who: who.name,
+    actor: who,
     action: RECOVERY_ACTION,
     note: `request ${id}`,
     result: "ok",
@@ -154,6 +156,7 @@ recovery.post("/recovery/:id/grant", requireAdmin, async (c) => {
     const locked = after?.status === "locked";
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "recovery.grant",
       note: `request ${id}: wrong code, ${left} left`,
       result: "denied",
@@ -162,6 +165,7 @@ recovery.post("/recovery/:id/grant", requireAdmin, async (c) => {
     if (locked) {
       await audit(db, {
         who: who.name,
+        actor: who,
         action: "recovery.locked",
         note: `request ${id}`,
         result: "denied",
@@ -211,6 +215,7 @@ recovery.post("/recovery/:id/grant", requireAdmin, async (c) => {
     return c.json({ error: "request changed, reload and retry" }, 409);
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "recovery.grant",
     note: `request ${id} for ${r.name}: ${plan.length} group(s) re-wrapped`,
     result: "ok",
@@ -235,6 +240,7 @@ recovery.post("/recovery/:id/cancel", async (c) => {
   if ((await sha256Hex(b.token)) !== r.cancel_hash) {
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "recovery.cancel",
       note: `request ${id}`,
       result: "denied",
@@ -245,6 +251,7 @@ recovery.post("/recovery/:id/cancel", async (c) => {
   await cancelRecovery(db, id);
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "recovery.cancel",
     note: `request ${id}`,
     result: "ok",

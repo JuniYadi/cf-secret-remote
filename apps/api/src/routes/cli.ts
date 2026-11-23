@@ -72,6 +72,7 @@ cliPublic.post("/cli/poll", async (c) => {
   );
   await audit(c.env.DB, {
     who: row.name ?? row.identity_id,
+    actor: { id: row.identity_id, kind: "user" },
     action: "login.ok",
     note: `cli ${row.device}`,
     result: "ok",
@@ -124,7 +125,16 @@ cliApprove.post("/cli/approve", async (c) => {
   if (!res) return c.json({ error: "code not found or expired", attemptsLeft: left }, 404);
   await audit(c.env.DB, {
     who: who.name,
+    actor: who,
     action: "cli.approve",
+    result: "ok",
+    ip: c.req.header("CF-Connecting-IP"),
+  });
+  await audit(c.env.DB, {
+    who: who.name,
+    actor: who,
+    action: "login.ok",
+    note: "cli approval",
     result: "ok",
     ip: c.req.header("CF-Connecting-IP"),
   });

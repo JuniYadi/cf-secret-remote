@@ -118,6 +118,7 @@ offboard.post("/offboard/:id/apps/:appId/reassign", async (c) => {
   if (!res.meta.changes) return c.json({ error: "owner changed, reload and retry" }, 409);
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "app.reassign",
     note: `${app.name}: ${p.name} -> ${next.name}`,
     result: "ok",
@@ -140,6 +141,7 @@ offboard.post("/offboard/:id/finish", async (c) => {
   if (blockers.groups.length || blockers.apps.length || blockers.twoAdmins) {
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "offboard.finish",
       note: `${p.name} refused`,
       result: "denied",
@@ -166,10 +168,18 @@ offboard.post("/offboard/:id/finish", async (c) => {
 
   // Each step that changed something is audited, then the run itself (every run is audited).
   if (flipped)
-    await audit(db, { who: who.name, action: "identity.disable", note: p.name, result: "ok", ip });
+    await audit(db, {
+      who: who.name,
+      actor: who,
+      action: "identity.disable",
+      note: p.name,
+      result: "ok",
+      ip,
+    });
   if (ended)
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "offboard.sessions",
       note: `${p.name}: ${ended} session(s) ended`,
       result: "ok",
@@ -178,12 +188,20 @@ offboard.post("/offboard/:id/finish", async (c) => {
   if (removed)
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "offboard.policies",
       note: `${p.name}: ${removed} policy link(s) removed`,
       result: "ok",
       ip,
     });
-  await audit(db, { who: who.name, action: "offboard.finish", note: p.name, result: "ok", ip });
+  await audit(db, {
+    who: who.name,
+    actor: who,
+    action: "offboard.finish",
+    note: p.name,
+    result: "ok",
+    ip,
+  });
   return c.json({
     id: p.id,
     status: "disabled",

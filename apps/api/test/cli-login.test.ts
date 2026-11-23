@@ -1,3 +1,4 @@
+import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { admin, api } from "./helpers.ts";
 
@@ -15,6 +16,12 @@ describe("cli device login", () => {
     expect(
       (await api("POST", "/cli/approve", adm.token, { userCode: s.body.userCode })).status,
     ).toBe(200);
+    const login = await env.DB.prepare(
+      "SELECT identity_id, identity_kind FROM audit WHERE identity_id = ? AND action = ?",
+    )
+      .bind(adm.id, "login.ok")
+      .first();
+    expect(login).toEqual({ identity_id: adm.id, identity_kind: "user" });
     const p = await api("POST", "/cli/poll", null, { deviceCode: s.body.deviceCode });
     expect(p.status).toBe(200);
     expect(p.body.token).toMatch(/^cfs_/);

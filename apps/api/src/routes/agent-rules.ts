@@ -140,6 +140,7 @@ agent_rules.post("/apps/:id/rules", requireAdmin, async (c) => {
   await insertRule(db, app.id, alias, input);
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "agent_rule.create",
     path: input.secretPath,
     note: `app ${app.name}, alias ${alias}`,
@@ -187,6 +188,7 @@ agent_rules.put("/apps/:id/rules/:alias", requireAdmin, async (c) => {
   await updateRule(db, app.id, alias, input);
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "agent_rule.update",
     path: input.secretPath,
     note: `app ${app.name}, alias ${alias}`,
@@ -209,6 +211,7 @@ agent_rules.delete("/apps/:id/rules/:alias", requireAdmin, async (c) => {
   await deleteRule(db, app.id, alias);
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "agent_rule.delete",
     path: current.secretPath,
     note: `app ${app.name}, alias ${alias}`,

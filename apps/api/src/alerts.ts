@@ -263,13 +263,14 @@ async function detect(
 ): Promise<Hit[]> {
   const hits: Hit[] = [];
   const who = row.who;
+  const subject = ref.actor?.id ?? who;
   const where = row.path ? ` on ${row.path}` : "";
   const from = row.ip ? ` from ${row.ip}` : "";
 
   if (on("blocked") && row.result === "denied") {
     hits.push({
       rule: "blocked",
-      subject: `${who}|${row.action}|${row.path ?? ""}`,
+      subject: `${subject}|${row.action}|${row.path ?? ""}`,
       title: "Request blocked",
       detail: `${who} ${row.action}${where}${from}`,
     });
@@ -280,11 +281,11 @@ async function detect(
     row.action === "secret.read" &&
     row.result === "ok" &&
     row.path?.split("/").includes("prod") &&
-    (await repo.isApp(db, who))
+    (ref.actor ? ref.actor.kind === "app" : await repo.isApp(db, who))
   ) {
     hits.push({
       rule: "agent_prod_read",
-      subject: `${who}|${row.path}`,
+      subject: `${subject}|${row.path}`,
       title: "Agent read production secret",
       detail: `agent ${who} read ${row.path}${from}`,
     });
@@ -292,11 +293,18 @@ async function detect(
 
   if (on("new_network") && row.action === "login.ok" && row.ip) {
     const net = networkOf(row.ip);
-    const seen = await repo.networkCount(db, who, row.at, ref.hash, net.needle);
+    const seen = await repo.networkCount(
+      db,
+      who,
+      ref.actor?.id ?? null,
+      row.at,
+      ref.hash,
+      net.needle,
+    );
     if ((seen?.n ?? 0) === 0) {
       hits.push({
         rule: "new_network",
-        subject: `${who}|${net.label}`,
+        subject: `${subject}|${net.label}`,
         title: "Sign-in from a new network",
         detail: `${who} signed in from ${net.label} for the first time`,
       });
@@ -304,12 +312,18 @@ async function detect(
   }
 
   if (on("read_burst") && row.action.startsWith("secret.read")) {
-    const reads = await repo.readCount(db, who, row.at - BURST_WINDOW_SECONDS, row.at);
+    const reads = await repo.readCount(
+      db,
+      who,
+      ref.actor?.id ?? null,
+      row.at - BURST_WINDOW_SECONDS,
+      row.at,
+    );
     const n = reads?.n ?? 0;
     if (n > BURST_MAX) {
       hits.push({
         rule: "read_burst",
-        subject: who,
+        subject,
         title: "Read burst",
         detail: `${who} made ${n} secret reads in 5 minutes`,
       });
@@ -345,7 +359,7 @@ async function detect(
   if (on("recovery_requested") && row.action === RECOVERY_ACTION) {
     hits.push({
       rule: "recovery_requested",
-      subject: who,
+      subject,
       title: "Recovery requested",
       detail: `${who} requested recovery${from}`,
     });

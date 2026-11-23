@@ -3,24 +3,24 @@ import type { Who } from "../types.ts";
 export function historyRows(db: D1Database, path: string, since: number) {
   return db
     .prepare(
-      `SELECT at, json_extract(entry, '$.who') AS who, json_extract(entry, '$.version') AS version
+      `SELECT at, who, identity_id AS identityId, json_extract(entry, '$.version') AS version
        FROM audit
-       WHERE json_extract(entry, '$.action') = 'secret.read'
-         AND json_extract(entry, '$.path') = ?
+       WHERE action = 'secret.read'
+         AND path = ?
          AND json_extract(entry, '$.result') = 'ok'
          AND at >= ?
        ORDER BY at DESC, seq DESC`,
     )
     .bind(path, since)
-    .all<{ at: number; who: string; version: number }>();
+    .all<{ at: number; who: string; identityId: string | null; version: number }>();
 }
 
-export function historyIdentity(db: D1Database, name: string) {
+export function historyIdentity(db: D1Database, name: string, id: string | null) {
   return db
     .prepare(
-      "SELECT id, kind, name, role, status FROM identity WHERE name = ? ORDER BY kind LIMIT 1",
+      "SELECT id, kind, name, role, status FROM identity WHERE (id = ? OR (? IS NULL AND name = ?)) ORDER BY kind LIMIT 1",
     )
-    .bind(name)
+    .bind(id, id, name)
     .first<Who & { status: string }>();
 }
 

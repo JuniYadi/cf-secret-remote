@@ -231,6 +231,13 @@ describe("access history (ADR 22)", () => {
     const r = t.people.r as Person;
     expect((await api("GET", `/secret?path=${path}`, r.token)).status).toBe(200);
     expect((await api("GET", `/secret?path=${path}`, r.token)).status).toBe(200);
+    expect((await api("GET", `/secret?path=${path}&merge=1`, r.token)).status).toBe(200);
+    const merge = await env.DB.prepare(
+      "SELECT identity_id, identity_kind FROM audit WHERE action = ? AND path = ?",
+    )
+      .bind("secret.merge_read", path)
+      .first();
+    expect(merge).toEqual({ identity_id: r.id, identity_kind: "user" });
     // x has no policy: the attempt is denied and is not an open.
     expect((await api("GET", `/secret?path=${path}`, (t.people.x as Person).token)).status).toBe(
       403,

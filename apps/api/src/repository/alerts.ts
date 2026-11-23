@@ -64,6 +64,7 @@ export async function chainWindow(db: D1Database) {
 export async function networkCount(
   db: D1Database,
   who: string,
+  identityId: string | null,
   at: number,
   hash: string,
   needle: string,
@@ -71,21 +72,27 @@ export async function networkCount(
   const seen = await db
     .prepare(
       `SELECT COUNT(*) AS n FROM audit
-         WHERE who = ? AND at <= ? AND hash != ? AND instr(entry, ?) > 0
-           AND json_extract(entry, '$.action') = 'login.ok'`,
+         WHERE (identity_id = ? OR (identity_id IS NULL AND who = ?)) AND at <= ? AND hash != ? AND instr(entry, ?) > 0
+           AND action = 'login.ok'`,
     )
-    .bind(who, at, hash, needle)
+    .bind(identityId, who, at, hash, needle)
     .first<{ n: number }>();
   return seen;
 }
-export async function readCount(db: D1Database, who: string, from: number, at: number) {
+export async function readCount(
+  db: D1Database,
+  who: string,
+  identityId: string | null,
+  from: number,
+  at: number,
+) {
   const reads = await db
     .prepare(
       `SELECT COUNT(*) AS n FROM audit
-         WHERE who = ? AND at > ? AND at <= ?
-           AND json_extract(entry, '$.action') LIKE 'secret.read%'`,
+         WHERE (identity_id = ? OR (identity_id IS NULL AND who = ?)) AND at > ? AND at <= ?
+           AND action LIKE 'secret.read%'`,
     )
-    .bind(who, from, at)
+    .bind(identityId, who, from, at)
     .first<{ n: number }>();
   return reads;
 }

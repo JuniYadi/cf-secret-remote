@@ -108,7 +108,7 @@ export const COLUMNS: Record<BackupTable, readonly string[]> = {
     "created_by",
     "created_at",
   ],
-  audit: ["seq", "at", "entry", "prev", "hash", "who"],
+  audit: ["seq", "at", "entry", "prev", "hash", "who", "identity_id", "identity_kind"],
   access_request: [
     "id",
     "requester_id",

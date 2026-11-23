@@ -37,6 +37,7 @@ async function memberGate(
   if (!mine) {
     await audit(db, {
       who: who.name,
+      actor: who,
       action,
       path: prefix,
       result: "denied",
@@ -83,6 +84,7 @@ membership.post("/keyrings/:prefix/members", requireAdmin, async (c) => {
   }
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "group.member.add",
     path: prefix,
     version: g.version,
@@ -145,6 +147,7 @@ membership.post("/keyrings/:prefix/rotate/start", requireAdmin, async (c) => {
   const live = await membershipRepo.liveSecrets(db, g.id);
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "group.rotate.start",
     path: prefix,
     version: next,
@@ -267,6 +270,7 @@ membership.post("/keyrings/:prefix/rotate/chunk", requireAdmin, async (c) => {
   for (const s of secrets)
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "secret.rotate",
       path: s.path,
       version: s.version,
@@ -317,6 +321,7 @@ membership.post("/keyrings/:prefix/rotate/commit", requireAdmin, async (c) => {
     return c.json({ error: "group changed, reload and retry" }, 409);
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "group.rotate.commit",
     path: prefix,
     version: next,
@@ -342,6 +347,7 @@ membership.post("/keyrings/:prefix/rotate/abort", requireAdmin, async (c) => {
   }
   await audit(db, {
     who: who.name,
+    actor: who,
     action: "group.rotate.abort",
     path: prefix,
     version: g.version,
@@ -384,6 +390,7 @@ membership.patch("/identities/:id", requireAdmin, async (c) => {
   if (status !== t.status)
     await audit(db, {
       who: who.name,
+      actor: who,
       action: status === "disabled" ? "identity.disable" : "identity.enable",
       note: t.name,
       result: "ok",
@@ -392,6 +399,7 @@ membership.patch("/identities/:id", requireAdmin, async (c) => {
   if (role !== t.role)
     await audit(db, {
       who: who.name,
+      actor: who,
       action: "identity.role",
       note: `${t.name}: ${t.role} -> ${role}`,
       result: "ok",

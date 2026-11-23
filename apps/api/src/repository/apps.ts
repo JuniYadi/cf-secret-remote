@@ -66,13 +66,19 @@ export async function appSessions(db: D1Database, id: string, at: number) {
       .all<{ id: string; createdAt: number; expiresAt: number }>()
   ).results;
 }
-export async function appActivity(db: D1Database, name: string, roleId: string, limit: number) {
+export async function appActivity(
+  db: D1Database,
+  id: string,
+  name: string,
+  roleId: string,
+  limit: number,
+) {
   return (
     await db
       .prepare(
-        "SELECT entry FROM audit WHERE json_extract(entry, '$.who') IN (?, ?) ORDER BY seq DESC LIMIT ?",
+        "SELECT entry FROM audit WHERE identity_id = ? OR (identity_id IS NULL AND who IN (?, ?)) ORDER BY seq DESC LIMIT ?",
       )
-      .bind(name, `app:${roleId}`, limit)
+      .bind(id, name, `app:${roleId}`, limit)
       .all<{ entry: string }>()
   ).results;
 }

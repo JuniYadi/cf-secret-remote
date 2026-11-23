@@ -45,6 +45,7 @@ admin.post("/policies", async (c) => {
   }
   await audit(c.env.DB, {
     who: c.get("who").name,
+    actor: c.get("who"),
     action: "policy.create",
     note: b.name,
     result: "ok",
@@ -58,6 +59,7 @@ admin.post("/policies/:id/assign", async (c) => {
   await repo.assignPolicy(c.env.DB, b.identityId, c.req.param("id"), b.expiresAt ?? null);
   await audit(c.env.DB, {
     who: c.get("who").name,
+    actor: c.get("who"),
     action: "policy.assign",
     note: `${c.req.param("id")} -> ${b.identityId}`,
     result: "ok",
@@ -96,7 +98,7 @@ function auditFilter(q: Record<string, string>): AuditFilter {
   const action = text("action");
   if (action !== undefined) {
     if (action.length > AUDIT_TEXT_MAX) return { error: "action is too long" };
-    where.push("json_extract(entry, '$.action') = ?");
+    where.push("action = ?");
     binds.push(action);
   }
   const path = text("path");
@@ -104,10 +106,10 @@ function auditFilter(q: Record<string, string>): AuditFilter {
     if (path.length > AUDIT_TEXT_MAX) return { error: "path is too long" };
     if (path.endsWith("*")) {
       const prefix = path.slice(0, -1);
-      where.push("substr(json_extract(entry, '$.path'), 1, length(?)) = ?");
+      where.push("substr(path, 1, length(?)) = ?");
       binds.push(prefix, prefix);
     } else {
-      where.push("json_extract(entry, '$.path') = ?");
+      where.push("path = ?");
       binds.push(path);
     }
   }
@@ -213,6 +215,7 @@ admin.get("/audit/export.csv", async (c) => {
   }
   await audit(c.env.DB, {
     who: c.get("who").name,
+    actor: c.get("who"),
     action: "audit.export",
     result: "ok",
     note: `${rows.length} rows`,

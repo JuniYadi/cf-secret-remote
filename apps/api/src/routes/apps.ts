@@ -90,7 +90,13 @@ apps.post("/apps", async (c) => {
   } catch {
     return c.json({ error: "name already used" }, 409);
   }
-  await audit(c.env.DB, { who: who.name, action: "app.create", note: name, result: "ok" });
+  await audit(c.env.DB, {
+    who: who.name,
+    actor: who,
+    action: "app.create",
+    note: name,
+    result: "ok",
+  });
   return c.json({ id, roleId, secretId }, 201);
 });
 
@@ -105,7 +111,7 @@ apps.get("/apps/:id", async (c) => {
   if (!row) return c.json({ error: "not found" }, 404);
   const sessions = await appSessions(db, row.id, now());
   // Activity is the audit trail of this app: its own events, and refused logins under its role_id.
-  const activity = await appActivity(db, row.name, row.roleId, SHOWN_ACTIVITY);
+  const activity = await appActivity(db, row.id, row.name, row.roleId, SHOWN_ACTIVITY);
   return c.json({
     ...view(row),
     sessions,
@@ -135,7 +141,13 @@ apps.post("/apps/:id/rotate", async (c) => {
   if (!row) return c.json({ error: "not found" }, 404);
   const secretId = newToken("cfssid");
   await rotateApp(c.env.DB, await sha256Hex(secretId), row.id);
-  await audit(c.env.DB, { who: who.name, action: "app.rotate", note: row.name, result: "ok" });
+  await audit(c.env.DB, {
+    who: who.name,
+    actor: who,
+    action: "app.rotate",
+    note: row.name,
+    result: "ok",
+  });
   return c.json({ roleId: row.roleId, secretId });
 });
 
@@ -145,6 +157,12 @@ apps.post("/apps/:id/disable", async (c) => {
   const row = await findApp(c.env.DB, c.req.param("id"));
   if (!row) return c.json({ error: "not found" }, 404);
   await disableApp(c.env.DB, row.id);
-  await audit(c.env.DB, { who: who.name, action: "app.disable", note: row.name, result: "ok" });
+  await audit(c.env.DB, {
+    who: who.name,
+    actor: who,
+    action: "app.disable",
+    note: row.name,
+    result: "ok",
+  });
   return c.json({ ok: true });
 });
