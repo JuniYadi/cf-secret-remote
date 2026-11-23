@@ -33,5 +33,7 @@ it("downloads the recovery key in a text file and revokes its URL", async () => 
   expect(blob.type).toBe("text/plain");
   expect(await blob.text()).toContain(phrase);
   expect(await blob.text()).toContain("keep these words safe");
+  expect(revoke).not.toHaveBeenCalled();
+  await new Promise((r) => setTimeout(r, 0));
   expect(revoke).toHaveBeenCalledWith("blob:recovery");
 });

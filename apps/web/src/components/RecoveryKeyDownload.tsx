@@ -19,7 +19,8 @@ export function RecoveryKeyDownload({ phrase }: { phrase: string | null }) {
       link.click();
     } finally {
       link.remove();
-      URL.revokeObjectURL(url);
+      // Revoking in the same task can cancel the download in some browsers (Safari).
+      setTimeout(() => URL.revokeObjectURL(url), 0);
     }
   }
 
