@@ -1,4 +1,4 @@
-import { isPrivateKeyLock, isRecoveryLockedKey } from "@cfs/core";
+import { ConflictCode, isPrivateKeyLock, isRecoveryLockedKey } from "@cfs/core";
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import { LAST_USED_EVERY } from "../auth.ts";
@@ -43,7 +43,8 @@ me.post("/vault", async (c) => {
   const b = await c.req.json<{ publicKey?: string; lockedKey?: string }>();
   if (!b.publicKey || !isPrivateKeyLock(b.lockedKey)) return c.json({ error: "bad request" }, 400);
   const res = await setupVault(c.env.DB, who.id, b.publicKey, b.lockedKey);
-  if (!res.meta.changes) return c.json({ error: "vault already set up" }, 409);
+  if (!res.meta.changes)
+    return c.json({ error: "vault already set up", code: ConflictCode.vault_already_setup }, 409);
   return c.json({ ok: true });
 });
 
@@ -57,7 +58,8 @@ me.put("/me/vault", async (c) => {
     .catch(() => ({}) as { lockedKey?: unknown });
   if (!isPrivateKeyLock(b.lockedKey)) return c.json({ error: "bad request" }, 400);
   const res = await updateVaultLock(c.env.DB, who.id, b.lockedKey);
-  if (!res.meta.changes) return c.json({ error: "set up your vault first" }, 409);
+  if (!res.meta.changes)
+    return c.json({ error: "set up your vault first", code: ConflictCode.vault_required }, 409);
   await audit(c.env.DB, {
     who: who.name,
     actor: who,
@@ -81,7 +83,8 @@ me.put("/me/recovery", async (c) => {
     .catch(() => ({}) as { lockedKey?: unknown });
   if (!isRecoveryLockedKey(b.lockedKey)) return c.json({ error: "bad request" }, 400);
   const res = await updateRecoveryLock(c.env.DB, who.id, b.lockedKey);
-  if (!res.meta.changes) return c.json({ error: "set up your vault first" }, 409);
+  if (!res.meta.changes)
+    return c.json({ error: "set up your vault first", code: ConflictCode.vault_required }, 409);
   await audit(c.env.DB, {
     who: who.name,
     actor: who,

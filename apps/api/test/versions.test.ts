@@ -194,7 +194,12 @@ describe("restore writes a new version (ADR 22)", () => {
     await save(t.adm.token, t.gk, path, { A: "1" });
     await save(t.adm.token, t.gk, path, { A: "2" });
     const before = (await versionRows(path)).results;
-    expect((await save(t.adm.token, t.gk, path, { A: "evil" }, { version: 1 })).status).toBe(409);
+    const stale = await save(t.adm.token, t.gk, path, { A: "evil" }, { version: 1 });
+    expect(stale.status).toBe(409);
+    expect(stale.body).toMatchObject({
+      code: "version_conflict",
+      error: "version changed, reload and retry",
+    });
     expect((await save(t.adm.token, t.gk, path, { A: "skip" }, { version: 5 })).status).toBe(409);
     expect((await versionRows(path)).results).toEqual(before);
   });
@@ -444,7 +449,9 @@ describe("soft delete and restore (ADR 22)", () => {
     await save(t.adm.token, t.gk, path, { A: "1" });
     expect((await api("DELETE", `/secret?path=${path}`, t.adm.token)).status).toBe(200);
     expect((await api("GET", `/secret?path=${path}`, t.adm.token)).status).toBe(404);
-    expect((await save(t.adm.token, t.gk, path, { A: "2" })).status).toBe(409);
+    const deleted = await save(t.adm.token, t.gk, path, { A: "2" });
+    expect(deleted.status).toBe(409);
+    expect(deleted.body).toMatchObject({ code: "secret_deleted" });
 
     expect(
       (await api("POST", `/secret/restore-delete?path=${path}`, (t.people.m as Person).token))

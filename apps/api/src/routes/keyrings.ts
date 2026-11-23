@@ -1,3 +1,4 @@
+import { ConflictCode } from "@cfs/core";
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
@@ -37,7 +38,13 @@ keyrings.post("/keyrings", requireAdmin, async (c) => {
   try {
     await createKeyring(c.env.DB, id, b.prefix, now(), b.members);
   } catch {
-    return c.json({ error: "group already exists or a member is unknown" }, 409);
+    return c.json(
+      {
+        error: "group already exists or a member is unknown",
+        code: ConflictCode.group_exists_or_member_unknown,
+      },
+      409,
+    );
   }
   await audit(c.env.DB, {
     who: who.name,
@@ -94,7 +101,7 @@ keyrings.post("/invites", requireAdmin, async (c) => {
   try {
     await inviteIdentity(c.env.DB, newId(), email, b.role === "admin" ? "admin" : "member", now());
   } catch {
-    return c.json({ error: "already invited" }, 409);
+    return c.json({ error: "already invited", code: ConflictCode.already_invited }, 409);
   }
   await audit(c.env.DB, {
     who: who.name,
@@ -127,14 +134,15 @@ keyrings.post("/me/personal-keyring", async (c) => {
   )
     return c.json({ error: "bad request" }, 400);
   const identity = await findPublicKey(c.env.DB, who.id);
-  if (!identity?.public_key) return c.json({ error: "set up your vault first" }, 409);
+  if (!identity?.public_key)
+    return c.json({ error: "set up your vault first", code: ConflictCode.vault_required }, 409);
   const id = newId();
   try {
     await createPersonalKeyring(c.env.DB, id, b.prefix, now(), who.id, b.wrappedKey);
   } catch {
     const existing = await findPersonalKeyringOwner(c.env.DB, who.id);
     if (existing) return c.json(existing);
-    return c.json({ error: "group already exists" }, 409);
+    return c.json({ error: "group already exists", code: ConflictCode.group_exists }, 409);
   }
   return c.json({ id, prefix: b.prefix, version: 1 }, 201);
 });

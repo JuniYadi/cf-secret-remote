@@ -41,12 +41,27 @@ describe("API client", () => {
   });
 
   it("throws an ApiError with the mapped kind, and no response text", async () => {
-    const fetchImpl = async () => json(409, { error: "vault already set up for alice@x" });
+    const fetchImpl = async () =>
+      json(409, { error: "vault already set up for alice@x", code: "vault_already_setup" });
     const err = await request("POST", "/vault", {}, fetchImpl).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).kind).toBe("conflict");
     expect((err as ApiError).status).toBe(409);
     expect((err as ApiError).message).toBe("conflict");
+    expect((err as ApiError).code).toBe("vault_already_setup");
+  });
+
+  it("retains future conflict codes and ignores malformed codes", async () => {
+    for (const body of [{ code: "not a code" }, {}, null]) {
+      const err = await request("POST", "/secret", {}, async () => json(409, body)).catch(
+        (e: unknown) => e,
+      );
+      expect((err as ApiError).code).toBeUndefined();
+    }
+    const future = await request("POST", "/secret", {}, async () =>
+      json(409, { code: "future_code" }),
+    ).catch((e: unknown) => e);
+    expect((future as ApiError).code).toBe("future_code");
   });
 
   it("maps a failed connection to network", async () => {

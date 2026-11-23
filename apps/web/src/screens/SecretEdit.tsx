@@ -9,7 +9,7 @@ import { PageTitle } from "../components/shared.tsx";
 import { useLang } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
 import { setImportHint } from "../lib/import-draft.ts";
-import { isConflict, saveValues } from "../lib/secret-store.ts";
+import { isConflict, saveValues, secretConflictMessage } from "../lib/secret-store.ts";
 import {
   type Field,
   fieldsFromValues,
@@ -149,7 +149,8 @@ export function EditForm({ name, current, onConflict }: FormProps) {
       navigate(secretHref(name));
     } catch (err) {
       setBusy(false);
-      if (isConflict(err)) onConflict();
+      if (secretConflictMessage(err)) setError({ text: secretConflictMessage(err) as string });
+      else if (isConflict(err)) onConflict();
       else
         setError({
           text: t(

@@ -1,3 +1,4 @@
+import { ConflictCode } from "@cfs/core";
 import { type Context, Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
@@ -150,10 +151,13 @@ requests.post("/requests/:id/cancel", async (c) => {
     });
     return c.json({ error: "only the requester can cancel" }, 403);
   }
-  if (row.status !== "pending") return c.json({ error: `already ${row.status}` }, 409);
-  if (overdue(row, now())) return c.json({ error: "request has expired" }, 409);
+  if (row.status !== "pending")
+    return c.json({ error: `already ${row.status}`, code: ConflictCode.request_not_open }, 409);
+  if (overdue(row, now()))
+    return c.json({ error: "request has expired", code: ConflictCode.request_expired }, 409);
   const done = await cancelRequest(db, now(), row.id);
-  if (done.meta.changes !== 1) return c.json({ error: "already decided, reload" }, 409);
+  if (done.meta.changes !== 1)
+    return c.json({ error: "already decided, reload", code: ConflictCode.request_decided }, 409);
   await audit(db, {
     who: who.name,
     actor: who,
@@ -175,11 +179,14 @@ requests.post("/requests/:id/deny", requireAdmin, async (c) => {
   const { row } = found;
   if (row.requesterId === who.id)
     return c.json({ error: "use cancel to withdraw your own request" }, 403);
-  if (row.status !== "pending") return c.json({ error: `already ${row.status}` }, 409);
-  if (overdue(row, now())) return c.json({ error: "request has expired" }, 409);
+  if (row.status !== "pending")
+    return c.json({ error: `already ${row.status}`, code: ConflictCode.request_not_open }, 409);
+  if (overdue(row, now()))
+    return c.json({ error: "request has expired", code: ConflictCode.request_expired }, 409);
   const t = now();
   const done = await denyRequest(db, who.id, t, row.id);
-  if (done.meta.changes !== 1) return c.json({ error: "already decided, reload" }, 409);
+  if (done.meta.changes !== 1)
+    return c.json({ error: "already decided, reload", code: ConflictCode.request_decided }, 409);
   await audit(db, {
     who: who.name,
     actor: who,
@@ -219,14 +226,19 @@ requests.post("/requests/:id/approve", requireAdmin, async (c) => {
     });
     return c.json({ error: "you cannot approve your own request" }, 403);
   }
-  if (row.status !== "pending") return c.json({ error: `already ${row.status}` }, 409);
+  if (row.status !== "pending")
+    return c.json({ error: `already ${row.status}`, code: ConflictCode.request_not_open }, 409);
   const t = now();
-  if (overdue(row, t)) return c.json({ error: "request has expired" }, 409);
+  if (overdue(row, t))
+    return c.json({ error: "request has expired", code: ConflictCode.request_expired }, 409);
 
   const group = await loadGroup(db, row.groupPrefix);
   if (!group) return c.json({ error: "no such group" }, 404);
   if (group.status !== "active")
-    return c.json({ error: "group is rotating, try again later" }, 409);
+    return c.json(
+      { error: "group is rotating, try again later", code: ConflictCode.group_rotating },
+      409,
+    );
 
   // The approver must hold the group key at the current version, and that grant must not have lapsed.
   const mine = await findMembership(db, group.id, who.id, group.version, t);
@@ -243,10 +255,14 @@ requests.post("/requests/:id/approve", requireAdmin, async (c) => {
     return c.json({ error: "you are not in this group" }, 403);
   }
   if (b.version !== group.version)
-    return c.json({ error: "group key changed, reload and retry" }, 409);
+    return c.json(
+      { error: "group key changed, reload and retry", code: ConflictCode.group_key_changed },
+      409,
+    );
 
   const requester = await findRequester(db, row.requesterId);
-  if (requester?.status !== "active") return c.json({ error: "requester is disabled" }, 409);
+  if (requester?.status !== "active")
+    return c.json({ error: "requester is disabled", code: ConflictCode.identity_disabled }, 409);
 
   const expiresAt = t + row.duration;
   const policyId = newId();
@@ -256,7 +272,7 @@ requests.post("/requests/:id/approve", requireAdmin, async (c) => {
   const applied = results[0]?.meta.changes === 1;
   const after = await loadRequest(db, row.id);
   if (!applied || after?.status !== "approved" || after.approver !== who.name)
-    return c.json({ error: "already decided, reload" }, 409);
+    return c.json({ error: "already decided, reload", code: ConflictCode.request_decided }, 409);
 
   await audit(db, {
     who: who.name,

@@ -26,16 +26,18 @@ export type ApiErrorKind =
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number;
-  /** Set only for a wrong CLI code (ADR 27): how many tries are left. No other body field is kept. */
+  /** Set only for a wrong CLI code (ADR 27): how many tries are left. Other response text is discarded. */
   readonly attemptsLeft: number | undefined;
   /** Seconds from the Retry-After header, when the server sent one (ADR 19, ADR 23). */
   readonly retryAfter: number | null;
+  readonly code: string | undefined;
 
   constructor(
     kind: ApiErrorKind,
     status: number,
     attemptsLeft?: number,
     retryAfter: number | null = null,
+    code?: string,
   ) {
     // The message is the kind only. Response bodies are never copied into errors or logs.
     super(kind);
@@ -44,15 +46,27 @@ export class ApiError extends Error {
     this.status = status;
     this.attemptsLeft = attemptsLeft;
     this.retryAfter = retryAfter;
+    this.code = code;
   }
 }
 
-/** Reads the one numeric field the CLI code check sends back. Anything else in the body is dropped. */
+/** Reads the numeric field the CLI code check sends back. */
 async function attemptsFrom(res: Response): Promise<number | undefined> {
   try {
     const body = (await res.json()) as { attemptsLeft?: unknown } | null;
     const n = body?.attemptsLeft;
     return typeof n === "number" && Number.isInteger(n) && n >= 0 ? n : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function conflictCodeFrom(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { code?: unknown } | null;
+    return typeof body?.code === "string" && /^[a-z][a-z0-9_]{0,63}$/.test(body.code)
+      ? body.code
+      : undefined;
   } catch {
     return undefined;
   }
@@ -145,7 +159,8 @@ export async function send(
   const retryAfter = retryAfterOf(res);
   if (kind === "quota" && method !== "GET") markQuotaReached(retryAfter);
   const attempts = res.status === 404 ? await attemptsFrom(res) : undefined;
-  throw new ApiError(kind, res.status, attempts, retryAfter);
+  const code = res.status === 409 ? await conflictCodeFrom(res) : undefined;
+  throw new ApiError(kind, res.status, attempts, retryAfter, code);
 }
 
 export async function request<T>(

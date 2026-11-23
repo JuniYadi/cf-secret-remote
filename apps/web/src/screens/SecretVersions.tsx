@@ -10,7 +10,7 @@ import { PageTitle } from "../components/shared.tsx";
 import { api, type VersionRow } from "../lib/api.ts";
 import { useLang } from "../lib/hooks.ts";
 import { currentLang, t } from "../lib/i18n.ts";
-import { isConflict, loadSecret, saveValues } from "../lib/secret-store.ts";
+import { isConflict, loadSecret, saveValues, secretConflictMessage } from "../lib/secret-store.ts";
 import { type DiffKind, diffRows, relativeTime } from "../lib/secrets.ts";
 import { pageCrumbs, secretHref } from "../routes.ts";
 
@@ -233,7 +233,9 @@ function RestoreCard({
     } catch (err) {
       setBusy(false);
       setConfirming(false);
-      if (isConflict(err)) {
+      if (secretConflictMessage(err)) {
+        setError(secretConflictMessage(err) as string);
+      } else if (isConflict(err)) {
         setError(
           t(
             "The secret changed while you were restoring. We reloaded the versions. Nothing was restored.",

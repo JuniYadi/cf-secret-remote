@@ -1,3 +1,4 @@
+import { t } from "./i18n.ts";
 // Reads and writes secret versions for the screens. The browser does every seal and open, with @cfs/core
 // (ADR 10, ADR 22). The server gets sealed envelopes and cleartext names, metadata and fingerprints only.
 // Values and the group key stay in this module's call stack and the screen state, never in storage or a URL.
@@ -104,3 +105,33 @@ export const isConflict = (err: unknown): boolean =>
 /** True when the person has no key for this group (GET /keyrings/:prefix/key answered 404). */
 export const isNoKey = (err: unknown): boolean =>
   err instanceof ApiError && err.kind === "not-found";
+
+/** A specific explanation for conflicts that are not ordinary version races. */
+export function secretConflictMessage(err: unknown): string | undefined {
+  if (!(err instanceof ApiError)) return undefined;
+  switch (err.code) {
+    case "group_rotating":
+      return t(
+        "This group is being re-locked. Try again when it finishes.",
+        "Grup ini sedang dikunci ulang. Coba lagi setelah selesai.",
+      );
+    case "group_key_changed":
+    case "group_changed":
+      return t(
+        "The group key changed. Reload the page and try again.",
+        "Kunci grup berubah. Muat ulang halaman lalu coba lagi.",
+      );
+    case "secret_deleted":
+      return t(
+        "This secret was deleted. An admin can restore it.",
+        "Secret ini telah dihapus. Admin dapat memulihkannya.",
+      );
+    case "group_required":
+      return t(
+        "Create the group before saving this secret.",
+        "Buat grup sebelum menyimpan secret ini.",
+      );
+    default:
+      return undefined;
+  }
+}

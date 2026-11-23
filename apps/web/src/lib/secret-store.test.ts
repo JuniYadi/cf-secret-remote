@@ -1,8 +1,16 @@
 import { generateKeyPair, newGroupKey, wrapGroupKey } from "@cfs/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api.ts";
+import { setLang } from "./i18n.ts";
 import { lock, unlock } from "./keystore.ts";
-import { isConflict, isNoKey, loadSecret, saveValues, VaultLockedError } from "./secret-store.ts";
+import {
+  isConflict,
+  isNoKey,
+  loadSecret,
+  saveValues,
+  secretConflictMessage,
+  VaultLockedError,
+} from "./secret-store.ts";
 
 // Crypto runs for real here (@cfs/core, WebCrypto). The API is a small fake that keeps what it is sent,
 // so the tests can check what the server would see.
@@ -165,4 +173,22 @@ describe("reading", () => {
     lock();
     await expect(loadSecret("myapp/dev")).rejects.toBeInstanceOf(VaultLockedError);
   });
+});
+
+it("explains secret conflicts in both languages", () => {
+  const err = new ApiError("conflict", 409, undefined, null, "group_rotating");
+  setLang("en");
+  expect(secretConflictMessage(err)).toContain("re-locked");
+  setLang("id");
+  expect(secretConflictMessage(err)).toContain("dikunci ulang");
+  setLang("en");
+  expect(
+    secretConflictMessage(new ApiError("conflict", 409, undefined, null, "secret_deleted")),
+  ).toContain("deleted");
+  expect(
+    secretConflictMessage(new ApiError("conflict", 409, undefined, null, "group_key_changed")),
+  ).toContain("key changed");
+  expect(
+    secretConflictMessage(new ApiError("conflict", 409, undefined, null, "version_conflict")),
+  ).toBeUndefined();
 });

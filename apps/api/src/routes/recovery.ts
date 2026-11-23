@@ -1,4 +1,10 @@
-import { b64uDecode, fingerprintWords, isPrivateKeyLock, normalizeWords } from "@cfs/core";
+import {
+  b64uDecode,
+  ConflictCode,
+  fingerprintWords,
+  isPrivateKeyLock,
+  normalizeWords,
+} from "@cfs/core";
 import { type Context, Hono } from "hono";
 import { accessJwtFrom, verifyAccessClaims } from "../access.ts";
 import { RECOVERY_ACTION } from "../alerts.ts";
@@ -86,7 +92,14 @@ recovery.post("/recovery/request", async (c) => {
     return c.json({ error: "bad request" }, 400);
 
   const pending = await findPendingRecovery(db, who.id);
-  if (pending) return c.json({ error: "a recovery request is already waiting for an admin" }, 409);
+  if (pending)
+    return c.json(
+      {
+        error: "a recovery request is already waiting for an admin",
+        code: ConflictCode.recovery_pending,
+      },
+      409,
+    );
 
   const id = newId();
   const cancelToken = newToken("cfsr");
@@ -94,7 +107,13 @@ recovery.post("/recovery/request", async (c) => {
     await createRecovery(db, id, who.id, b.publicKey, b.lockedKey, await sha256Hex(cancelToken), t);
   } catch {
     // The partial unique index stopped a second open request at the same moment.
-    return c.json({ error: "a recovery request is already waiting for an admin" }, 409);
+    return c.json(
+      {
+        error: "a recovery request is already waiting for an admin",
+        code: ConflictCode.recovery_pending,
+      },
+      409,
+    );
   }
   // RECOVERY_ACTION is the exact name the ADR 18 "recovery_requested" alert watches.
   await audit(db, {
@@ -143,7 +162,8 @@ recovery.post("/recovery/:id/grant", requireAdmin, async (c) => {
 
   const r = await loadRequest(c.env.DB, id);
   if (!r) return c.json({ error: "no such request" }, 404);
-  if (r.status !== "pending") return c.json({ error: "this request is not open" }, 409);
+  if (r.status !== "pending")
+    return c.json({ error: "this request is not open", code: ConflictCode.request_not_open }, 409);
   if (r.identity_id === who.id)
     return c.json({ error: "another admin must grant this recovery" }, 403);
 
@@ -197,8 +217,16 @@ recovery.post("/recovery/:id/grant", requireAdmin, async (c) => {
   for (const k of keys) {
     const g = await findRecoveryGroup(db, k.prefix);
     if (!g) return c.json({ error: `no such group: ${k.prefix}` }, 404);
-    if (g.status !== "active") return c.json({ error: `group is rotating: ${k.prefix}` }, 409);
-    if (k.version !== g.version) return c.json({ error: "group changed, reload and retry" }, 409);
+    if (g.status !== "active")
+      return c.json(
+        { error: `group is rotating: ${k.prefix}`, code: ConflictCode.group_rotating },
+        409,
+      );
+    if (k.version !== g.version)
+      return c.json(
+        { error: "group changed, reload and retry", code: ConflictCode.group_changed },
+        409,
+      );
     const adminIn = await findRecoveryMember(db, g.id, who.id, g.version);
     if (!adminIn) return c.json({ error: `you are not in group: ${k.prefix}` }, 403);
     const personIn = await findRecoveryMember(db, g.id, r.identity_id, g.version);
@@ -212,7 +240,10 @@ recovery.post("/recovery/:id/grant", requireAdmin, async (c) => {
 
   const done = await loadRequest(c.env.DB, id);
   if (done?.status !== "granted")
-    return c.json({ error: "request changed, reload and retry" }, 409);
+    return c.json(
+      { error: "request changed, reload and retry", code: ConflictCode.request_changed },
+      409,
+    );
   await audit(db, {
     who: who.name,
     actor: who,
@@ -236,7 +267,8 @@ recovery.post("/recovery/:id/cancel", async (c) => {
   const r = await findCancellation(db, id);
   // Someone else's request looks the same as no request.
   if (!r || r.identity_id !== who.id) return c.json({ error: "no such request" }, 404);
-  if (r.status !== "pending") return c.json({ error: "this request is not open" }, 409);
+  if (r.status !== "pending")
+    return c.json({ error: "this request is not open", code: ConflictCode.request_not_open }, 409);
   if ((await sha256Hex(b.token)) !== r.cancel_hash) {
     await audit(db, {
       who: who.name,

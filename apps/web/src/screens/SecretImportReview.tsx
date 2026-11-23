@@ -23,7 +23,13 @@ import {
   type ImportDraft,
   setImportDraft,
 } from "../lib/import-draft.ts";
-import { groupKeyFor, isConflict, isNoKey, saveValues } from "../lib/secret-store.ts";
+import {
+  groupKeyFor,
+  isConflict,
+  isNoKey,
+  saveValues,
+  secretConflictMessage,
+} from "../lib/secret-store.ts";
 import {
   groupOf,
   type MergeRow,
@@ -130,7 +136,9 @@ function ReviewBody({ initial, onDone }: { initial: ImportDraft; onDone: (path: 
       onDone(path);
     } catch (err) {
       setBusy(false);
-      if (isConflict(err)) {
+      if (secretConflictMessage(err)) {
+        setError(secretConflictMessage(err) as string);
+      } else if (isConflict(err)) {
         setError(
           t(
             "This secret changed while you were reviewing. We reloaded it, so check the table again and save once more. Nothing was saved.",
