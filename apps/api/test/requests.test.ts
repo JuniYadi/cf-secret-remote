@@ -9,6 +9,7 @@ import {
   wrapGroupKey,
 } from "@cfs/core";
 import { describe, expect, it } from "vitest";
+import { ACCESS_ACTION } from "../src/alerts.ts";
 import { runDaily } from "../src/cron.ts";
 import type { Env } from "../src/types.ts";
 import { now } from "../src/util.ts";
@@ -137,7 +138,7 @@ describe("ADR 16: request", () => {
     expect(r.body.status).toBe("pending");
     expect(r.body.requester).toBe(asker.name);
     expect(r.body.rekeyAfter).toBe(false);
-    expect((await audited("request.create", "ok", `${prefix}/prod`)).length).toBe(1);
+    expect((await audited(ACCESS_ACTION, "ok", `${prefix}/prod`)).length).toBe(1);
     // The reason is for the approver, never the audit log.
     expect(JSON.stringify(await auditRows())).not.toContain("incident 42");
   });

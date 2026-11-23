@@ -1,18 +1,20 @@
-import { createExecutionContext, env, SELF, waitOnExecutionContext } from "cloudflare:test";
+import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  ACCESS_ACTION,
-  flushAlerts,
-  RECOVERY_ACTION,
-  resetAlertSenders,
-  setAlertSenders,
-} from "../src/alerts.ts";
+import { ACCESS_ACTION, RECOVERY_ACTION } from "../src/alerts.ts";
 import { audit } from "../src/audit.ts";
 import worker from "../src/index.ts";
 import { dayOf, WARN_AT_WRITES } from "../src/quota.ts";
 import type { Env } from "../src/types.ts";
 import { now } from "../src/util.ts";
-import { admin, api, makeIdentity } from "./helpers.ts";
+import {
+  api,
+  flushAlerts,
+  inAlertContext,
+  resetAlertSenders,
+  setAlertSenders,
+  testFetch,
+} from "./alert-helpers.ts";
+import { admin, makeIdentity } from "./helpers.ts";
 
 // ADR 18: alerts and notifications. Every rule has a test that it fires on its event and not otherwise.
 
@@ -26,7 +28,7 @@ let sent: string[]; // webhook message texts
 let urls: string[]; // webhook URLs that were posted to
 let emails: { to: string[]; subject: string; text: string }[];
 
-const ev = (p: Parameters<typeof audit>[1]) => audit(db, p);
+const ev = (p: Parameters<typeof audit>[1]) => inAlertContext(() => audit(db, p));
 const titled = (title: string) => sent.filter((t) => t.includes(title));
 const settle = () => flushAlerts();
 const resetDedupe = () => db.prepare("DELETE FROM alert_state").run();
@@ -38,7 +40,7 @@ async function configure(body: Record<string, unknown>) {
 }
 
 const bogusRequest = (ip = "203.0.113.9") =>
-  SELF.fetch("http://t.test/api/v1/me", {
+  testFetch("http://t.test/api/v1/me", {
     headers: { authorization: "Bearer cfs_not_a_real_token", "CF-Connecting-IP": ip },
   });
 
@@ -450,7 +452,7 @@ describe("ADR 18: settings and the masked webhook", () => {
 
 describe("ADR 18: message content", () => {
   it("never carries tokens, values, notes or the webhook URL", async () => {
-    await SELF.fetch("http://t.test/api/v1/me", {
+    await testFetch("http://t.test/api/v1/me", {
       headers: { authorization: "Bearer cfs_MARKERTOKEN9", "CF-Connecting-IP": "203.0.113.9" },
     });
     await makeIdentity({ kind: "app", name: "bot-content" });
@@ -533,10 +535,12 @@ describe("ADR 18: delivery failures", () => {
   it("evaluation is handed to the request's waitUntil", async () => {
     const ctx = createExecutionContext();
     const spy = vi.spyOn(ctx, "waitUntil");
-    const res = await worker.fetch(
-      new Request("http://t.test/api/v1/me", { headers: { authorization: "Bearer cfs_nope" } }),
-      cfEnv,
-      ctx,
+    const res = await inAlertContext(() =>
+      worker.fetch(
+        new Request("http://t.test/api/v1/me", { headers: { authorization: "Bearer cfs_nope" } }),
+        cfEnv,
+        ctx,
+      ),
     );
     expect(res.status).toBe(401);
     await waitOnExecutionContext(ctx);

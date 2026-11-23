@@ -13,9 +13,10 @@ import {
   wrapGroupKey,
 } from "@cfs/core";
 import { beforeAll, describe, expect, it } from "vitest";
-import { flushAlerts, resetAlertSenders, setAlertSenders } from "../src/alerts.ts";
+import { RECOVERY_ACTION } from "../src/alerts.ts";
 import { accessJwt, freshLogin, installAccessCerts } from "./access-jwt.ts";
-import { api, makeIdentity } from "./helpers.ts";
+import { api, flushAlerts, resetAlertSenders, setAlertSenders } from "./alert-helpers.ts";
+import { makeIdentity } from "./helpers.ts";
 
 // ADR 20 rules, one test each (failures included). Real Workers runtime and D1.
 
@@ -113,6 +114,11 @@ describe("ADR 18: recovery_requested alert (real route)", () => {
 
       const ok = await startRecovery(p);
       expect(ok.r.status).toBe(201);
+      expect(
+        (await auditEntries()).some(
+          (e) => e.action === RECOVERY_ACTION && e.who === p.name && e.result === "ok",
+        ),
+      ).toBe(true);
       await flushAlerts();
       expect(sent.filter((t) => t.includes("Recovery requested"))).toHaveLength(1);
     } finally {

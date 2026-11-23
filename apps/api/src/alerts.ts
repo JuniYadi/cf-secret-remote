@@ -43,40 +43,32 @@ export type WebhookSender = (url: string, text: string) => Promise<void>;
 /** Sends one alert to the admin addresses. */
 export type EmailSender = (to: string[], subject: string, text: string) => Promise<void>;
 
-let overrides: { webhook?: WebhookSender; email?: EmailSender } = {};
-
-/** Test seam: replaces the webhook or email sender. Production never calls this. */
-export function setAlertSenders(s: { webhook?: WebhookSender; email?: EmailSender }): void {
-  overrides = { ...s };
-}
-export function resetAlertSenders(): void {
-  overrides = {};
+export interface AlertSenders {
+  webhook?: WebhookSender;
+  email?: EmailSender;
 }
 
 // Requests run inside this store, so evaluation can be handed to ctx.waitUntil.
-const requestScope = new AsyncLocalStorage<{ env: Env; ctx: ExecutionContext }>();
-export function withAlertContext<T>(env: Env, ctx: ExecutionContext, fn: () => T): T {
-  return requestScope.run({ env, ctx }, fn);
-}
-
-const pending = new Set<Promise<void>>();
-
-/** Resolves once every scheduled evaluation has finished. Tests use it; production does not need it. */
-export async function flushAlerts(): Promise<void> {
-  while (pending.size > 0) await Promise.all([...pending]);
+const requestScope = new AsyncLocalStorage<{
+  env: Env;
+  ctx: ExecutionContext;
+  senders?: AlertSenders;
+}>();
+export function withAlertContext<T>(
+  env: Env,
+  ctx: ExecutionContext,
+  fn: () => T,
+  senders: AlertSenders | undefined = requestScope.getStore()?.senders,
+): T {
+  return requestScope.run({ env, ctx, senders }, fn);
 }
 
 /** Starts evaluation for one appended row. Returns at once; never throws. */
 export function scheduleAlerts(row: AuditRow, ref: AuditRef): void {
   const scope = requestScope.getStore();
-  const job: Promise<void> = evaluate(row, ref, scope?.env)
-    .catch(() => {
-      console.error("alert evaluation failed");
-    })
-    .finally(() => {
-      pending.delete(job);
-    });
-  pending.add(job);
+  const job = evaluate(row, ref, scope?.env, scope?.senders).catch(() => {
+    console.error("alert evaluation failed");
+  });
   scope?.ctx.waitUntil(job);
 }
 
@@ -162,8 +154,8 @@ interface Hit {
   detail: string;
 }
 
-function emailSenderFor(env: Env | undefined): EmailSender | undefined {
-  if (overrides.email) return overrides.email;
+function emailSenderFor(env: Env | undefined, senders?: AlertSenders): EmailSender | undefined {
+  if (senders?.email) return senders.email;
   if (env?.SEND_EMAIL && env.ALERT_EMAIL_FROM) {
     const binding = env.SEND_EMAIL;
     const from = env.ALERT_EMAIL_FROM;
@@ -196,11 +188,16 @@ async function attempt(label: string, send: () => Promise<void>): Promise<void> 
   console.error(`alert send failed after retry: ${label}`);
 }
 
-async function evaluate(row: AuditRow, ref: AuditRef, env: Env | undefined): Promise<void> {
+async function evaluate(
+  row: AuditRow,
+  ref: AuditRef,
+  env: Env | undefined,
+  senders?: AlertSenders,
+): Promise<void> {
   const db = ref.db;
   const cfg = await loadConfig(db);
   const webhook = cfg.webhookUrl;
-  const email = emailSenderFor(env);
+  const email = emailSenderFor(env, senders);
   if (!webhook && !email) return;
 
   // A rule runs only when at least one of its channels is on.
@@ -212,7 +209,7 @@ async function evaluate(row: AuditRow, ref: AuditRef, env: Env | undefined): Pro
     if (!(await repo.claim(db, hit.rule, hit.subject, now()))) continue;
     const text = `[cfs] ${hit.title}: ${hit.detail} (${new Date(row.at * 1000).toISOString()})`;
     if (webhook !== null && channelOn(cfg.toggles, hit.rule, "webhook")) {
-      await attempt(`webhook ${hit.rule}`, () => (overrides.webhook ?? postWebhook)(webhook, text));
+      await attempt(`webhook ${hit.rule}`, () => (senders?.webhook ?? postWebhook)(webhook, text));
     }
     if (email && channelOn(cfg.toggles, hit.rule, "email")) {
       const to = await adminEmails(db);
@@ -387,6 +384,7 @@ export async function sendTestAlert(
   env: Env,
   by: string,
 ): Promise<{ webhook: TestOutcome; email: TestOutcome }> {
+  const senders = requestScope.getStore()?.senders;
   const cfg = await loadConfig(env.DB);
   const text = `[cfs] Test alert: sent by ${by} (${new Date().toISOString()})`;
   const run = async (send: () => Promise<void>): Promise<TestOutcome> => {
@@ -398,9 +396,9 @@ export async function sendTestAlert(
     }
   };
   const webhook: TestOutcome = cfg.webhookUrl
-    ? await run(() => (overrides.webhook ?? postWebhook)(cfg.webhookUrl as string, text))
+    ? await run(() => (senders?.webhook ?? postWebhook)(cfg.webhookUrl as string, text))
     : "off";
-  const sender = emailSenderFor(env);
+  const sender = emailSenderFor(env, senders);
   const to = sender ? await adminEmails(env.DB) : [];
   const email: TestOutcome =
     sender && to.length > 0 ? await run(() => sender(to, "cfs test alert", text)) : "off";
