@@ -121,6 +121,8 @@ secrets.get("/secrets", async (c) => {
         updatedAt: r.updatedAt,
         names: JSON.parse(r.names) as string[],
         meta: r.meta ? (JSON.parse(r.meta) as Meta) : {},
+        lastOpenedBy: r.lastOpenedBy,
+        lastOpenedAt: r.lastOpenedAt,
       })),
   );
 });
@@ -169,7 +171,12 @@ secrets.get("/secret", async (c) => {
     note: guard.note,
     ip: c.req.header("CF-Connecting-IP"),
   });
-  return c.json({ ...row, names: JSON.parse(row.names) });
+  const { meta, ...rest } = row;
+  return c.json({
+    ...rest,
+    names: JSON.parse(row.names),
+    meta: meta ? (JSON.parse(meta) as Meta) : {},
+  });
 });
 
 // Write: the client sends an already-encrypted version. The server cannot read or validate the values.

@@ -373,6 +373,9 @@ export interface SecretSummary {
   updatedAt: number;
   names: string[];
   meta: Meta;
+  /** Who last fetched the ciphertext (a merge read does not count), or null if nobody has. */
+  lastOpenedBy?: string | null;
+  lastOpenedAt?: number | null;
 }
 
 /** GET /secret: the sealed version. The client opens it with the group key. */
@@ -384,6 +387,7 @@ export interface SecretRecord {
   wrappedDek: string;
   ciphertext: string;
   createdAt: number;
+  meta: Meta;
 }
 
 /** GET /secret/versions: metadata and fingerprints for each version, newest first. */

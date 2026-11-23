@@ -30,31 +30,11 @@ import {
 import { type SecretState, useSecret } from "../lib/use-secret.ts";
 import { deniedPath, PATHS, pageCrumbs, SECRET_TABS, secretHref } from "../routes.ts";
 
-/** Cleartext metadata for one secret, from GET /secrets (GET /secret does not carry it). */
-export function useMeta(path: string): Meta {
-  const [meta, setMeta] = useState<Meta>({});
-  useEffect(() => {
-    let live = true;
-    api
-      .secrets()
-      .then((rows) => {
-        const row = Array.isArray(rows) ? rows.find((r) => r.path === path) : undefined;
-        if (live && row) setMeta(row.meta);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [path]);
-  return meta;
-}
-
 /** The Values tab for one secret. */
 export function SecretDetailPage({ name }: { name: string }) {
   useLang();
   const [, navigate] = useLocation();
   const { state, reload } = useSecret(name);
-  const meta = useMeta(name);
 
   useEffect(() => {
     if (state.status === "denied") navigate(deniedPath(name));
@@ -72,7 +52,7 @@ export function SecretDetailPage({ name }: { name: string }) {
   }
   if (state.status === "nokey") return <NoKeyView name={name} record={state.record} />;
   if (state.status === "ready") {
-    return <ValuesView name={name} secret={state.secret} meta={meta} />;
+    return <ValuesView name={name} secret={state.secret} meta={state.record.meta ?? {}} />;
   }
   return <SecretProblem name={name} state={state} onRetry={reload} />;
 }

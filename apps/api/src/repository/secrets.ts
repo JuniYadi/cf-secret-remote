@@ -16,9 +16,16 @@ export function findOwner(db: D1Database, name: string) {
 export function listSecrets(db: D1Database) {
   return db
     .prepare(
-      `SELECT s.path, s.current AS version, v.names, v.created_at AS updatedAt, s.meta
+      `SELECT s.path, s.current AS version, v.names, v.created_at AS updatedAt, s.meta,
+       a.at AS lastOpenedAt, COALESCE(i.name, a.who) AS lastOpenedBy
      FROM secret s JOIN secret_version v ON v.secret_id = s.id AND v.version = s.current
      JOIN keyring k ON k.id = s.keyring_id AND k.personal_owner IS NULL
+     LEFT JOIN audit a ON a.seq = (
+       SELECT a2.seq FROM audit a2
+       WHERE a2.path = s.path AND a2.action = 'secret.read'
+         AND json_extract(a2.entry, '$.result') = 'ok'
+       ORDER BY a2.at DESC, a2.seq DESC LIMIT 1)
+     LEFT JOIN identity i ON i.id = a.identity_id
      WHERE s.deleted_at IS NULL ORDER BY s.path`,
     )
     .all<{
@@ -27,18 +34,20 @@ export function listSecrets(db: D1Database) {
       names: string;
       updatedAt: number;
       meta: string | null;
+      lastOpenedAt: number | null;
+      lastOpenedBy: string | null;
     }>();
 }
 export function readSecret(db: D1Database, version: number | null, path: string) {
   return db
     .prepare(
-      `SELECT v.version, v.keyring_version AS keyringVersion, v.names, v.wrapped_dek AS wrappedDek, v.ciphertext, v.created_at AS createdAt
+      `SELECT v.version, v.keyring_version AS keyringVersion, v.names, v.wrapped_dek AS wrappedDek, v.ciphertext, v.created_at AS createdAt, s.meta
      FROM secret s JOIN secret_version v ON v.secret_id = s.id AND v.version = COALESCE(?, s.current)
      JOIN keyring k ON k.id = s.keyring_id AND k.personal_owner IS NULL
      WHERE s.path = ? AND s.deleted_at IS NULL AND v.version <= s.current`,
     )
     .bind(version, path)
-    .first<{ version: number; names: string }>();
+    .first<{ version: number; names: string; meta: string | null }>();
 }
 export function findSecret(db: D1Database, path: string) {
   return db

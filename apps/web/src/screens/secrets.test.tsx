@@ -35,6 +35,7 @@ interface Stored {
   createdAt: number;
   fps?: Record<string, string>;
   createdBy?: string;
+  meta?: Record<string, string>;
 }
 
 interface World {
@@ -48,6 +49,8 @@ interface World {
     updatedAt: number;
     names: string[];
     meta: Record<string, string>;
+    lastOpenedBy?: string | null;
+    lastOpenedAt?: number | null;
   }[];
   current: Stored | null;
   versions: Stored[];
@@ -197,6 +200,8 @@ describe("secrets list", () => {
         updatedAt: 1,
         names: ["A", "B"],
         meta: { owner: "alice@myorg.com", rotateBy: "2020-01-01" },
+        lastOpenedBy: "bob@myorg.com",
+        lastOpenedAt: Math.floor(Date.now() / 1000) - 7200,
       },
       { path: "myapp/prod", version: 1, updatedAt: 1, names: ["X"], meta: {} },
     ];
@@ -207,6 +212,8 @@ describe("secrets list", () => {
     expect(text()).toContain("myapp/prod");
     expect(text()).toContain("Owner: alice@myorg.com");
     expect(text()).toContain("Rotation overdue");
+    expect(text()).toContain("Last opened by");
+    expect(text()).toContain("bob@myorg.com, 2 hours ago");
     expect(text()).not.toContain(SECRET);
   });
 
@@ -273,6 +280,20 @@ describe("secret detail", () => {
     expect(text()).toContain(SECRET);
     await vi.advanceTimersByTimeAsync(1_000);
     expect(text()).not.toContain(SECRET);
+  });
+
+  it("takes owner and rotation from GET /secret without calling GET /secrets", async () => {
+    world.current = {
+      ...(world.current as Stored),
+      meta: { owner: "alice@myorg.com", rotateBy: "2999-01-01" },
+    };
+    const fetchMock = serve();
+    render(<SecretDetailPage name="myapp/dev" />, host);
+    await flush();
+    expect(text()).toContain("Owner: alice@myorg.com");
+    expect(text()).toContain("2999-01-01");
+    const urls = fetchMock.mock.calls.map((c) => new URL(c[0], "https://cfs.test").pathname);
+    expect(urls).not.toContain("/api/v1/secrets");
   });
 
   it("shows the names but locks the values when the person has no key", async () => {
