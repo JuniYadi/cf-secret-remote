@@ -1,3 +1,4 @@
+import { countAttempt, getAttemptCount } from "./repository/throttle.ts";
 import { now } from "./util.ts";
 
 /**
@@ -11,16 +12,8 @@ export async function attemptsLeft(
   windowSec: number,
 ): Promise<number> {
   const w = now() - (now() % windowSec);
-  await db
-    .prepare(
-      "INSERT INTO login_attempt (key, window, count) VALUES (?, ?, 1) ON CONFLICT (key, window) DO UPDATE SET count = count + 1",
-    )
-    .bind(key, w)
-    .run();
-  const row = await db
-    .prepare("SELECT count FROM login_attempt WHERE key = ? AND window = ?")
-    .bind(key, w)
-    .first<{ count: number }>();
+  await countAttempt(db, key, w);
+  const row = await getAttemptCount(db, key, w);
   return limit - (row?.count ?? 0);
 }
 
@@ -42,10 +35,7 @@ export async function spent(
   windowSec: number,
 ): Promise<boolean> {
   const w = now() - (now() % windowSec);
-  const row = await db
-    .prepare("SELECT count FROM login_attempt WHERE key = ? AND window = ?")
-    .bind(key, w)
-    .first<{ count: number }>();
+  const row = await getAttemptCount(db, key, w);
   return (row?.count ?? 0) >= limit;
 }
 

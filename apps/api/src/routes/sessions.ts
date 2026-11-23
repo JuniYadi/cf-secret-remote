@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
+import { deleteSession, deleteSessions, listSessions } from "../repository/account.ts";
 import type { AppEnv } from "../types.ts";
 import { now } from "../util.ts";
 
@@ -7,21 +8,13 @@ import { now } from "../util.ts";
 export const sessions = new Hono<AppEnv>();
 
 sessions.get("/sessions", async (c) => {
-  const rows = await c.env.DB.prepare(
-    "SELECT substr(token_hash, 1, 16) AS id, kind, device, created_at AS createdAt, last_used_at AS lastUsedAt, expires_at AS expiresAt FROM session WHERE identity_id = ? AND expires_at > ? ORDER BY created_at DESC",
-  )
-    .bind(c.get("who").id, now())
-    .all();
+  const rows = await listSessions(c.env.DB, c.get("who").id, now());
   return c.json(rows.results);
 });
 
 sessions.delete("/sessions/:id", async (c) => {
   const who = c.get("who");
-  const res = await c.env.DB.prepare(
-    "DELETE FROM session WHERE identity_id = ? AND substr(token_hash, 1, 16) = ?",
-  )
-    .bind(who.id, c.req.param("id"))
-    .run();
+  const res = await deleteSession(c.env.DB, who.id, c.req.param("id"));
   if (!res.meta.changes) return c.json({ error: "not found" }, 404);
   await audit(c.env.DB, {
     who: who.name,
@@ -35,9 +28,7 @@ sessions.delete("/sessions/:id", async (c) => {
 // Ends every session of the caller, including the one that made this call when it is a CLI token.
 sessions.delete("/sessions", async (c) => {
   const who = c.get("who");
-  const res = await c.env.DB.prepare("DELETE FROM session WHERE identity_id = ?")
-    .bind(who.id)
-    .run();
+  const res = await deleteSessions(c.env.DB, who.id);
   await audit(c.env.DB, {
     who: who.name,
     action: "session.revoke",
