@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { PROTOCOL_VERSION } from "@cfs/core";
+import { VERSION } from "../../../version.ts";
 import { flag } from "./args.ts";
 import { commands } from "./commands/index.ts";
 import { useProfile } from "./config.ts";
@@ -21,7 +22,7 @@ async function main() {
   const cmd = args.shift();
   if (!cmd || cmd === "--help" || cmd === "-h" || cmd === "help") return console.log(usage());
   if (cmd === "--version" || cmd === "-v")
-    return console.log(`cfs 0.0.1 (protocol ${PROTOCOL_VERSION})`);
+    return console.log(`cfs ${VERSION} (protocol ${PROTOCOL_VERSION})`);
   const c = commands[cmd];
   if (!c) {
     console.error(usage());
