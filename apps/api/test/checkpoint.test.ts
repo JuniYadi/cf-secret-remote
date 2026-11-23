@@ -1,5 +1,6 @@
 import { createExecutionContext, env, SELF, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { adminEmails } from "../src/alerts.ts";
 import { appendRow } from "../src/audit.ts";
 import { retentionDays, runDaily } from "../src/cron.ts";
 import worker from "../src/index.ts";
@@ -101,6 +102,57 @@ describe("ADR 19: checkpoints", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     await runDaily(cfEnv, now());
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("emails the checkpoint to active admins", async () => {
+    await admin();
+    const recipients = await adminEmails(db);
+    const send = vi.fn().mockResolvedValue(undefined);
+    const t = now();
+    const result = await runDaily(
+      {
+        ...cfEnv,
+        ALERT_EMAIL_FROM: "alerts@example.com",
+        SEND_EMAIL: { send } as unknown as Env["SEND_EMAIL"],
+      },
+      t,
+    );
+    expect(recipients.length).toBeGreaterThan(0);
+    expect(send.mock.calls.map((call) => call[0])).toEqual(
+      recipients.map((to) => ({
+        to,
+        from: "alerts@example.com",
+        subject: "cfs audit checkpoint",
+        text: `cfs audit checkpoint ${dayOf(t)}: 0 rows, head ${result.head}`,
+      })),
+    );
+  });
+
+  it("continues when an email send fails", async () => {
+    await admin();
+    const recipients = await adminEmails(db);
+    expect(recipients.length).toBeGreaterThan(0);
+    const send = vi.fn().mockRejectedValue(new Error("send failed"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const t = now();
+    const result = await runDaily(
+      {
+        ...cfEnv,
+        ALERT_EMAIL_FROM: "alerts@example.com",
+        SEND_EMAIL: { send } as unknown as Env["SEND_EMAIL"],
+      },
+      t,
+    );
+    expect(send).toHaveBeenCalledTimes(recipients.length);
+    for (const [index, to] of recipients.entries()) {
+      expect(send.mock.calls[index]?.[0]).toEqual({
+        to,
+        from: "alerts@example.com",
+        subject: "cfs audit checkpoint",
+        text: `cfs audit checkpoint ${dayOf(t)}: 0 rows, head ${result.head}`,
+      });
+    }
+    expect(error).toHaveBeenCalledWith("checkpoint email failed");
   });
 });
 

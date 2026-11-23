@@ -1,3 +1,4 @@
+import { adminEmails } from "./alerts.ts";
 import { dayOf } from "./quota.ts";
 import { currentHead, pruneAudit, pruneUsage, saveCheckpoint } from "./repository/cron.ts";
 import { sweepExpiredRequests } from "./requests-sweep.ts";
@@ -47,11 +48,26 @@ export async function runDaily(
   const head = await currentHead(db);
 
   await saveCheckpoint(db, day, head.seq, head.hash, t);
-  if (env.CHECKPOINT_WEBHOOK_URL)
-    await sendWebhook(
-      env.CHECKPOINT_WEBHOOK_URL,
-      `cfs audit checkpoint ${day}: ${head.rows} rows, head ${head.hash}`,
-    );
+  const text = `cfs audit checkpoint ${day}: ${head.rows} rows, head ${head.hash}`;
+  if (env.CHECKPOINT_WEBHOOK_URL) await sendWebhook(env.CHECKPOINT_WEBHOOK_URL, text);
+  if (env.SEND_EMAIL && env.ALERT_EMAIL_FROM) {
+    try {
+      for (const to of await adminEmails(db)) {
+        try {
+          await env.SEND_EMAIL.send({
+            to,
+            from: env.ALERT_EMAIL_FROM,
+            subject: "cfs audit checkpoint",
+            text,
+          });
+        } catch {
+          console.error("checkpoint email failed");
+        }
+      }
+    } catch {
+      console.error("checkpoint email recipients unavailable");
+    }
+  }
 
   const pruned = await pruneAudit(db, t, (await loadLimits(env)).auditRetentionDays);
   await backupDaily(env, t);
