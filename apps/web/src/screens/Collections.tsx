@@ -20,8 +20,8 @@ import {
   draftBody,
   type EnvRow,
   extraNames,
-  hasChanges,
   type KeyRow,
+  LABEL_RE,
   MAX_ENVS,
   MAX_KEYS,
   removalsOf,
@@ -337,10 +337,12 @@ function CollectionForm({
   mode,
   initial,
   revision,
+  source = "",
 }: {
   mode: "new" | "edit";
   initial: { name: string; envs: EnvRow[]; keys: KeyRow[] };
   revision: number;
+  source?: string;
 }) {
   useLang();
   const [, navigate] = useLocation();
@@ -349,7 +351,7 @@ function CollectionForm({
     initial.envs.length ? initial.envs : [{ label: "", path: "" }],
   );
   const [keys, setKeys] = useState<KeyRow[]>(initial.keys);
-  const [from, setFrom] = useState("");
+  const [from, setFrom] = useState(source);
   const [discovered, setDiscovered] = useState<DiscoverResult | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [sourceVersions, setSourceVersions] = useState<Record<string, number> | undefined>(
@@ -390,6 +392,7 @@ function CollectionForm({
 
   async function readPaths() {
     setError(null);
+    setDiscovered(null);
     const paths = from
       .split(",")
       .map((p) => p.trim())
@@ -400,11 +403,6 @@ function CollectionForm({
       const d = await api.discoverPaths(paths);
       setDiscovered(d);
       setPicked(new Set(d.union));
-      setSourceVersions(
-        Object.fromEntries(
-          d.sources.flatMap((s) => (s.status === "ok" ? [[s.path, s.version] as const] : [])),
-        ),
-      );
     } catch (err) {
       setError(collectionFailure(err));
     } finally {
@@ -417,6 +415,14 @@ function CollectionForm({
     const added = [...picked]
       .filter((n) => !have.has(n))
       .map((n) => ({ name: n, description: "" }));
+    if (added.length && discovered) {
+      const versions = Object.fromEntries(
+        discovered.sources.flatMap((s) =>
+          s.status === "ok" ? [[s.path, s.version] as const] : [],
+        ),
+      );
+      setSourceVersions((previous) => ({ ...versions, ...previous }));
+    }
     setKeys([...keys, ...added]);
   }
 
@@ -431,7 +437,7 @@ function CollectionForm({
         await api.createCollection({
           name: name.trim(),
           ...body,
-          ...(sourceVersions && discovered ? { sourceVersions } : {}),
+          ...(sourceVersions && Object.keys(sourceVersions).length ? { sourceVersions } : {}),
         });
         navigate(collectionPath(name.trim()));
       } else {
@@ -519,6 +525,14 @@ function CollectionForm({
               "Hanya nama. Jangan tulis nilai secret di deskripsi.",
             )}
           </p>
+          {source && (
+            <p class="note">
+              {t(
+                "Read the source names below, choose the ones to copy, and add your other environment paths. The collection tracks missing names; it does not create secrets or copy values.",
+                "Baca nama sumber di bawah, pilih yang akan disalin, lalu tambahkan path environment lainnya. Koleksi melacak nama yang belum ada; koleksi tidak membuat secret atau menyalin nilai.",
+              )}
+            </p>
+          )}
           {mode === "new" && (
             <div class="field">
               <label for="collection-from">
@@ -535,7 +549,10 @@ function CollectionForm({
                   placeholder="myapp/dev, myapp/prod"
                   class="mono-input"
                   autocomplete="off"
-                  onInput={(e) => setFrom(e.currentTarget.value)}
+                  onInput={(e) => {
+                    setFrom(e.currentTarget.value);
+                    setDiscovered(null);
+                  }}
                 />
                 <button
                   type="button"
@@ -729,7 +746,20 @@ function PreviewList({ preview }: { preview: CollectionPreview }) {
 }
 
 export function CollectionNewPage() {
-  return <CollectionForm mode="new" initial={{ name: "", envs: [], keys: [] }} revision={0} />;
+  const source = new URLSearchParams(window.location.search).get("source") ?? "";
+  const label = source.split("/").pop() ?? "";
+  return (
+    <CollectionForm
+      mode="new"
+      initial={{
+        name: "",
+        envs: source ? [{ label: LABEL_RE.test(label) ? label : "", path: source }] : [],
+        keys: [],
+      }}
+      revision={0}
+      source={source}
+    />
+  );
 }
 
 /** Loads the stored definition, then opens the form on it. */
