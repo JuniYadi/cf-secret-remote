@@ -18,6 +18,13 @@ export function isReservedSecretPath(path: string): boolean {
   );
 }
 
+// ADR 36: fixed web routes for environment collections. `new` is refused as a collection name.
+export const COLLECTION_FIXED_NAMES = { new: "new" } as const;
+
+export function isReservedCollectionName(name: string): boolean {
+  return Object.values(COLLECTION_FIXED_NAMES).some((reserved) => reserved === name);
+}
+
 export function isReservedGroupName(name: string): boolean {
   return Object.values(GROUP_FIXED_NAMES).some((reserved) => reserved === name);
 }

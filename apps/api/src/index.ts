@@ -14,6 +14,7 @@ import { apps } from "./routes/apps.ts";
 import { backup, blockDuringMaintenance } from "./routes/backup.ts";
 import { checkpoint } from "./routes/checkpoint.ts";
 import { cliApprove, cliPublic } from "./routes/cli.ts";
+import { collections } from "./routes/collections.ts";
 import { keyrings } from "./routes/keyrings.ts";
 import { logins } from "./routes/logins.ts";
 import { me } from "./routes/me.ts";
@@ -59,6 +60,7 @@ v1.route("/", recovery);
 v1.route("/", offboard);
 v1.route("/", versions);
 v1.route("/", backup);
+v1.route("/", collections);
 app.route("/api/v1", v1);
 
 app.all("/api/*", (c) => c.json({ error: "not found" }, 404));

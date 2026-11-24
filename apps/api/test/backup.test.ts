@@ -477,6 +477,67 @@ describe("ADR 23: restore", () => {
     expect(after.audit.length).toBe(before.audit.length + 1);
   });
 
+  it("ADR 36: environment collections survive a backup and restore unchanged", async () => {
+    const { adm } = await seedWorld();
+    const name = `bk-col-${uniq()}`;
+    const made = await api("POST", "/collections", adm.token, {
+      name,
+      envs: [
+        { label: "dev", path: `bkc${uniq()}/dev` },
+        { label: "prod", path: `bkc${uniq()}/prod` },
+      ],
+      keys: [{ name: "API_KEY", description: "payments" }, { name: "DATABASE_URL" }],
+    });
+    expect(made.status).toBe(201);
+    const rowsOf = async () => ({
+      collection: (await db.prepare("SELECT * FROM env_collection WHERE name = ?").bind(name).all())
+        .results,
+      env: (
+        await db
+          .prepare(
+            "SELECT e.* FROM env_collection_env e JOIN env_collection c ON c.id = e.collection_id WHERE c.name = ? ORDER BY e.label",
+          )
+          .bind(name)
+          .all()
+      ).results,
+      key: (
+        await db
+          .prepare(
+            "SELECT k.* FROM env_collection_key k JOIN env_collection c ON c.id = k.collection_id WHERE c.name = ? ORDER BY k.name",
+          )
+          .bind(name)
+          .all()
+      ).results,
+    });
+    const before = await rowsOf();
+    const file = (await download(adm.token)).bytes;
+    const plain = await plainFile(file);
+    expect((plain.tables.env_collection ?? []).map((r) => r.name)).toContain(name);
+    expect((plain.tables.env_collection_key ?? []).map((r) => r.name).sort()).toEqual([
+      "API_KEY",
+      "DATABASE_URL",
+    ]);
+
+    await db.batch([
+      db.prepare("DELETE FROM cli_login"),
+      db.prepare("DELETE FROM login_attempt"),
+      ...[...BACKUP_TABLES]
+        .reverse()
+        .filter((t) => t !== "identity")
+        .map((t) => db.prepare(`DELETE FROM ${t}`)),
+      db.prepare("DELETE FROM identity WHERE id != ?").bind(adm.id),
+    ]);
+    expect((await rowsOf()).collection).toEqual([]);
+
+    const r = await post("/restore", adm.token, restoreBody(file));
+    expect(r.status).toBe(200);
+    // The restore ends every session, so the definition is compared in the database, not through the API.
+    expect(await rowsOf()).toEqual(before);
+    expect(before.collection).toHaveLength(1);
+    expect(before.env).toHaveLength(2);
+    expect(before.key).toHaveLength(2);
+  });
+
   it("refuses a wrong host name and changes nothing", async () => {
     const { adm } = await seedWorld();
     const file = (await download(adm.token)).bytes;

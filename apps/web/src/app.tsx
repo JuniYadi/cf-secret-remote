@@ -13,6 +13,12 @@ import { AgentRulesPage } from "./screens/AgentRules.tsx";
 import { AlertsPage } from "./screens/Alerts.tsx";
 import { CliAuthorizePage } from "./screens/CliAuthorize.tsx";
 import { CliDonePage } from "./screens/CliDone.tsx";
+import {
+  CollectionDetailPage,
+  CollectionEditPage,
+  CollectionNewPage,
+  CollectionsPage,
+} from "./screens/Collections.tsx";
 import { DevicesPage } from "./screens/Devices.tsx";
 import { ForgotPage } from "./screens/Forgot.tsx";
 import { LoginDetailPage } from "./screens/LoginDetail.tsx";
@@ -176,6 +182,31 @@ function renderPage(
       return (
         <ShellFrame>
           <DevicesPage />
+        </ShellFrame>
+      );
+    // ADR 36: environment collections.
+    case "collections":
+      return (
+        <ShellFrame>
+          <CollectionsPage />
+        </ShellFrame>
+      );
+    case "collectionNew":
+      return (
+        <ShellFrame>
+          <CollectionNewPage />
+        </ShellFrame>
+      );
+    case "collectionDetail":
+      return (
+        <ShellFrame>
+          <CollectionDetailPage name={page.name ?? ""} />
+        </ShellFrame>
+      );
+    case "collectionEdit":
+      return (
+        <ShellFrame>
+          <CollectionEditPage name={page.name ?? ""} />
         </ShellFrame>
       );
     // ADR 24 part 5: settings, offboarding, give access again, account password, quota.

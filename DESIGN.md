@@ -1,5 +1,9 @@
 # cf-secret-remote — Desain v1
 
+## Addendum: kesesuaian key antar-environment (ADR 36)
+
+Collection menghubungkan path environment yang dipilih dengan daftar nama key yang diharapkan dan deskripsi opsional. Definisi ini adalah metadata tanpa nilai. Perbandingan menunjukkan key yang ada, hilang, atau ekstra, serta path yang tidak ada atau tidak dapat diakses. Nilai tetap terpisah dan tidak disalin otomatis. Akses metadata collection diatur terpisah dari izin list pada setiap path; pengelolaan nilai tetap memakai izin dan enkripsi yang ada. Lihat [ADR 36](docs/adr/0036-environment-key-consistency.md) untuk protokol dan batasnya.
+
 Vault untuk kredensial QA dan secret, untuk tim atau satu orang. Targetnya tim teknis kecil—developer, QA, agensi, dan startup—yang punya akun Cloudflare. Hanya berjalan di Cloudflare Workers + D1 dalam akun pengguna; SaaS hosted di luar cakupan.
 
 Server tidak bisa membaca nilai (ADR 2), akses dapat dibuktikan lewat audit (ADR 6), dan mesin serta agent mendapat kredensial lewat AppRole (ADR 15 dan 17). Login item dan alur CLI, web, ekstensi, serta import masih direncanakan (ADR 29–33).

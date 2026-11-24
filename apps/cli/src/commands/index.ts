@@ -2,6 +2,7 @@ import { account } from "./account.ts";
 import { app } from "./app.ts";
 import { audit } from "./audit.ts";
 import { backup } from "./backup.ts";
+import { collection } from "./collection.ts";
 import { deploy } from "./deploy.ts";
 import { group } from "./group.ts";
 import { offboard } from "./offboard.ts";
@@ -40,6 +41,7 @@ export const commands: Commands = {
   ...recovery,
   ...offboard,
   ...versions,
+  ...collection,
   ...backup,
   ...deploy,
   restore: {

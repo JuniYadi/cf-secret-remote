@@ -1,6 +1,7 @@
 /** Stable codes returned in HTTP 409 responses. */
 export const ConflictCode = {
   alias_exists: "alias_exists",
+  collection_changed: "collection_changed",
   already_exists: "already_exists",
   already_in_group: "already_in_group",
   already_invited: "already_invited",
@@ -30,6 +31,7 @@ export const ConflictCode = {
   rotation_secrets_missing: "rotation_secrets_missing",
   secret_deleted: "secret_deleted",
   secret_not_live: "secret_not_live",
+  source_changed: "source_changed",
   two_admins_required: "two_admins_required",
   vault_already_setup: "vault_already_setup",
   vault_required: "vault_required",

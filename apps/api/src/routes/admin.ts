@@ -2,7 +2,7 @@ import { ConflictCode, GENESIS, verifyChain } from "@cfs/core";
 import { Hono } from "hono";
 import { audit } from "../audit.ts";
 import { requireAdmin } from "../auth.ts";
-import { prefixOf } from "../policy.ts";
+import { COLLECTION_CAPS, prefixOf, SECRET_CAPS } from "../policy.ts";
 import * as repo from "../repository/admin.ts";
 import type { AppEnv } from "../types.ts";
 import { newId, now } from "../util.ts";
@@ -28,14 +28,32 @@ admin.get("/policies", async (c) => {
   );
 });
 
+// A rule is either a secret rule (path glob, secret capabilities) or a collection rule (ADR 36: collection glob,
+// read or manage). A rule never mixes the two.
+function validRule(r: { path?: string; collection?: string; caps?: unknown }): boolean {
+  if (!Array.isArray(r.caps)) return false;
+  if (r.collection !== undefined) {
+    return (
+      r.path === undefined &&
+      typeof r.collection === "string" &&
+      COLLECTION_GLOB_RE.test(r.collection) &&
+      r.caps.every((x) => (COLLECTION_CAPS as readonly unknown[]).includes(x))
+    );
+  }
+  return (
+    typeof r.path === "string" &&
+    r.path !== "" &&
+    r.caps.every((x) => (SECRET_CAPS as readonly unknown[]).includes(x))
+  );
+}
+const COLLECTION_GLOB_RE = /^[a-z0-9*][a-z0-9._*-]{0,63}$/i;
+
 admin.post("/policies", async (c) => {
-  const b = await c.req.json<{ name?: string; rules?: { path: string; caps: string[] }[] }>();
-  const caps = ["create", "read", "update", "delete", "list"];
-  if (
-    !b.name ||
-    !Array.isArray(b.rules) ||
-    b.rules.some((r) => !r.path || !r.caps?.every((x) => caps.includes(x)))
-  )
+  const b = await c.req.json<{
+    name?: string;
+    rules?: { path?: string; collection?: string; caps: string[] }[];
+  }>();
+  if (!b.name || !Array.isArray(b.rules) || b.rules.some((r) => !validRule(r)))
     return c.json({ error: "bad request" }, 400);
   const id = newId();
   try {
