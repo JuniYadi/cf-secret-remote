@@ -584,6 +584,79 @@ async function run(): Promise<void> {
     return "child saw both values, exit code 7 passed through";
   });
 
+  // ADR 36: environment collections. Names only. Exit codes: 0 clean, 1 drift, 2 incomplete.
+  await step(
+    "collections: declare names per environment, compare, add a name, exit codes",
+    async () => {
+      const prod = await cli(people.admin, ["set", `${GROUP}/prod`], {
+        stdin: `API_KEY=${secretValue}\nEXTRA=1\n`,
+      });
+      expect(prod.code === 0, `set prod failed: ${lastLine(prod.stderr)}`);
+      const made = await cli(people.admin, [
+        "collection",
+        "create",
+        "team-envs",
+        "--env",
+        `dev=${SECRET}`,
+        "--env",
+        `prod=${GROUP}/prod`,
+        "--key",
+        "API_KEY",
+        "--key",
+        "PORT",
+        "--yes",
+      ]);
+      expect(made.code === 0, `collection create failed: ${lastLine(made.stderr || made.stdout)}`);
+      const drift = await cli(people.admin, ["collection", "compare", "team-envs", "--json"]);
+      expect(drift.code === 1, `drift should exit 1 (got ${drift.code})`);
+      expect(drift.stdout.includes('"result":"drift"'), "compare did not report drift");
+      const added = await cli(people.admin, [
+        "collection",
+        "add-keys",
+        "team-envs",
+        "EXTRA",
+        "--yes",
+      ]);
+      expect(added.code === 0, `add-keys failed: ${lastLine(added.stderr || added.stdout)}`);
+      const still = await cli(people.admin, ["get", SECRET, "API_KEY"]);
+      expect(still.stdout.trim() === secretValue, "a collection change altered a stored value");
+      const gap = await cli(people.admin, [
+        "collection",
+        "create",
+        "team-gap",
+        "--env",
+        `dev=${SECRET}`,
+        "--env",
+        `ghost=${GROUP}/ghost`,
+        "--key",
+        "API_KEY",
+        "--yes",
+      ]);
+      expect(gap.code === 0, `create team-gap failed: ${lastLine(gap.stderr || gap.stdout)}`);
+      const incomplete = await cli(people.admin, ["collection", "compare", "team-gap"]);
+      expect(incomplete.code === 2, `a missing path should exit 2 (got ${incomplete.code})`);
+      const clean = await cli(people.admin, [
+        "collection",
+        "create",
+        "team-clean",
+        "--env",
+        `dev=${SECRET}`,
+        "--key",
+        "API_KEY",
+        "--key",
+        "PORT",
+        "--yes",
+      ]);
+      expect(
+        clean.code === 0,
+        `create team-clean failed: ${lastLine(clean.stderr || clean.stdout)}`,
+      );
+      const ok = await cli(people.admin, ["collection", "compare", "team-clean"]);
+      expect(ok.code === 0, `a matching collection should exit 0 (got ${ok.code})`);
+      return "drift 1, incomplete 2, clean 0; values unchanged";
+    },
+  );
+
   await step("accounts: add, get JSON and inject into a child", async () => {
     const add = await cli(
       people.admin,

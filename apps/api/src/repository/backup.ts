@@ -11,6 +11,9 @@ export const BACKUP_TABLES = [
   "access_request",
   "secret",
   "secret_version",
+  "env_collection",
+  "env_collection_env",
+  "env_collection_key",
   "login",
   "login_version",
   "setting",
@@ -96,6 +99,10 @@ export const COLUMNS: Record<BackupTable, readonly string[]> = {
     "created_at",
     "fps",
   ],
+  // ADR 36: definitions only. Descriptions are cleartext metadata, like key names.
+  env_collection: ["id", "name", "revision", "created_at", "updated_at"],
+  env_collection_env: ["collection_id", "label", "path"],
+  env_collection_key: ["collection_id", "name", "description"],
   login: ["id", "keyring_id", "current", "created_at", "deleted_at"],
   login_version: [
     "login_id",

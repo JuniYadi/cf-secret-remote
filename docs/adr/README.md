@@ -41,6 +41,7 @@ Product detail lives in `DESIGN.md`. These records state the decisions that code
 | [33](0033-import-logins.md) | Import Logins | core and CLI implemented; web import pending |
 | [34](0034-security-disclosure-and-supply-chain.md) | Security disclosure, licence, supply chain | implemented; PVR setting pending owner |
 | [35](0035-deferred-agent-fill-and-account-lease.md) | Deferred: agent-safe fill, account leases | deferred |
+| [36](0036-environment-key-consistency.md) | Environment key consistency and name-only definitions | implemented (issue #130; collection API, CLI, web, backup) |
 
 ## Build order
 

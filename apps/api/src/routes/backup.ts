@@ -44,7 +44,7 @@ import { now, sha256Hex } from "../util.ts";
 // Values stay encrypted. Names, paths, emails and dates are in clear.
 
 /** The number of the latest migration. A file must match it to restore. */
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 /** Daily R2 copies kept (ADR 23). */
 export const R2_KEEP = 30;

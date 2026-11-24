@@ -95,3 +95,55 @@ describe("rules as the API stores them", () => {
     );
   });
 });
+
+// ADR 36: collection rules sit beside path rules, with their own check and their own sentence.
+import {
+  type CollectionRuleDraft,
+  collectionGlobError,
+  toCollectionRules,
+  validateCollectionGlob,
+} from "./permissions.ts";
+
+describe("collection rules in a permission set", () => {
+  const pathRow: RuleDraft[] = [{ path: "myapp/*", caps: ["read"] }];
+
+  it("accepts collection rows alone, and ignores blank path rows", () => {
+    const blank: RuleDraft[] = [{ path: "", caps: [] }];
+    const coll: CollectionRuleDraft[] = [{ collection: "myapp*", caps: ["read"] }];
+    expect(validatePermissionSet("Team", blank, coll).valid).toBe(true);
+    expect(toRules(blank)).toEqual([]);
+    expect(toCollectionRules(coll)).toEqual([{ collection: "myapp*", caps: ["read"] }]);
+  });
+
+  it("refuses a set with nothing in it, including blank collection rows", () => {
+    expect(
+      validatePermissionSet("Team", [{ path: "", caps: [] }], [{ collection: "", caps: [] }]).valid,
+    ).toBe(false);
+  });
+
+  it("checks the collection glob and the capabilities of each collection row", () => {
+    expect(validateCollectionGlob("myapp*")).toBeNull();
+    expect(validateCollectionGlob("my/app")).toBe("shape");
+    expect(validateCollectionGlob("")).toBe("empty");
+    const res = validatePermissionSet("Team", pathRow, [{ collection: "myapp*", caps: [] }]);
+    expect(res.valid).toBe(false);
+    expect(res.errors.collections[0]?.caps).toBe("none");
+  });
+
+  it("uses a collection sentence for the collection error, not the folder one", () => {
+    expect(collectionGlobError("shape")).toContain("myapp*");
+    expect(collectionGlobError("shape")).not.toContain("folder");
+  });
+
+  it("describes and prints collection rules apart from path rules", () => {
+    const rules = [
+      { path: "myapp/*", caps: ["read" as const] },
+      { collection: "myapp*", caps: ["manage" as const] },
+    ];
+    const lines = describeRules(rules);
+    expect(lines[0]).toContain("myapp/*");
+    expect(lines[1]).toContain("myapp*");
+    expect(rulesAsText(rules)).toContain('collection "myapp*"');
+    expect(rulesAsText(rules)).toContain('path "myapp/*"');
+  });
+});

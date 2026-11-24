@@ -460,6 +460,14 @@ export interface Rule {
 
 export type Cap = "create" | "read" | "update" | "delete" | "list";
 
+/** ADR 36: a collection rule grants view (read) or change (manage) of collections whose names match. */
+export interface CollectionRule {
+  collection: string;
+  caps: CollectionCap[];
+}
+export type CollectionCap = "read" | "manage";
+export type PolicyRule = Rule | CollectionRule;
+
 export interface PolicyAssignee {
   identityId: string;
   name: string;
@@ -470,7 +478,7 @@ export interface PolicyAssignee {
 export interface PolicyRow {
   id: string;
   name: string;
-  rules: Rule[];
+  rules: PolicyRule[];
   assignees: PolicyAssignee[];
 }
 
@@ -648,6 +656,77 @@ function passphraseHeader(passphrase: string | undefined): Record<string, string
   return passphrase ? { "X-Backup-Passphrase": passphrase } : undefined;
 }
 
+// ADR 36: environment collections. Names, descriptions and paths only. Values are never in these shapes.
+export interface CollectionSummary {
+  name: string;
+  revision: number;
+  updatedAt: number;
+  envCount: number;
+  keyCount: number;
+}
+export interface CollectionEnv {
+  label: string;
+  path: string;
+}
+export interface CollectionKey {
+  name: string;
+  description: string | null;
+}
+export interface CollectionDefinition {
+  name: string;
+  revision: number;
+  createdAt: number;
+  updatedAt: number;
+  envs: CollectionEnv[];
+  keys: CollectionKey[];
+}
+export interface CollectionDiff {
+  addedKeys: string[];
+  removedKeys: string[];
+  changedKeys: string[];
+  addedEnvs: string[];
+  removedEnvs: string[];
+  changedEnvs: string[];
+}
+export type EnvStatus = "ok" | "missing_path" | "inaccessible";
+export interface CollectionPreview {
+  name: string;
+  exists: boolean;
+  revision: number | null;
+  changes: CollectionDiff;
+  envs: (CollectionEnv & { status: EnvStatus })[];
+}
+export interface EnvCompare extends CollectionEnv {
+  status: EnvStatus;
+  version?: number;
+  present?: string[];
+  missing?: string[];
+  extra?: string[];
+}
+export type CompareResult = "clean" | "drift" | "incomplete";
+export interface CollectionCompare {
+  name: string;
+  revision: number;
+  observedAt: number;
+  result: CompareResult;
+  envs: EnvCompare[];
+}
+export interface DiscoverResult {
+  sources: (
+    | { path: string; status: "ok"; version: number; updatedAt: number; names: string[] }
+    | { path: string; status: "missing_path" }
+  )[];
+  union: string[];
+}
+export interface ReconcilePreview {
+  name: string;
+  revision: number;
+  names: { name: string; declared: boolean; observedIn: string[] }[];
+  sourceVersions: Record<string, number>;
+}
+
+const collectionPath = (name: string) => `/collections/${encodeURIComponent(name)}`;
+
 export const api = {
   whoami: (fetchImpl?: FetchLike) => request<Me>("GET", "/whoami", undefined, fetchImpl),
   recordUnlock: () => request<{ ok: true }>("POST", "/me/unlocked"),
@@ -755,6 +834,44 @@ export const api = {
     request<{ ok: true }>("DELETE", `/apps/${appId}/rules/${alias}`),
 
   // Devices (ADR 27)
+  // ADR 36: environment collections.
+  collections: () => request<CollectionSummary[]>("GET", "/collections"),
+  collection: (name: string) => request<CollectionDefinition>("GET", collectionPath(name)),
+  collectionCompare: (name: string) =>
+    request<CollectionCompare>("GET", `${collectionPath(name)}/compare`),
+  collectionPreview: (body: { name: string; envs: CollectionEnv[]; keys: CollectionKey[] }) =>
+    request<CollectionPreview>("POST", "/collections/preview", body),
+  createCollection: (body: {
+    name: string;
+    envs: CollectionEnv[];
+    keys: CollectionKey[];
+    sourceVersions?: Record<string, number>;
+  }) => request<{ name: string; revision: number }>("POST", "/collections", body),
+  updateCollection: (
+    name: string,
+    body: {
+      revision: number;
+      envs: CollectionEnv[];
+      keys: CollectionKey[];
+      removed: { keys: string[]; envs: string[] };
+    },
+  ) => request<{ name: string; revision: number }>("PUT", collectionPath(name), body),
+  deleteCollection: (name: string, revision: number) =>
+    request<{ ok: true }>("DELETE", `${collectionPath(name)}?revision=${revision}`),
+  discoverPaths: (paths: string[]) =>
+    request<DiscoverResult>("POST", "/collections/discover", { paths }),
+  reconcilePreview: (name: string, names: string[]) =>
+    request<ReconcilePreview>("POST", `${collectionPath(name)}/reconcile/preview`, { names }),
+  reconcileApply: (
+    name: string,
+    body: { revision: number; names: string[]; sourceVersions: Record<string, number> },
+  ) =>
+    request<{ name: string; revision: number; added: string[] }>(
+      "POST",
+      `${collectionPath(name)}/reconcile`,
+      body,
+    ),
+
   sessions: () => request<SignedInDevice[]>("GET", "/sessions"),
   signOutDevice: (id: string) => request<{ ok: true }>("DELETE", `/sessions/${id}`),
   /** Ends every command-line session of the caller, including the CLI that sends this when it is one. */
@@ -835,7 +952,7 @@ export const api = {
 
   // Permissions (ADR 5)
   policies: () => request<PolicyRow[]>("GET", "/policies"),
-  createPolicy: (name: string, rules: Rule[]) =>
+  createPolicy: (name: string, rules: PolicyRule[]) =>
     request<{ id: string }>("POST", "/policies", { name, rules }),
   assignPolicy: (policyId: string, identityId: string) =>
     request<{ ok: true }>("POST", `/policies/${encodeURIComponent(policyId)}/assign`, {

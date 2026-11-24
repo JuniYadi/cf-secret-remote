@@ -16,6 +16,9 @@ export const PATHS = {
   loginsNew: "/logins/new",
   groups: "/groups",
   permissions: "/permissions",
+  // ADR 36: environment collections (declared key names per environment).
+  collections: "/collections",
+  collectionsNew: "/collections/new",
   apps: "/apps",
   activity: "/activity",
   settings: "/settings",
@@ -70,6 +73,8 @@ export const groupAddPath = (prefix: string) => `${groupPath(prefix)}/add`;
 export const groupRelockPath = (prefix: string) => `${groupPath(prefix)}/relock`;
 export const appPath = (id: string) => `${PATHS.apps}/${encodeURIComponent(id)}`;
 export const appKitPath = (id: string) => `${appPath(id)}/kit`;
+export const collectionPath = (name: string) => `${PATHS.collections}/${encodeURIComponent(name)}`;
+export const collectionEditPath = (name: string) => `${collectionPath(name)}/edit`;
 
 export type PageId =
   | "root"
@@ -80,6 +85,10 @@ export type PageId =
   | "loginEdit"
   | "groups"
   | "permissions"
+  | "collections"
+  | "collectionNew"
+  | "collectionDetail"
+  | "collectionEdit"
   | "apps"
   | "activity"
   | "settings"
@@ -127,6 +136,10 @@ export type PageId =
 /** Pages inside the signed-in shell (sidebar and header). They need an unlocked vault. */
 export const SHELL_PAGES: ReadonlySet<PageId> = new Set<PageId>([
   "secrets",
+  "collections",
+  "collectionNew",
+  "collectionDetail",
+  "collectionEdit",
   "logins",
   "loginDetail",
   "loginNew",
@@ -185,6 +198,8 @@ const STATIC_PATHS: Readonly<Record<string, PageId>> = {
   [PATHS.loginsNew]: "loginNew",
   [PATHS.groups]: "groups",
   [PATHS.permissions]: "permissions",
+  [PATHS.collections]: "collections",
+  [PATHS.collectionsNew]: "collectionNew",
   [PATHS.apps]: "apps",
   [PATHS.activity]: "activity",
   [PATHS.settings]: "settings",
@@ -235,6 +250,8 @@ const PARAM_PATHS: readonly { re: RegExp; id: PageId }[] = [
   { re: /^\/groups\/([^/]+)\/add$/, id: "groupAdd" },
   { re: /^\/groups\/([^/]+)\/relock$/, id: "groupRelock" },
   { re: /^\/groups\/([^/]+)$/, id: "groupDetail" },
+  { re: /^\/collections\/([^/]+)\/edit$/, id: "collectionEdit" },
+  { re: /^\/collections\/([^/]+)$/, id: "collectionDetail" },
   { re: /^\/apps\/([^/]+)\/kit$/, id: "appKit" },
   { re: /^\/apps\/([^/]+)$/, id: "appDetail" },
 ];
@@ -316,6 +333,24 @@ export function pageCrumbs(id: PageId, name?: string): Crumb[] {
       return [{ label: t("Groups", "Grup"), href: PATHS.groups }];
     case "permissions":
       return [{ label: t("Permissions", "Izin"), href: PATHS.permissions }];
+    case "collections":
+      return [{ label: t("Collections", "Koleksi"), href: PATHS.collections }];
+    case "collectionNew":
+      return [
+        { label: t("Collections", "Koleksi"), href: PATHS.collections },
+        { label: t("New collection", "Koleksi baru") },
+      ];
+    case "collectionDetail":
+      return [
+        { label: t("Collections", "Koleksi"), href: PATHS.collections },
+        { label: name ?? "" },
+      ];
+    case "collectionEdit":
+      return [
+        { label: t("Collections", "Koleksi"), href: PATHS.collections },
+        { label: name ?? "", href: collectionPath(name ?? "") },
+        { label: t("Edit", "Ubah") },
+      ];
     case "apps":
       return [{ label: t("Apps & bots", "Aplikasi & bot"), href: PATHS.apps }];
     case "activity":
@@ -464,6 +499,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: PATHS.logins, label: () => t("Logins", "Akun"), icon: "secrets" },
   { path: PATHS.groups, label: () => t("Groups", "Grup"), icon: "groups" },
   { path: PATHS.permissions, label: () => t("Permissions", "Izin"), icon: "permissions" },
+  { path: PATHS.collections, label: () => t("Collections", "Koleksi"), icon: "groups" },
   { path: PATHS.apps, label: () => t("Apps & bots", "Aplikasi & bot"), icon: "apps" },
   { path: PATHS.activity, label: () => t("Activity", "Aktivitas"), icon: "activity" },
   { path: PATHS.devices, label: () => t("Devices", "Perangkat"), icon: "devices" },

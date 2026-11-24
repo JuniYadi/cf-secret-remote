@@ -9,16 +9,21 @@ import {
   useLoad,
 } from "../components/Admin.tsx";
 import { PageTitle } from "../components/shared.tsx";
-import { ApiError, api, type Identity, type PolicyRow, type Rule } from "../lib/api.ts";
+import { ApiError, api, type Identity, type PolicyRow, type PolicyRule } from "../lib/api.ts";
 import { useLang, useSession } from "../lib/hooks.ts";
 import { t } from "../lib/i18n.ts";
 import {
   CAPS,
+  COLLECTION_CAPS,
+  type CollectionRuleDraft,
   capLabel,
+  collectionCapLabel,
+  collectionGlobError,
   describeRules,
   globError,
   type RuleDraft,
   rulesAsText,
+  toCollectionRules,
   toggleCap,
   toRules,
   validatePermissionSet,
@@ -268,6 +273,89 @@ function RuleRows({
   );
 }
 
+/** ADR 36: rows for collection rules. A name glob with View or Manage. Separate from path rules. */
+function CollectionRuleRows({
+  rules,
+  errors,
+  onChange,
+  onRemove,
+}: {
+  rules: CollectionRuleDraft[];
+  errors: ReturnType<typeof validatePermissionSet>["errors"]["collections"];
+  onChange: (index: number, next: CollectionRuleDraft) => void;
+  onRemove: (index: number) => void;
+}) {
+  useLang();
+  return (
+    <>
+      {rules.map((rule, i) => {
+        const row = errors[i];
+        const globId = `collection-rule-${i}`;
+        return (
+          <div class="rule-row" key={`c${i}`}>
+            <div class="field">
+              <label for={globId}>{t("Collections", "Koleksi")}</label>
+              <input
+                id={globId}
+                type="text"
+                value={rule.collection}
+                onInput={(e) => onChange(i, { ...rule, collection: e.currentTarget.value })}
+                aria-invalid={row?.collection ? "true" : undefined}
+                aria-describedby={row?.collection ? `${globId}-err` : undefined}
+                placeholder="myapp*"
+                autocomplete="off"
+                class="mono-input"
+              />
+              {row?.collection && (
+                <span id={`${globId}-err`} class="field-error" role="alert">
+                  {collectionGlobError(row.collection)}
+                </span>
+              )}
+            </div>
+            <fieldset class="field fieldset">
+              <legend>{t("What they can do", "Apa yang boleh dilakukan")}</legend>
+              <div class="cap-toggles">
+                {COLLECTION_CAPS.map((cap) => {
+                  const on = rule.caps.includes(cap);
+                  return (
+                    <button
+                      key={cap}
+                      type="button"
+                      class={`cap ${on ? "on" : ""}`.trim()}
+                      aria-pressed={on}
+                      onClick={() =>
+                        onChange(i, {
+                          ...rule,
+                          caps: on ? rule.caps.filter((c) => c !== cap) : [...rule.caps, cap],
+                        })
+                      }
+                    >
+                      <span aria-hidden="true">{on ? "✓" : ""}</span>
+                      {collectionCapLabel(cap)}
+                    </button>
+                  );
+                })}
+              </div>
+              {row?.caps && (
+                <span class="field-error" role="alert">
+                  {t(
+                    "Pick at least one thing this applies to.",
+                    "Pilih minimal satu hal yang diizinkan.",
+                  )}
+                </span>
+              )}
+            </fieldset>
+            <button type="button" class="link-btn" onClick={() => onRemove(i)}>
+              {t("Remove this rule", "Hapus aturan ini")}
+              <span class="visually-hidden"> {i + 1}</span>
+            </button>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 /** New permission set (ADR 5): path globs with the capabilities each one grants. Default deny. */
 export function PermNewPage() {
   useLang();
@@ -275,6 +363,7 @@ export function PermNewPage() {
   const { me } = useSession();
   const [name, setName] = useState("");
   const [rules, setRules] = useState<RuleDraft[]>([{ path: "", caps: [] }]);
+  const [collections, setCollections] = useState<CollectionRuleDraft[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
@@ -290,8 +379,8 @@ export function PermNewPage() {
       </div>
     );
 
-  const check = validatePermissionSet(name, rules);
-  const allows = describeRules(toRules(rules));
+  const check = validatePermissionSet(name, rules, collections);
+  const allows = describeRules([...toRules(rules), ...toCollectionRules(collections)]);
 
   async function onSubmit(event: Event) {
     event.preventDefault();
@@ -300,7 +389,7 @@ export function PermNewPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.createPolicy(name.trim(), toRules(rules));
+      await api.createPolicy(name.trim(), [...toRules(rules), ...toCollectionRules(collections)]);
       navigate(PATHS.permissions);
     } catch (err) {
       setBusy(false);
@@ -364,6 +453,29 @@ export function PermNewPage() {
               onClick={() => setRules([...rules, { path: "", caps: [] }])}
             >
               {t("+ Add a rule", "+ Tambah aturan")}
+            </button>
+          </div>
+
+          <h2 class="section-title">{t("Collections", "Koleksi")}</h2>
+          <p class="note">
+            {t(
+              "Collection rules let someone see or change which key names each environment must have. They never open a secret's values.",
+              "Aturan koleksi membuat seseorang bisa melihat atau mengubah nama key yang harus dimiliki tiap environment. Aturan ini tidak pernah membuka nilai secret.",
+            )}
+          </p>
+          <CollectionRuleRows
+            rules={collections}
+            errors={check.errors.collections}
+            onChange={(i, next) => setCollections(collections.map((r, j) => (j === i ? next : r)))}
+            onRemove={(i) => setCollections(collections.filter((_, j) => j !== i))}
+          />
+          <div>
+            <button
+              type="button"
+              class="btn ghost sm"
+              onClick={() => setCollections([...collections, { collection: "", caps: [] }])}
+            >
+              {t("+ Add a collection rule", "+ Tambah aturan koleksi")}
             </button>
           </div>
           {tried && check.errors.rulesEmpty && (
@@ -443,7 +555,9 @@ export function RoleNewPage() {
     .filter((i: Identity) => i.status === "active")
     .filter((i) => i.name.toLowerCase().includes(query.trim().toLowerCase()));
   const sets = policies.data ?? [];
-  const chosenRules: Rule[] = sets.filter((p) => chosenSets.includes(p.id)).flatMap((p) => p.rules);
+  const chosenRules: PolicyRule[] = sets
+    .filter((p) => chosenSets.includes(p.id))
+    .flatMap((p) => p.rules);
   const canSave = !busy && chosenPeople.length > 0 && chosenSets.length > 0;
 
   async function onSubmit(event: Event) {
