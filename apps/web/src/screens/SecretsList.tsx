@@ -181,6 +181,14 @@ export function SecretsListPage() {
                           <Link class="p" href={secretHref(s.path)}>
                             {s.path}
                           </Link>
+                          <div>
+                            <Link
+                              class="link-btn"
+                              href={`${PATHS.collectionsNew}?source=${encodeURIComponent(s.path)}`}
+                            >
+                              {t("Copy key names", "Salin nama key")}
+                            </Link>
+                          </div>
                         </td>
                         <td>{s.names.length}</td>
                         <td>

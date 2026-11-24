@@ -119,6 +119,75 @@ describe("Collection detail", () => {
 });
 
 describe("New collection form", () => {
+  it("copies selected names from a source into a reviewed collection without values", async () => {
+    window.history.replaceState(null, "", "/collections/new?source=myapp%2Fdev");
+    const routes = routeFetch({
+      "POST /collections/discover": {
+        body: {
+          sources: [{ path: "myapp/dev", status: "ok", version: 3, names: ["API_KEY", "DB_URL"] }],
+          union: ["API_KEY", "DB_URL"],
+        },
+      },
+      "POST /collections/preview": {
+        body: {
+          name: "myapp",
+          exists: false,
+          revision: null,
+          changes: {
+            addedKeys: ["API_KEY"],
+            removedKeys: [],
+            changedKeys: [],
+            addedEnvs: ["dev", "prod"],
+            removedEnvs: [],
+            changedEnvs: [],
+          },
+          envs: [],
+        },
+      },
+      "POST /collections": { status: 201, body: { name: "myapp", revision: 1 } },
+    });
+    vi.stubGlobal("fetch", routes.fn);
+    await mount(<CollectionNewPage />);
+    const set = (id: string, value: string) => {
+      const el = host.querySelector(`#${id}`) as HTMLInputElement;
+      el.value = value;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    const click = (label: string) =>
+      Array.from(host.querySelectorAll("button"))
+        .find((b) => b.textContent?.includes(label))
+        ?.click();
+    expect((host.querySelector("#collection-from") as HTMLInputElement).value).toBe("myapp/dev");
+    expect((host.querySelector("#env-path-0") as HTMLInputElement).value).toBe("myapp/dev");
+    set("collection-name", "myapp");
+    click("Read names");
+    await flush();
+    const checkboxes = host.querySelectorAll<HTMLInputElement>("fieldset input[type=checkbox]");
+    checkboxes[1]?.click();
+    await flush();
+    click("Add selected names");
+    click("Add environment");
+    await flush();
+    set("env-label-1", "prod");
+    set("env-path-1", "myapp/prod");
+    await flush();
+    click("Preview changes");
+    await flush();
+    (host.querySelector("form button[type=submit]") as HTMLButtonElement).click();
+    await flush();
+    expect(routes.to("POST /collections/discover")[0]?.body).toEqual({ paths: ["myapp/dev"] });
+    expect(routes.to("POST /collections")[0]?.body).toEqual({
+      name: "myapp",
+      envs: [
+        { label: "dev", path: "myapp/dev" },
+        { label: "prod", path: "myapp/prod" },
+      ],
+      keys: [{ name: "API_KEY", description: null }],
+      sourceVersions: { "myapp/dev": 3 },
+    });
+    expect(routes.calls.every((call) => !call.path.startsWith("/secret"))).toBe(true);
+  });
+
   it("previews before it saves, then creates with exactly the reviewed body", async () => {
     const routes = routeFetch({
       "POST /collections/preview": {

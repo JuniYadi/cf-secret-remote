@@ -218,6 +218,9 @@ describe("secrets list", () => {
     expect(text()).toContain("Rotation overdue");
     expect(text()).toContain("Last opened by");
     expect(text()).toContain("bob@myorg.com, 2 hours ago");
+    expect(
+      host.querySelector('a[href="/collections/new?source=myapp%2Fdev"]')?.textContent,
+    ).toContain("Copy key names");
     expect(text()).not.toContain(SECRET);
   });
 
